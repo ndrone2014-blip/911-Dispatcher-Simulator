@@ -1,0 +1,11 @@
+{
+  "name": "911-dispatch-simulator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "First-person 3D 911 dispatch simulator that runs in the browser. No API keys, no build step.",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "test": "node tests/run-logic-tests.js"
+  }
+}
