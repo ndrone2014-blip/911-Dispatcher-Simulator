@@ -4,6 +4,8 @@ import { city, TOWNS, RIVERS, ROADS, COUNTY_LINE, MAP_BOUNDS, DISTRICTS } from '
 import { DEPT_BY_ID, TYPE_BY_ID } from '../../data/departments.js';
 import { UNIT_STATUS_COLORS } from '../../data/incidentTypes.js';
 import { EVENT_KINDS } from '../../sim/cityEvents.js';
+import { SCALE } from '../../data/city.js';
+import { drawGround, drawRail, drawSettlement, drawBridges, drawOverlays, drawSites, SITE_KINDS } from './mapDetail.js';
 
 const ZONE_FILL = { residential: '#13202f', commercial: '#18233a', downtown: '#1b2741', industrial: '#1d272b', park: '#10301f', forest: '#0d2918', institutional: '#1b2240', airport: '#182130', water: null };
 const PRI_COLOR = { 1: '#ff4d4d', 2: '#ff9f43', 3: '#f2c94c', 4: '#6fa8dc' };
@@ -38,7 +40,8 @@ export class MapRenderer {
     ctx.fillStyle = '#0e1412'; ctx.fillRect(X(11300), Y(-600), 1400 * s, 11800 * s);
     // county farmland with field patchwork
     ctx.save(); path(COUNTY_LINE); ctx.closePath(); ctx.fillStyle = '#141d16'; ctx.fill(); ctx.clip();
-    if (detail > 0 && s > 0.02) {
+    if (detail > 0) drawGround(ctx, X, Y, s, w, h);
+    else if (detail > 0 && s > 0.02) {
       const F = 640;
       for (let fx = 0; fx < 11600; fx += F) for (let fy = 0; fy < 10600; fy += F) {
         const k = ((fx * 7 + fy * 13) / F) % 5;
@@ -59,6 +62,7 @@ export class MapRenderer {
       path(rv.points); ctx.strokeStyle = '#1b4a72'; ctx.lineWidth = wd; ctx.stroke();
       if (detail > 0 && wd > 3) { path(rv.points); ctx.strokeStyle = 'rgba(120,180,230,.18)'; ctx.lineWidth = wd * 0.35; ctx.stroke(); }
     }
+    if (detail > 0) drawRail(ctx, X, Y, s);
     // county line
     path(COUNTY_LINE); ctx.closePath(); ctx.setLineDash([10, 6]); ctx.strokeStyle = 'rgba(160,175,140,.45)'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
     // town blocks & buildings
@@ -77,8 +81,9 @@ export class MapRenderer {
       }
     }
     // farmsteads & oil wells
+    if (detail > 0) { drawSettlement(ctx, X, Y, s, w, h); drawSites(ctx, X, Y, s, w, h); }
     if (s > 0.07 && detail > 0) {
-      for (const f of city.farms) { const px = X(f.x), py = Y(f.y); if (px < -10 || py < -10 || px > w + 10 || py > h + 10) continue; ctx.fillStyle = '#5d6b7d'; const z = Math.max(2, 14 * s); ctx.fillRect(px - z / 2, py - z / 2, z, z); if (f.barn) { ctx.fillStyle = '#7a2f25'; ctx.fillRect(px + z * 0.8, py - z * 0.6, z * 1.3, z * 1.1); } }
+      if (false) for (const f of city.farms) { const px = X(f.x), py = Y(f.y); if (px < -10 || py < -10 || px > w + 10 || py > h + 10) continue; ctx.fillStyle = '#5d6b7d'; const z = Math.max(2, 14 * s); ctx.fillRect(px - z / 2, py - z / 2, z, z); if (f.barn) { ctx.fillStyle = '#7a2f25'; ctx.fillRect(px + z * 0.8, py - z * 0.6, z * 1.3, z * 1.1); } }
       ctx.fillStyle = '#c9a227';
       for (const wl of city.wells) { const px = X(wl.x), py = Y(wl.y); const z = Math.max(2.5, 10 * s); ctx.beginPath(); ctx.moveTo(px, py - z); ctx.lineTo(px + z * 0.8, py + z * 0.6); ctx.lineTo(px - z * 0.8, py + z * 0.6); ctx.closePath(); ctx.fill(); }
     }
@@ -107,6 +112,7 @@ export class MapRenderer {
       if (kind === 'street') { ctx.strokeStyle = '#9a8540'; ctx.lineWidth = Math.max(1.6, 11 * s); ctx.beginPath(); for (const e of city.edges) if (e.alias) { const A = city.nodes[e.a], Bn = city.nodes[e.b]; ctx.moveTo(X(A.x), Y(A.y)); ctx.lineTo(X(Bn.x), Y(Bn.y)); } ctx.stroke(); }
     }
     ctx.lineCap = 'butt';
+    if (detail > 0) drawBridges(ctx, X, Y, s, w, h);
     if (!labels) return;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     // street names in towns
@@ -153,6 +159,7 @@ export class MapRenderer {
       ctx.font = '10px system-ui, sans-serif'; ctx.fillStyle = 'rgba(210,220,235,.7)';
       for (const p of city.pois) { ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), 2.5, 0, 6.283); ctx.fill(); ctx.fillText(p.name, X(p.x), Y(p.y) + 10); }
     }
+    if (detail > 0) drawOverlays(ctx, X, Y, s, w, h, SCALE);
   }
 
   shield(ctx, name, x, y) {
@@ -203,7 +210,7 @@ export class MapRenderer {
     if (layers.facilities) for (const f of city.facilities) {
       if (s < 0.13 && !['hospital', 'eoc', 'sheriff', 'fire', 'police_hq', 'precinct'].includes(f.kind)) continue;
       if (s < 0.06 && f.kind !== 'hospital' && f.kind !== 'eoc') continue;
-      const [col, glyph] = FAC_STYLE[f.kind] || ['#888', '?']; const x = X(f.x), y = Y(f.y);
+      const [col, glyph] = FAC_STYLE[f.kind] || ['#888', '?']; const x = X(f.x), y = Y(f.y) - (s > 0.45 && SITE_KINDS.has(f.kind) ? Math.min(60, 34 * s) : 0);
       if (x < -20 || y < -20 || x > w + 20 || y > h + 20) continue;
       const r = Math.max(5, Math.min(10, 14 * s));
       ctx.fillStyle = 'rgba(0,0,0,.45)'; roundRect(ctx, x - r + 1.5, y - r + 2, r * 2, r * 2, 4); ctx.fill();
@@ -272,7 +279,7 @@ export class MapRenderer {
       for (const inc of sim.incidents.list) if (inc.status !== 'closed') consider('incident', inc, inc.location.x, inc.location.y, 16);
       for (const u of sim.units.list) consider('unit', u, u.x, u.y, 11);
     }
-    if (!best) for (const f of city.facilities) consider('facility', f, f.x, f.y, 12);
+    if (!best) for (const f of city.facilities) consider('facility', f, f.x, f.y, Math.max(12, (SITE_KINDS.has(f.kind) ? 34 : 12) * s));
     return best || { kind: 'point', x: wx, y: wy };
   }
 }

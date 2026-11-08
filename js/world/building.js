@@ -491,11 +491,61 @@ export function buildCenter(opts = {}) {
     for (const x of [-9.5, 6.4, 10.3]) { mb('frame').box(x, 1.65, 10.49, 0.9, 0.65, 0.025); mb(x > 0 ? 'print2' : 'print1').box(x, 1.65, 10.475, 0.8, 0.55, 0.01, { uv: 0 }); }
   }
 
+  if (D >= 1) buildLawEnforcement({ mb, col, D });
+
   if (opts.thanksgiving) buildThanksgiving({ mb, col, screen, consoles });
 
   return { batches: B, colliders, interactables, screens, lights, consoles };
 }
 
+
+// ---------------- Police / sheriff details ----------------
+function buildLawEnforcement({ mb, col, D }) {
+  // US and Illinois flags on floor stands flanking the video wall
+  for (const [x, mat] of [[-5.15, 'flagUS'], [5.15, 'flagIL']]) {
+    const z = -7.5;
+    mb('gold').cylinder(x, 0.03, z, 0.2, 0.06, 18); mb('chrome').cylinder(x, 1.25, z, 0.018, 2.5, 8); mb('gold').sphere(x, 2.55, z, 0.05, 10, 8);
+    // draped flag: four slightly angled panels read as folds
+    const folds = [[-0.32, 0.18], [-0.1, -0.2], [0.12, 0.2], [0.33, -0.15]];
+    folds.forEach(([dx, a], i) => mb(mat).panel(x + (x < 0 ? -0.36 : 0.36) + dx * 0.55, 2.05, z + 0.02 + (i % 2) * 0.03, 0.27, 0.8, 'z', 1, { rotY: a, uvRect: [i / 4, 0, (i + 1) / 4, 1] }));
+    col(x - 0.22, z - 0.22, x + 0.22, z + 0.22);
+  }
+  // Sheriff's star seal + award plaques on the main-floor south wall (facing the consoles)
+  mb('seal').panel(-1.3, 2.25, 7.905, 1.15, 1.15, 'z', -1);
+  mb('gold').tube(-1.3, 2.25, 7.925, 0.6, 0.02, 'z', 32);
+  for (const [i, x] of [[0, -3.1], [1, -2.55], [2, -0.05], [3, 0.5]]) {
+    mb('wood').rbox(x, 2.25 + (i % 2 ? 0.0 : 0.1), 7.93, 0.36, 0.46, 0.025, { r: 0.006, uv: 1 });
+    mb('gold').box(x, 2.22 + (i % 2 ? 0.0 : 0.1), 7.915, 0.26, 0.2, 0.006);
+  }
+  // Officer lockers along the corridor (north wall, facing the corridor)
+  mb('lockers').box(7.9, 0.95, 8.33, 3.2, 1.9, 0.44, { faces: 'Z', uv: 0, uvFront: [[0, 0], [2, 0], [2, 1], [0, 1]] });
+  mb('satin').box(7.9, 0.95, 8.33, 3.2, 1.9, 0.44, { faces: 'xXy', color: [0.3, 0.34, 0.4] });
+  mb('satin').box(7.9, 1.92, 8.31, 3.24, 0.04, 0.48, { color: [0.26, 0.29, 0.34] });
+  col(6.25, 8.0, 9.55, 8.6);
+  // duty bag and boots in front of the lockers
+  mb('matte').rbox(6.9, 0.14, 8.78, 0.6, 0.28, 0.3, { r: 0.06, color: [0.07, 0.07, 0.08] });
+  for (const dx of [0, 0.14]) mb('matte').rbox(8.7 + dx, 0.07, 8.75, 0.11, 0.14, 0.28, { r: 0.04, color: [0.05, 0.05, 0.05] });
+  // Portable-radio charging rack (8 bays with charge LEDs) on the corridor wall
+  mb('satin').rbox(1.6, 1.32, 8.13, 1.1, 0.16, 0.14, { r: 0.015, color: [0.1, 0.11, 0.12] });
+  for (let i = 0; i < 8; i++) {
+    const x = 1.15 + i * 0.13;
+    mb('satin').rbox(x, 1.47, 8.13, 0.07, 0.16, 0.05, { r: 0.01, color: [0.06, 0.06, 0.07] });
+    mb('satin').cylinder(x + 0.02, 1.62, 8.13, 0.006, 0.14, 6, { color: [0.05, 0.05, 0.05] });
+    mb(i === 3 || i === 6 ? 'beaconAmber' : 'beaconGreen').box(x, 1.37, 8.205, 0.025, 0.012, 0.004);
+  }
+  // Key cabinet next to it
+  mb('satin').rbox(0.55, 1.45, 8.11, 0.4, 0.5, 0.08, { r: 0.01, color: [0.55, 0.57, 0.6] });
+  mb('glassFrost').box(0.55, 1.45, 8.152, 0.34, 0.42, 0.004);
+  // BOLO / attempt-to-locate board
+  mb('cork').panel(-4.8, 1.6, 8.09, 1.5, 0.94, 'z', 1);
+  mb('satin').box(-4.8, 1.6, 8.07, 1.56, 1.0, 0.03, { color: [0.36, 0.25, 0.14] });
+  // Jacket rack with duty jackets (one high-vis)
+  mb('chrome').cylinder(10.3, 0.85, 8.4, 0.02, 1.7, 8); mb('satin').cylinder(10.3, 0.02, 8.4, 0.22, 0.04, 16, { color: [0.1, 0.1, 0.11] });
+  for (const [a, c] of [[0, [0.09, 0.12, 0.2]], [2.1, [0.75, 0.82, 0.12]], [4.2, [0.12, 0.12, 0.13]]]) {
+    mb('matte').rbox(10.3 + Math.cos(a) * 0.17, 1.28, 8.4 + Math.sin(a) * 0.17, 0.3, 0.62, 0.14, { r: 0.05, rotY: -a, color: c });
+  }
+  col(10.05, 8.15, 10.55, 8.65);
+}
 
 // ---------------- Thanksgiving decorations ----------------
 function buildThanksgiving({ mb, col, screen, consoles }) {

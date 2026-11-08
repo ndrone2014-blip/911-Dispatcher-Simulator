@@ -186,6 +186,48 @@ export function makeTextures(size = 256) {
     const v = 214 + (n - 0.5) * 8 + gap + pull; return [clamp(v - 2), clamp(v), clamp(v + 2)];
   }, { offset: 12 });
 
+  // ---- law-enforcement set ----
+  // US flag
+  { const c = cv(256, 160); const g = c.getContext('2d');
+    for (let i = 0; i < 13; i++) { g.fillStyle = i % 2 ? '#f4f2ee' : '#b22234'; g.fillRect(0, i * 160 / 13, 256, 160 / 13 + 1); }
+    g.fillStyle = '#3c3b6e'; g.fillRect(0, 0, 104, 86);
+    g.fillStyle = '#f4f2ee'; for (let r = 0; r < 9; r++) for (let q = 0; q < (r % 2 ? 5 : 6); q++) { const x = 9 + q * 17 + (r % 2 ? 8.5 : 0), y = 6 + r * 8.6; g.beginPath(); g.arc(x, y, 2.4, 0, 6.283); g.fill(); }
+    T.flagUS = c; }
+  // Illinois state flag (white field, simplified eagle seal, banner)
+  { const c = cv(256, 160); const g = c.getContext('2d'); g.fillStyle = '#f4f2ee'; g.fillRect(0, 0, 256, 160);
+    g.fillStyle = '#7a5a2a'; g.beginPath(); g.ellipse(128, 70, 34, 26, 0, 0, 6.283); g.fill();
+    g.fillStyle = '#4d6b2a'; g.fillRect(96, 88, 64, 12); g.fillStyle = '#3c3b6e'; g.fillRect(108, 54, 40, 22); g.fillStyle = '#b22234'; for (let i = 0; i < 4; i++) g.fillRect(110 + i * 10, 64, 5, 12);
+    g.fillStyle = '#c9a227'; g.fillRect(84, 100, 88, 8); g.fillStyle = '#3c3b6e'; g.font = '900 22px system-ui'; g.textAlign = 'center'; g.fillText('ILLINOIS', 128, 134);
+    T.flagIL = c; }
+  // Sheriff star seal
+  { const n = 256; const c = cv(n); const g = c.getContext('2d'); g.fillStyle = '#1f3552'; g.fillRect(0, 0, n, n);
+    g.fillStyle = '#c9a227'; g.beginPath(); g.arc(128, 128, 120, 0, 6.283); g.fill(); g.fillStyle = '#1f3552'; g.beginPath(); g.arc(128, 128, 108, 0, 6.283); g.fill();
+    const star = (r1, r2, col) => { g.fillStyle = col; g.beginPath(); for (let i = 0; i < 14; i++) { const a = -Math.PI / 2 + i * Math.PI / 7; const rr = i % 2 ? r2 : r1; g.lineTo(128 + Math.cos(a) * rr, 128 + Math.sin(a) * rr); } g.closePath(); g.fill(); };
+    star(96, 52, '#d9b23a'); star(84, 46, '#f0cf5a');
+    for (let i = 0; i < 7; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / 7; g.fillStyle = '#d9b23a'; g.beginPath(); g.arc(128 + Math.cos(a) * 96, 128 + Math.sin(a) * 96, 7, 0, 6.283); g.fill(); }
+    g.fillStyle = '#1f3552'; g.beginPath(); g.arc(128, 128, 34, 0, 6.283); g.fill();
+    g.fillStyle = '#f0cf5a'; g.font = '900 14px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('WHITE', 128, 120); g.fillText('COUNTY', 128, 136);
+    g.save(); g.translate(128, 128); g.font = '800 15px system-ui'; const txt = 'SHERIFF · EMERGENCY COMMUNICATIONS ·'; for (let i = 0; i < txt.length; i++) { g.save(); g.rotate(-Math.PI * 0.95 + (i / txt.length) * Math.PI * 1.9); g.fillText(txt[i], 0, -114 + 0); g.restore(); } g.restore();
+    T.seal = c; }
+  // Steel lockers: 4 louvered doors with name plates
+  { const c = cv(256); const g = c.getContext('2d'); g.fillStyle = '#4e5866'; g.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 4; i++) { const x = i * 64; g.fillStyle = '#5b6676'; g.fillRect(x + 3, 3, 58, 250); g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x + 61, 3, 2, 250);
+      for (let k = 0; k < 6; k++) { g.fillStyle = '#2e343d'; g.fillRect(x + 14, 14 + k * 7, 36, 3); g.fillRect(x + 14, 206 + (k % 3) * 7, 36, 3); }
+      g.fillStyle = '#e6e2d3'; g.fillRect(x + 20, 64, 24, 9); g.fillStyle = '#333'; g.fillRect(x + 23, 67, 18, 3);
+      g.fillStyle = '#b8bec6'; g.fillRect(x + 50, 118, 6, 22); }
+    T.lockers = c; }
+  // BOLO / bulletin cork board with pinned flyers
+  { const c = cv(256, 160); const g = c.getContext('2d'); const rr = rng(77);
+    g.fillStyle = '#b38a5a'; g.fillRect(0, 0, 256, 160); for (let i = 0; i < 900; i++) { g.fillStyle = rr() < 0.5 ? 'rgba(90,60,30,.25)' : 'rgba(230,200,150,.2)'; g.fillRect(rr() * 256, rr() * 160, 2, 2); }
+    const flyer = (x, y, w, h, head, col, photo) => { g.save(); g.translate(x + w / 2, y + h / 2); g.rotate((rr() - 0.5) * 0.12); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(-w / 2 + 2, -h / 2 + 2, w, h); g.fillStyle = '#f7f5ee'; g.fillRect(-w / 2, -h / 2, w, h);
+      g.fillStyle = col; g.fillRect(-w / 2, -h / 2, w, 12); g.fillStyle = '#fff'; g.font = '900 9px system-ui'; g.textAlign = 'center'; g.fillText(head, 0, -h / 2 + 9);
+      if (photo) { g.fillStyle = '#9aa3ad'; g.fillRect(-w / 2 + 6, -h / 2 + 16, 18, 22); g.fillStyle = '#6d757e'; g.beginPath(); g.arc(-w / 2 + 15, -h / 2 + 24, 5, 0, 6.283); g.fill(); g.fillRect(-w / 2 + 8, -h / 2 + 31, 14, 7); }
+      g.fillStyle = 'rgba(40,40,40,.6)'; for (let l = 0; l < 6; l++) g.fillRect(-w / 2 + (photo ? 28 : 6), -h / 2 + 18 + l * 5, w - (photo ? 34 : 12) - (l % 3) * 4, 1.6);
+      g.fillStyle = '#d63a2f'; g.beginPath(); g.arc(0, -h / 2 + 2, 2.5, 0, 6.283); g.fill(); g.restore(); };
+    flyer(10, 10, 66, 64, 'BOLO', '#b22234', true); flyer(88, 8, 70, 66, 'ATTEMPT TO LOCATE', '#c26a12', true); flyer(170, 12, 74, 60, 'MISSING PERSON', '#1f4f8a', true);
+    flyer(14, 86, 80, 62, 'SHIFT NOTES', '#2f6b3a', false); flyer(104, 90, 64, 58, 'ROAD CLOSED', '#7a5a12', false); flyer(178, 84, 66, 66, 'TRAINING', '#4b3a7a', false);
+    g.strokeStyle = '#6b4a24'; g.lineWidth = 8; g.strokeRect(0, 0, 256, 160); T.cork = c; }
+
   return T;
 }
 
