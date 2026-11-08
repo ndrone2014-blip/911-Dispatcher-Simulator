@@ -16,8 +16,8 @@ import { toast } from '../ui/dom.js';
 
 // ratio: fraction of CSS pixels rendered (devicePixelRatio is only used from High up, capped).
 export const PRESETS = {
-  low: { quality: 'low', ratio: 0.7, dprCap: 1, lights: 4, screenRes: 256, npcs: 'low', tvHz: 1, extHz: 3, texSize: 256, detail: 1, rseg: 1 },
-  medium: { quality: 'medium', ratio: 0.9, dprCap: 1, lights: 6, screenRes: 384, npcs: 'full', tvHz: 3, extHz: 8, texSize: 512, detail: 1 },
+  low: { quality: 'low', ratio: 0.7, dprCap: 1, lights: 4, screenRes: 256, npcs: 'low', tvHz: 1, extHz: 3, texSize: 256, detail: 1, rseg: 1, extDetail: 0 },
+  medium: { quality: 'medium', ratio: 0.9, dprCap: 1, lights: 6, screenRes: 384, npcs: 'full', tvHz: 3, extHz: 8, texSize: 512, detail: 1, extDetail: 1 },
   high: { quality: 'high', ratio: 1, dprCap: 1.25, lights: 8, screenRes: 512, npcs: 'full', tvHz: 10, extHz: 15, texSize: 512, detail: 2 },
   ultra: { quality: 'ultra', ratio: 1, dprCap: 2, lights: 12, screenRes: 768, npcs: 'full', tvHz: 20, extHz: 24, texSize: 512, detail: 2 },
 };
@@ -182,7 +182,7 @@ export class World {
   build() {
     if (this.failed || !this.renderer) return;
     const g = this.game; const mode = g.sim?.state.mode || 'free';
-    const opts = { thirdMonitor: g.career.has('third_monitor', mode), espresso: g.career.has('espresso', mode), ergoChair: g.career.has('ergo_chair', mode), thanksgiving: thanksgivingOn(g.settings), detail: this.preset.detail, rseg: this.preset.rseg };
+    const opts = { thirdMonitor: g.career.has('third_monitor', mode), espresso: g.career.has('espresso', mode), ergoChair: g.career.has('ergo_chair', mode), thanksgiving: thanksgivingOn(g.settings), detail: this.preset.detail, rseg: this.preset.rseg, extDetail: this.preset.extDetail ?? this.preset.detail };
     this.disposeScene(); // free the previous GPU buffers/textures – rebuilding used to leak them
     const center = buildCenter(opts);
     this.center = center; this.colliders = center.colliders; this.interactablesStatic = center.interactables; this.lightDefs = center.lights;
@@ -226,7 +226,11 @@ export class World {
   env() {
     const sim = this.game.sim; const m = sim ? sim.clock() : 10 * 60; const hr = m / 60;
     const wx = sim ? sim.weather.current() : 'clear';
-    const overcast = { clear: 0, rain: 0.6, thunderstorm: 0.8, snow: 0.5, fog: 0.7, severe: 0.9 }[wx] ?? 0;
+    // overcast eases toward the new weather over ~half a minute instead of snapping
+    const targetOC = { clear: 0, rain: 0.6, thunderstorm: 0.8, snow: 0.5, fog: 0.7, severe: 0.9 }[wx] ?? 0;
+    const nowMs = performance.now(); const dtE = Math.min(0.5, ((nowMs - (this._envT || nowMs)) / 1000)); this._envT = nowMs;
+    this._oc = this._oc == null ? targetOC : this._oc + (targetOC - this._oc) * Math.min(1, dtE * 0.12);
+    const overcast = this._oc;
     const day = Math.max(0, Math.min(1, Math.sin(((hr - 6) / 12) * Math.PI) * 1.3));
     const sunAmt = day * (1 - overcast * 0.85);
     const warm = hr < 9 || hr > 16.5 ? [1.0, 0.72, 0.45] : [1.0, 0.95, 0.85];

@@ -224,7 +224,7 @@ export function buildCenter(opts = {}) {
   for (const [a, b] of winZ) screen(`rain_e${a}`, 'rainfx', 12.3, 1.85, (a + b) / 2, b - a, 1.9, 'x', -1, 0, { shared: 'scr_rain', unlit: true, transparent: true });
   screen('rain_dir', 'rainfx', 12.3, 1.85, 13.3, 3.8, 1.9, 'x', -1, 0, { shared: 'scr_rain', unlit: true, transparent: true });
   screen('rain_brk', 'rainfx', -7.5, 1.75, 18.3, 5, 1.7, 'z', -1, 0, { shared: 'scr_rain', unlit: true, transparent: true });
-  { const X = buildExterior({ D }); B['ext@out'] = X.ext; B['extGlow@out'] = X.glow; B['extSigns@out'] = X.signs; B['extFlagUS@out'] = X.flagUS; B['extFlagIL@out'] = X.flagIL; }
+  { const X = buildExterior({ D: opts.extDetail ?? D }); B['ext@out'] = X.ext; B['extGlow@out'] = X.glow; B['extSigns@out'] = X.signs; B['extFlagUS@out'] = X.flagUS; B['extFlagIL@out'] = X.flagIL; }
 
   // ---------------- Lights & ceiling services ----------------
   for (const x of [-7, 0, 7]) for (const z of [-5, -0.4, 4.4]) light(x, z, 'floor', H - 0.05, 1.6, 0.6);

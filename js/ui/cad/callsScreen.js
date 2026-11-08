@@ -8,11 +8,23 @@ import { pri, gameAge, clock } from '../fmt.js';
 import { INCIDENT_TYPES, INCIDENT_CATEGORIES, TYPE, guessTypeFromText } from '../../data/incidentTypes.js';
 import { suggestions, SLOT_LABELS } from '../../ai/conversation.js';
 import { PERSONAS } from '../../ai/dialogue.js';
+import { understand, matchStreet } from '../../ai/nlu.js';
 
 function typeOptions(selected) {
   const groups = {};
   for (const t of INCIDENT_TYPES) (groups[t.category] ||= []).push(t);
   return Object.entries(groups).map(([cat, list]) => `<optgroup label="${INCIDENT_CATEGORIES[cat]?.label || cat}">${list.map((t) => `<option value="${t.id}" ${t.id === selected ? 'selected' : ''}>${t.label} (${t.code})</option>`).join('')}</optgroup>`).join('');
+}
+
+function bestAlternative(alts) {
+  if (!alts?.length) return '';
+  let best = alts[0], bs = -1;
+  alts.forEach((a, i) => {
+    const u = understand(a); const known = u.filter((x) => x.intent !== 'unknown');
+    const score = known.reduce((m, x) => m + x.score, 0) / Math.max(1, u.length) + (matchStreet(a) ? 0.25 : 0) - i * 0.04;
+    if (score > bs) { bs = score; best = a; }
+  });
+  return best;
 }
 
 export class CallsScreen extends Screen {
@@ -54,7 +66,8 @@ export class CallsScreen extends Screen {
     const inv = () => this.invalidate();
     for (const ev of ['call:incoming', 'call:answered', 'call:updated', 'call:ended', 'incident:created', 'incident:updated']) bus.on(ev, inv);
     bus.on('call:message', ({ call }) => { if (call.id === this.callId) this.invalidate(); else this.invalidate(); });
-    bus.on('call:answered', ({ call }) => { this.callId = call.id; this.renderedCall = null; });
+    bus.on('call:answered', ({ call }) => { this.callId = call.id; this.renderedCall = null; this.handsFreeOff = false; });
+    bus.on('speech:end', (item) => this.handsFreeTick(item));
   }
 
   call() { return this.callId ? this.sim.calls.byId(this.callId) : null; }
@@ -222,13 +235,25 @@ export class CallsScreen extends Screen {
     if (sp.listening) { sp.stopListening(); return; }
     const btn = this.root.querySelector('[data-act="mic"]'); const inp = this.r('say');
     btn?.classList.add('listening');
+    if (inp) { inp.placeholder = 'Listening… speak now'; inp.classList.add('listening'); }
     const okStart = await sp.listen({
+      // Of the recognizer's guesses, use the one the caller engine understands best (street names count too).
+      choose: (alts) => bestAlternative(alts),
       onInterim: (t) => { if (inp) inp.value = t; },
       onFinal: (t) => { if (inp) inp.value = t; if (this.game.settings.data.speech.autoSend) this.send(); },
-      onEnd: () => { btn?.classList.remove('listening'); },
-      onError: (msg) => { btn?.classList.remove('listening'); toast(msg, { level: 'warn', title: 'Microphone' }); },
+      onNothing: () => { if (!this.game.settings.data.speech.handsFree) toast('Didn’t catch that – press the mic and try again, or type.', { level: 'info', title: 'Microphone' }); },
+      onEnd: () => { btn?.classList.remove('listening'); if (inp) { inp.placeholder = 'Type what you say to the caller… (Enter to send)'; inp.classList.remove('listening'); } },
+      onError: (msg) => { btn?.classList.remove('listening'); this.handsFreeOff = true; toast(msg, { level: 'warn', title: 'Microphone' }); },
     });
     if (!okStart) btn?.classList.remove('listening');
+  }
+
+  /** Hands-free: reopen the mic after the caller finishes talking. */
+  handsFreeTick(item) {
+    const s = this.game.settings.data.speech; const c = this.call();
+    if (!s.handsFree || this.handsFreeOff || !c || c.status !== 'active' || item?.opts?.category !== 'caller') return;
+    if (this.game.speech.listening || !this.visible) return;
+    clearTimeout(this.hfTimer); this.hfTimer = setTimeout(() => { if (!this.game.speech.speaking && !this.game.speech.listening && this.call()?.status === 'active') this.toggleMic(); }, 450);
   }
 
   createIncident() {

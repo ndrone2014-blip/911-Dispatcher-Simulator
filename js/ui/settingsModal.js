@@ -41,7 +41,11 @@ export function openSettings(game) {
         + row('Radio voices', 'Speak unit radio traffic aloud.', tog('speech.radioTTS'))
         + row('Staff voices', 'Coworkers speak aloud.', tog('speech.staffTTS'))
         + row('Speech recognition', sp.recognitionSupported ? `Supported. Microphone: <b>${esc(sp.micState)}</b>.` : '<span class="warn">Not supported in this browser – type or use suggested questions (Chrome, Edge and Safari support it).</span>', `<button class="btn sm" data-act="mictest" ${sp.recognitionSupported ? '' : 'disabled'}>Test microphone</button>`)
+        + row('Natural pacing', 'Speak line by line with natural pauses and per-sentence inflection (less robotic).', tog('speech.naturalPacing'))
+        + row('Voice speed', '', sel('speech.rate', { 0.9: 'Slower', 1: 'Normal', 1.1: 'Faster' }))
+        + row('Best voices found', sp.ttsSupported ? (sp.naturalAvailable() ? `Using: <b>${esc(sp.bestVoices(3).join(', ') || 'default')}</b>` : `<span class="warn">Only basic voices are installed (${esc(sp.bestVoices(2).join(', ') || 'none')}).</span> For far more natural voices use Microsoft Edge (its "Natural" voices are free) or Chrome (Google voices), or install extra voices in your device's speech settings (iPhone/Mac: "Enhanced/Premium" voices).`) : '—', `<button class="btn sm" data-act="voicetest">▶ Test</button>`)
         + row('Auto-send speech', 'Send what you say as soon as you stop talking.', tog('speech.autoSend'))
+        + row('Hands-free calls', 'After the caller finishes talking, the microphone opens again automatically (speech-to-text).', tog('speech.handsFree'))
         + row('Recognition language', '', sel('speech.lang', { 'en-US': 'English (US)', 'en-GB': 'English (UK)', 'en-AU': 'English (AU)', 'en-CA': 'English (CA)', 'en-IN': 'English (India)' }))
         + `<div class="set" style="flex-direction:column;align-items:stretch"><div><b>Optional local AI model</b><small>Make caller wording more natural with a language model running on <i>your own computer</i>. Free, no keys, never required. The game's engine still decides what callers know – the model only rephrases. Works with <b>Ollama</b> (set OLLAMA_ORIGINS="*" so the browser may connect) or any OpenAI-compatible local server like LM Studio.</small></div>
           <div class="row wrap" style="margin-top:8px">${tog('llm.enabled')}<span>Enabled</span>${sel('llm.kind', { ollama: 'Ollama', openai: 'OpenAI-compatible (LM Studio)' })}</div>
@@ -72,7 +76,7 @@ export function openSettings(game) {
     const p = t.dataset.path; if (!p) return;
     let v = t.type === 'checkbox' ? t.checked : t.type === 'range' ? parseFloat(t.value) : t.value;
     if (t.dataset.invert) v = !v;
-    if (p === 'graphics.monitorRefresh') v = parseFloat(v);
+    if (p === 'graphics.monitorRefresh' || p === 'speech.rate') v = parseFloat(v);
     s.set(p, v);
     if (p === 'graphics.preset') setTimeout(draw, 60);
   }
@@ -80,7 +84,10 @@ export function openSettings(game) {
     if (a === 'done') m.close();
     else if (a === 'tab') { tab = t.dataset.t; draw(); }
     else if (a === 'fullscreen') game.toggleFullscreen();
-    else if (a === 'mictest') {
+    else if (a === 'voicetest') {
+      game.speech.speak('Nine-one-one, what is the address of your emergency? Okay… stay on the line with me, help is on the way.', { key: 'test-f', sex: 'f', category: 'caller' });
+      setTimeout(() => game.speech.speak("Um, yeah, I'm at 412 W Main St in Carmi. There's smoke coming out of the garage!", { key: 'test-m', sex: 'm', rate: 1.08, pitch: 1.04, category: 'caller' }), 300);
+    } else if (a === 'mictest') {
       toast('Say something…', { level: 'info', title: 'Microphone test' });
       await game.speech.listen({ onFinal: (txt) => toast(`Heard: "${txt}"`, { level: 'good', title: 'Microphone test' }), onError: (msg) => toast(msg, { level: 'warn' }) });
       setTimeout(draw, 300);

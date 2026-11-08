@@ -45,6 +45,53 @@ export const INSTRUCTION_TEXT = {
   light: 'Turn on the porch light and unlock the door for responders.', else: 'Is there anything else I should know?', bye: 'Help is there now. I\'m going to let you go.',
 };
 
+export const SLOT_INTENT = Object.fromEntries(Object.entries(INTENT_SLOT).map(([k, v]) => [v, k]));
+
+// Keyword understanding: a second opinion that catches plain-language questions the
+// example-based classifier misses ("was the driver hurt?", "what color was it?").
+const KEYWORDS = [
+  ['location', /\b(address|where (are|is|was|were|did)|located|location|what street|which street|what road|you at|where exactly|what town|which town)\b/],
+  ['cross', /\b(cross ?street|intersection|corner of|nearest street|between what|near what|landmark)\b/],
+  ['apt', /\b(apartment|apt|unit|suite|floor|which door|room number)\b/],
+  ['weapons', /\b(gun|guns|knife|knives|weapon|armed|shoot|shot|shots|firearm|rifle|pistol|bat|machete)\b/],
+  ['bleeding', /\b(bleed|bleeding|blood|cut|wound)\b/],
+  ['breathing', /\b(breath|breathing|breathe|airway|choking|chest rise|turning blue|blue lips)\b/],
+  ['conscious', /\b(conscious|unconscious|awake|responsive|respond|responding|passed out|talking|alert|eyes open|wake)\b/],
+  ['injuries', /\b(hurt|injur|injured|injuries|pain|wounded|okay|ok|alright|broken)\b/],
+  ['age', /\b(how old|age|years old|elderly|child|baby|kid|adult)\b/],
+  ['history', /\b(medical|history|medication|meds|diabet|heart|condition|seizure|allerg|pills|insulin|prescri)\b/],
+  ['suspect', /\b(look like|looked like|describe (him|her|them|the person|the guy|the man|the woman)|wearing|clothes|clothing|tall|height|hair|race|build|male|female|suspect|guy|man|woman)\b/],
+  ['vehicle', /\b(car|truck|van|vehicle|suv|plate|license|make|model|color|colour|motorcycle|tractor|semi)\b/],
+  ['direction', /\b(which way|direction|heading|headed|went|go|gone|leave|left|flee|fled|took off|ran)\b/],
+  ['when', /\b(when|how long ago|what time|how long has|how long have|started|start)\b/],
+  ['still', /\b(still (there|here|around|on scene|at)|are they (there|still)|is (he|she|it) still|still going|still happening|can you (still )?see (him|her|them|it|the)|do you (still )?see (him|her|them)|in sight|watching (him|her|them))\b/],
+  ['count', /\b(how many|number of (people|patients|cars|vehicles)|anyone else|more than one|other people)\b/],
+  ['fire', /\b(fire|smoke|flames|burning|on fire|what.s burning|catching)\b/],
+  ['inside', /\b(inside|in the (house|home|building|car|vehicle)|trapped|stuck|anyone in|people in|everyone out|left in)\b/],
+  ['hazards', /\b(gas|wires|power lines|leak|leaking|fuel|chemical|hazard|danger|propane|smell)\b/],
+  ['animal', /\b(dog|dogs|animal|cow|cows|cattle|horse|deer|pig|livestock|snake|bite|bit)\b/],
+  ['blocking', /\b(blocking|blocked|in the road|lanes|traffic|lane|roadway|shoulder|ditch)\b/],
+  ['relation', /\b(know (him|her|them)|related|relationship|husband|wife|boyfriend|girlfriend|neighbor|family|son|daughter|mother|father|friend)\b/],
+  ['drugs', /\b(drink|drinking|drunk|alcohol|drugs|high|overdose|intoxicated|took something|substance)\b/],
+  ['access', /\b(door|gate|locked|code|key|get in|unlock|entrance|access)\b/],
+  ['lastseen', /\b(last seen|last saw|when did you see|missing since)\b/],
+  ['name', /\b(your name|who am i speaking|who is this|who.?s calling|who are you|what.?s your name|who.?s this)\b/],
+  ['phone', /\b(phone number|callback|call you back|reach you|number you.re)\b/],
+  ['safe', /\b(are you safe|you okay|are you ok|you alright|somewhere safe|in danger)\b/],
+  ['nature', /\b(what happened|what.s going on|what is going on|what.s wrong|what do you see|tell me (more|what)|explain|describe what|what.s the emergency|what is the emergency)\b/],
+];
+const STATUS_RE = /\b(how (is|are|'?s) (he|she|they|the patient|it|everyone|things|everything)( doing)?( now)?|is (he|she|it|everyone|everybody) (okay|ok|alright|still)|any (change|changes)|getting (worse|better)|what('?s| is) (happening|going on) now|right now|update me|status)\b/;
+const QUESTION_RE = /^(what|where|when|who|whom|why|how|which|is|are|was|were|do|does|did|can|could|will|would|has|have|had|any|should|you)\b/;
+const COMMAND_RE = /^(please |ok(ay)? |now |i need you to |i want you to |can you |could you )?(go|get|stay|don'?t|do not|keep|make|tell|check|look|lock|unlock|open|close|turn|put|move|hold|wait|try|grab|find|leave|stop|let|bring|step|walk|listen|watch|sit|lay|lie|roll|cover|shut|count|push|press|breathe|calm|answer|go ahead|head|send|ask|wave|flag)\b/;
+// short follow-ups that only make sense with the previous question
+const FOLLOWUP = [
+  [/^(what )?(color|colour|make|model|kind of (car|truck|vehicle)|plate)\b/, 'vehicle'],
+  [/^(how bad|how serious|how much blood|where (is|are) (he|she|they) (hurt|bleeding))/, 'injuries'],
+  [/^(where (did|are) (they|he|she) go|which way)/, 'direction'],
+  [/^(and )?(what about|how about) (him|her|them|the other|the driver|the kids|the other car)/, 'injuries'],
+  [/^(is (he|she|it) still|still)/, 'still'],
+];
+
 export function newConvo(sc) {
   const p = PERSONAS[sc.caller.persona] || PERSONAS.calm;
   const panic = clamp(p.panic + (sc.severity === 'major' ? 0.15 : sc.severity === 'small' ? -0.08 : 0), 0, 1);
@@ -104,14 +151,64 @@ function answerSlot(call, slot, r) {
     default: {
       const f = factOf(sc, slot);
       if (!f) {
-        const none = { weapons: 'none_weapons', injuries: 'none_injuries', suspect: 'none_suspect', vehicle: 'none_vehicle', hazards: 'none_hazards', fire: 'none_fire',
-          breathing: 'none_patient', conscious: 'none_patient', age: 'none_patient', history: 'none_patient', bleeding: 'none_injuries', direction: 'none_vehicle' }[slot] || 'none_generic';
+        const medical = !!(sc.facts?.breathing || sc.facts?.conscious);
+        const none = { weapons: 'none_weapons', injuries: 'none_injuries', suspect: medical ? 'none_suspect' : 'none_suspect_look', vehicle: 'none_vehicle', hazards: 'none_hazards', fire: 'none_fire',
+          breathing: 'none_patient', conscious: 'none_patient', age: 'none_patient', history: 'none_patient', bleeding: 'none_injuries', direction: 'none_direction',
+          when: 'none_when', still: 'none_still', count: 'none_count', inside: 'none_inside', animal: 'none_animal', blocking: 'none_blocking', relation: 'none_relation',
+          drugs: 'none_drugs', access: 'none_access', lastseen: 'none_lastseen' }[slot] || 'none_generic';
         return { text: line(none, ctx, r), note: slot === 'weapons' ? 'None seen' : slot === 'injuries' ? 'None reported' : null };
       }
       if (f.say === 'unknown') return { text: line('unknown', ctx, r), note: 'Unknown' };
       return { text: fill(f.say, ctx, r), note: f.note ? fill(f.note, ctx, r) : null };
     }
   }
+}
+
+/** Which slot a sentence is really asking about, from keywords (relevant slots win). */
+export function keywordSlot(text, sc, prev) {
+  const t = ` ${normalize(text)} `;
+  const relevant = new Set([...(sc.relevant || []), ...Object.keys(sc.facts || {})]);
+  let best = null, bs = 0;
+  for (const [slot, re] of KEYWORDS) {
+    const m = t.match(re); if (!m) continue;
+    let score = 1 + m[0].length / 40;
+    if (relevant.has(slot)) score += 1.2;
+    if (slot === 'injuries' && /\b(okay|ok|alright)\b/.test(m[0]) && !/hurt|injur/.test(t)) score -= 0.8; // "is he okay" leans on status
+    if (slot === prev) score += 0.3;
+    if (score > bs) { bs = score; best = slot; }
+  }
+  return best;
+}
+function followUpSlot(text, prev) {
+  if (!prev) return null; const t = normalize(text);
+  if (t.split(' ').length > 7) return null;
+  for (const [re, slot] of FOLLOWUP) if (re.test(t)) return slot === 'still' || slot === 'direction' ? slot : prev === 'suspect' && slot === 'vehicle' ? 'vehicle' : slot;
+  if (/^(and|what about|how about|anything|any) /.test(t) || /^(why|how come|really|are you sure|how do you know)\b/.test(t)) return prev;
+  return null;
+}
+
+/** Answer to "how is he doing now?" from the most relevant current facts. */
+function statusAnswer(call, r) {
+  const sc = call.sc; const ctx = ctxOf(call);
+  for (const slot of ['conscious', 'breathing', 'fire', 'bleeding', 'still', 'injuries', 'blocking']) {
+    const f = factOf(sc, slot); if (!f || f.say === 'unknown') continue;
+    const txt = fill(f.say, ctx, r); const pre = line('status_prefix', ctx, r);
+    return { slot, text: pre ? pre + txt.charAt(0).toLowerCase() + txt.slice(1) : txt, note: f.note ? fill(f.note, ctx, r) : null };
+  }
+  return { slot: null, text: line('status_none', ctx, r) };
+}
+
+function gracefulReply(call, text, r) {
+  const sc = call.sc; const c = call.convo; const t = normalize(text); const ctx = ctxOf(call);
+  const isCmd = COMMAND_RE.test(t) && !/\?\s*$/.test(text);
+  const isQ = !isCmd && (/\?\s*$/.test(text) || QUESTION_RE.test(t));
+  if (isCmd) { c.panic = clamp(c.panic - 0.05, 0, 1); return line(r.chance(0.3) ? 'comply_done' : 'comply', ctx, r); }
+  if (isQ) {
+    if (c.panic > 0.7) return line('unknown_q_panicked', ctx, r);
+    const natureLow = fill(sc.natureShort || sc.nature, ctx, r).replace(/[.!]+$/, '');
+    return r.chance(0.35) ? line('unknown_q_nature', { ...ctx, natureLow: natureLow.charAt(0).toLowerCase() + natureLow.slice(1) }, r) : line('unknown_q', ctx, r);
+  }
+  return line('ack', ctx, r);
 }
 
 function recordInfo(call, slot, note) {
@@ -154,10 +251,30 @@ export function respond(call, text, r) {
 
   for (const it of intents) {
     let intent = it.intent;
+    // "How is he doing now?" → current status from the scenario
+    // weak or off-topic classifications defer to strong keyword evidence ("can you see him right now?")
+    if (['confirm_location', 'yes', 'no', 'greet', 'smalltalk', 'thanks'].includes(intent) || (it.score < 0.55 && intent !== 'unknown')) {
+      const hasAddr = addr.street || (addr.number && addr.number >= 100);
+      const ks = !hasAddr && keywordSlot(it.text || text, sc, c.lastSlot);
+      if (ks && SLOT_INTENT[ks] && normalize(it.text || text).split(' ').length >= 3) intent = SLOT_INTENT[ks];
+    }
+    if ((intent === 'unknown' || it.score < 0.6) && STATUS_RE.test(normalize(it.text || text)) && c.turns > 1) {
+      const st = statusAnswer(call, r); if (st.slot) { recordInfo(call, st.slot, st.note); c.lastSlot = st.slot; }
+      out.push(styled(st.text, sc.caller.persona, r, { panic: c.panic })); continue;
+    }
+    // Plain-language understanding: follow-ups that lean on the previous question, then keywords
+    if (intent === 'unknown' || intent === 'yes' || intent === 'no') {
+      const fs = followUpSlot(it.text || text, c.lastSlot) || ((intent === 'unknown') ? keywordSlot(it.text || text, sc, c.lastSlot) : null);
+      if (fs && SLOT_INTENT[fs]) intent = SLOT_INTENT[fs];
+    } else if (INTENT_SLOT[intent] && !factOf(sc, INTENT_SLOT[intent]) && !['location', 'cross', 'apt', 'name', 'phone', 'nature', 'safe'].includes(INTENT_SLOT[intent])) {
+      // the classifier picked a slot this call has nothing for – do the words point at one it does?
+      const ks = keywordSlot(it.text || text, sc, c.lastSlot);
+      if (ks && ks !== INTENT_SLOT[intent] && (factOf(sc, ks) || ['location', 'cross', 'name', 'phone', 'safe', 'nature'].includes(ks))) intent = SLOT_INTENT[ks];
+    }
     // context fallback: an inapplicable slot may really mean an alternative intent
     const slot0 = INTENT_SLOT[intent];
     if (slot0 && !['location', 'cross', 'apt', 'name', 'phone', 'nature', 'safe'].includes(slot0) && !factOf(sc, slot0)) {
-      const alt = (it.alternatives || []).find((a) => a.score > 0.4 && INTENT_SLOT[a.intent] && factOf(sc, INTENT_SLOT[a.intent]));
+      const alt = (it.alternatives || []).find((a) => a.score > 0.4 && a.score >= it.score * 0.85 && INTENT_SLOT[a.intent] && factOf(sc, INTENT_SLOT[a.intent]));
       if (alt) intent = alt.intent;
     }
     const slot = INTENT_SLOT[intent];
@@ -176,6 +293,7 @@ export function respond(call, text, r) {
       if (!ans.partial) { c.revealed[slot] = true; effects.revealed.push(slot); }
       if (slot === 'location' && !ans.partial) delete c.revealed.location_partial;
       recordInfo(call, slot, ans.note);
+      c.lastSlot = slot;
       out.push(styled(txt, sc.caller.persona, r, { panic: c.panic }));
       continue;
     }
@@ -233,10 +351,15 @@ export function respond(call, text, r) {
       case 'yes': out.push(line('yes_generic', ctx, r)); break;
       case 'no': out.push(line('no_generic', ctx, r)); break;
       case 'unknown':
-      default:
+      default: {
+        // Respond like a person would: answer "I don't know" to questions, go along with
+        // instructions, acknowledge statements. Only gibberish gets "what?".
+        const words = normalize(it.text || text).split(' ').filter(Boolean);
+        if (words.length >= 2 && !out.length) { out.push(styled(gracefulReply(call, it.text || text, r), sc.caller.persona, r, { panic: c.panic, allowPost: false })); break; }
         c.panic = clamp(c.panic + 0.03, 0, 1);
         if (!out.length) out.push(styled(line(c.panic > 0.65 ? 'dont_understand_panicked' : 'dont_understand', ctx, r), sc.caller.persona, r, { panic: c.panic, allowPost: false }));
         break;
+      }
     }
   }
   if (!out.length) out.push(line('dont_understand', ctx, r));

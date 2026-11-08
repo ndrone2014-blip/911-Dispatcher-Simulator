@@ -10,6 +10,7 @@ import { DEFAULT_CONFIG } from '../sim/sim.js';
 import { thanksgivingOn } from '../core/season.js';
 
 const CREDIT = 'Developed by Drone Hive Studios | Developer @ndrone40';
+export const DISCLAIMER = 'This is an independently developed fictional emergency dispatch simulator inspired by White County, Illinois. It is not affiliated with, endorsed by, or operated by White County or any real emergency services agency.';
 
 export class Menu {
   constructor(game) { this.game = game; this.root = document.getElementById('menu'); this.bound = false; }
@@ -42,8 +43,8 @@ export class Menu {
     const g = this.game; const shift = g.save.loadShift();
     const rank = g.career.rank();
     const tg = thanksgivingOn(g.settings);
-    return `<div class="title-block"><img class="menu-logo" src="icon.svg" alt="911 Dispatch Simulator logo" width="96" height="96"><div class="eyebrow">White County Emergency Communications · Carmi, Illinois</div><h1>911 Dispatch<br><span>Simulator</span></h1>
-      ${tg ? '<div class="holiday-note">🦃 Happy Thanksgiving from White County 911 — thanks for working the holiday shift! 🍂</div>' : ''}
+    return `<div class="title-block"><img class="menu-logo" src="icon.svg" alt="911 Dispatch Simulator logo" width="96" height="96"><div class="eyebrow">A fictional simulator inspired by White County, Illinois</div><h1>911 Dispatch<br><span>Simulator</span></h1>
+      ${tg ? '<div class="holiday-note">🦃 Happy Thanksgiving — thanks for working the holiday shift! 🍂</div>' : ''}
       <p>Sit at your console, answer calls, talk to callers, and run the whole emergency response for Carmi and all of White County, Illinois – at your own pace.</p></div>
       <div class="menu-list">
         ${shift ? `<button class="menu-btn" data-act="continue"><span class="ico">▶</span><span><b>Continue shift</b><small>${esc(shift.mode === 'career' ? 'Career' : shift.mode === 'custom' ? 'Custom shift' : 'Free play')} · saved ${esc(new Date(shift.savedAt).toLocaleString())}</small></span></button>` : ''}
@@ -57,7 +58,8 @@ export class Menu {
           <button class="menu-btn grow" data-act="go" data-v="about"><span class="ico">ℹ</span><span><b>About</b></span></button>
         </div>
       </div>
-      <div class="menu-foot">${CREDIT}<br>No API keys · No accounts · Runs entirely in your browser · Progress saves on this device.</div>`;
+      <div class="menu-foot">${CREDIT}<br>No API keys · No accounts · Runs entirely in your browser · Progress saves on this device.</div>
+      <div class="disclaimer" role="note">${DISCLAIMER}</div>`;
   }
 
   defaults(mode) {
@@ -167,6 +169,8 @@ export class Menu {
 
   about() {
     return `<div class="menu-panel"><div class="row"><button class="btn ghost sm" data-act="back">← Back</button><h2 class="grow">About</h2></div>
+      <h3>Independent &amp; fictional</h3><div class="disclaimer big" role="note">${DISCLAIMER}</div>
+      <div class="muted" style="font-size:.9em;line-height:1.6;margin-top:6px">All characters, callers, calls, units, call signs and storylines are made up. Place names and road layouts are used only to make the setting feel familiar and are simplified. Nothing in this game reflects real policies, procedures, personnel or incidents of any agency, and it is not a training tool for real emergency work. In a real emergency, call 911.</div>
       <h3>Controls – PC</h3><div class="muted" style="line-height:1.8;font-size:.92em">
         <span class="kbd">W A S D</span> move · <span class="kbd">Mouse</span> look · <span class="kbd">E</span> interact / sit · <span class="kbd">Tab</span> go to your console · <span class="kbd">Esc</span> stand up / pause<br>
         At the console: <span class="kbd">A</span> answer · <span class="kbd">T</span> type to caller · <span class="kbd">F2</span> microphone · <span class="kbd">Ctrl+Enter</span> create incident · <span class="kbd">U</span> assign units · <span class="kbd">F4</span> end call · <span class="kbd">C I M R N D H B</span> switch screens · <span class="kbd">P</span> pause</div>

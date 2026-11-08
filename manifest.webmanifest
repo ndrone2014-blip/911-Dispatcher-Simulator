@@ -9,7 +9,7 @@
   "orientation": "any",
   "background_color": "#070d1a",
   "theme_color": "#070d1a",
-  "description": "First-person 3D 911 dispatch simulator set in Carmi and White County, Illinois. No API keys, runs in the browser.",
+  "description": "Independent, fictional first-person 3D 911 dispatch simulator inspired by White County, Illinois. Not affiliated with any real agency.",
   "categories": ["games", "simulation"],
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

@@ -8,7 +8,7 @@ export const DEFAULT_SETTINGS = {
     master: 0.85, game: 0.7, caller: 1, radio: 0.75, ambience: 0.45, notifications: 0.7,
     muted: { game: false, caller: false, radio: false, ambience: false, notifications: false },
   },
-  speech: { tts: true, radioTTS: true, staffTTS: true, recognition: true, lang: 'en-US', autoSend: true, handsFree: false },
+  speech: { tts: true, radioTTS: true, staffTTS: true, recognition: true, lang: 'en-US', autoSend: true, handsFree: false, naturalPacing: true, rate: 1 },
   controls: { mouseSensitivity: 1, invertY: false, touchSensitivity: 1, headBob: true },
   map: { theme: 'day' },
   ui: { textScale: 1, toasts: true, toastCalls: true, toastRadio: true, toastIncidents: true, compactCad: false, showHints: true, clock24: true, seasonal: 'auto' },

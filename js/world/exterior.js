@@ -80,19 +80,19 @@ export function buildExterior({ D = 1 } = {}) {
   };
   const tree = (x, z, h = 7 + r() * 5, kind) => {
     const ever = kind === 'ever' || (kind == null && r() < 0.12);
-    ext.cylinder(x, h * 0.22, z, 0.16 + h * 0.012, h * 0.44, 6, { color: C.trunk, caps: false });
+    ext.cylinder(x, h * 0.22, z, 0.16 + h * 0.012, h * 0.44, 5, { color: C.trunk, caps: false });
     if (ever) { for (let i = 0; i < 3; i++) ext.cylinder(x, h * (0.35 + i * 0.2), z, h * (0.28 - i * 0.07), h * 0.32, 8, { color: C.evergreen.map((v) => v * (0.9 + i * 0.08)), r2: 0.05 }); return; }
     if (S === 'winter' && r() < 0.7) { // bare branches
       for (let i = 0; i < 5; i++) { const a = i * 1.3; ext.box(x + Math.cos(a) * h * 0.12, h * 0.62, z + Math.sin(a) * h * 0.12, 0.08, h * 0.38, 0.08, { color: C.trunk, uv: 0, rotY: a }); }
       ext.sphere(x, h * 0.72, z, h * 0.3, 7, 5, { color: [0.3, 0.25, 0.2], sy: 0.9 }); return;
     }
     const base = pick(C.leaves); const R = h * (0.26 + r() * 0.08);
-    const seg = D >= 2 ? 9 : 7;
-    ext.sphere(x, h * 0.66, z, R, seg, 6, { color: base, sy: 0.85 });
-    ext.sphere(x + R * 0.45, h * 0.58, z + R * 0.2, R * 0.7, seg, 5, { color: base.map((v) => v * 0.9) });
-    if (D >= 1) ext.sphere(x - R * 0.35, h * 0.78, z - R * 0.25, R * 0.62, seg, 5, { color: base.map((v) => Math.min(1, v * 1.12)) });
+    const seg = D >= 2 ? 8 : 6, rings = D >= 2 ? 5 : 4;
+    ext.sphere(x, h * 0.66, z, R, seg, rings, { color: base, sy: 0.85 });
+    ext.sphere(x + R * 0.45, h * 0.58, z + R * 0.2, R * 0.7, seg, rings, { color: base.map((v) => v * 0.9) });
+    if (D >= 2) ext.sphere(x - R * 0.35, h * 0.78, z - R * 0.25, R * 0.62, seg, rings, { color: base.map((v) => Math.min(1, v * 1.12)) });
   };
-  const shrub = (x, z, s = 1) => ext.sphere(x, 0.35 * s, z, 0.55 * s, 7, 5, { color: S === 'winter' ? C.evergreen : [0.16, 0.32, 0.13], sy: 0.75 });
+  const shrub = (x, z, s = 1) => ext.sphere(x, 0.35 * s, z, 0.55 * s, 6, 4, { color: S === 'winter' ? C.evergreen : [0.16, 0.32, 0.13], sy: 0.75 });
   // Sedan / pickup / patrol car with rounded body, sloped glasshouse, wheels and lamps. rot = 0 faces +x.
   const car = (x, z, rot, color, kind = 'sedan') => {
     const pickup = kind === 'pickup'; const L = pickup ? 5.5 : 4.85, W = 1.86; const cr = Math.cos(rot), sr = Math.sin(rot);

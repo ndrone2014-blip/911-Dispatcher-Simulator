@@ -105,9 +105,30 @@ export const SLOT_LINES = {
   none_hazards: ['No, nothing like that.', 'Not that I can see.', 'I don\'t smell anything weird, no.'],
   none_fire: ['Fire? No, there\'s no fire.', 'No, nothing\'s on fire.'],
   none_patient: ['It\'s not a medical thing.', 'Nobody needs medical help, I don\'t think.'],
+  none_suspect_look: ['I didn\'t really get a good look.', 'I can\'t really describe them, sorry.', 'Not really — I didn\'t see much.'],
+  none_direction: ['I didn\'t see where they went.', 'I\'m not sure which way.', 'I didn\'t see anybody leave.'],
+  none_when: ['Just now — right before I called.', 'A couple minutes ago.', 'Maybe five minutes ago?', 'Just a few minutes ago.'],
+  none_still: ['I think so, yeah.', 'As far as I can tell, yeah.', 'I can\'t see from here, honestly.'],
+  none_count: ['Just the one, I think.', 'As far as I know, just one.', 'I only see one.'],
+  none_inside: ['No, nobody\'s inside that I know of.', 'I don\'t think anyone\'s in there.', 'No, it\'s empty I think.'],
+  none_animal: ['No, there\'s no animals involved.', 'No, no animals.'],
+  none_blocking: ['No, it\'s not blocking the road.', 'No, traffic\'s getting by.', 'Not really, no.'],
+  none_relation: ['I don\'t really know them.', 'I just know them to see them, you know?', 'No relation, no.'],
+  none_drugs: ['Not that I know of.', 'I don\'t think so.', 'I couldn\'t tell you.'],
+  none_access: ['The door should be open.', 'You can just come right up.', 'It\'s not locked, I don\'t think.'],
+  none_lastseen: ['I\'m not sure exactly.', 'I don\'t know, a while ago.'],
   none_generic: ['That doesn\'t really apply here.', 'No, nothing like that.', 'Not really, no.'],
   repeat_irritated: ['I already told you — {answer}', 'Like I said, {answer}', 'I just said, {answer}', 'Again, {answer}', 'Yes, {answer} I already told you that!'],
   dont_understand: ['I\'m sorry, what?', 'What do you mean?', 'I don\'t understand.', 'Sorry, I didn\'t get that.', 'Can you ask that a different way?', 'Huh?'],
+  // graceful replies when the engine can't map a sentence to a known question
+  unknown_q: ['I don\'t know.', 'I\'m not sure, I can\'t tell from here.', 'I really don\'t know, sorry.', 'I didn\'t see that part.', 'Hm, I don\'t know about that.', 'I couldn\'t tell you, sorry.'],
+  unknown_q_panicked: ['I don\'t know! I don\'t know!', 'I can\'t— I don\'t know, please!', 'I don\'t know, just hurry!'],
+  unknown_q_nature: ['I don\'t know. All I know is {natureLow}.', 'I\'m not sure — I just know {natureLow}.', 'No idea. Like I said, {natureLow}.'],
+  comply: ['Okay, I can do that.', 'Okay. Okay, doing it now.', 'Alright, hold on.', 'Okay, give me a second.', 'Yes, okay.', 'Got it.', 'Okay, I will.'],
+  comply_done: ['Okay, I did it.', 'Done. Now what?', 'Okay, it\'s done.', 'Alright, I did that.'],
+  ack: ['Okay.', 'Alright.', 'Okay, thank you.', 'Mm-hm.', 'Okay, I understand.', 'Yeah, okay.'],
+  status_none: ['Nothing\'s changed, it\'s the same.', 'Still the same as before.', 'No change that I can see.', 'It\'s about the same.'],
+  status_prefix: ['Right now, ', 'Still — ', 'Um, right now ', 'Same as before — ', ''],
   dont_understand_panicked: ['What? I don\'t— please just send someone!', 'I don\'t understand, please!', 'What?! Just hurry!'],
   reassure: ['Okay. Okay, thank you.', 'Thank you, thank you so much.', 'Okay... how long will they be?', 'Please tell them to hurry.', 'Okay, I\'ll wait.', 'Thank god.'],
   reassure_calm: ['Great, thank you.', 'Okay, sounds good.', 'Perfect, thanks.', 'Alright, I appreciate it.'],
@@ -143,7 +164,9 @@ export function styled(text, persona, r, { panic = 0, first = false, allowPost =
   const p = PERSONAS[persona] || PERSONAS.calm;
   let out = text.trim();
   if (!out) return out;
-  const pre = r.chance(0.55) ? r.pick(p.pre) : '';
+  let pre = r.chance(0.55) ? r.pick(p.pre) : '';
+  if (/^(yes|yeah|sure|okay)/i.test(pre) && /^(no\b|not\b|nobody|nothing|never|i don.t|i didn.t|i can.t)/i.test(out)) pre = ''; // never "Yes, no…"
+  if (/^(yes|yeah|sure)/i.test(pre) && /^(yes|yeah|yep|sure)/i.test(out)) pre = '';
   if (pre) out = `${pre} ${/^(I\b|I'|[A-Z]{2}|[A-Z][a-z]+ [A-Z])/.test(out) ? out : out.charAt(0).toLowerCase() + out.slice(1)}`;
   if (persona === 'panicked' && panic > 0.6 && r.chance(0.3)) out = out.replace(/^(\w)/, (m) => `${m}-${m}`);
   if (allowPost && r.chance(persona === 'panicked' ? Math.min(0.8, 0.3 + panic) : 0.3)) { const post = r.pick(p.post); if (post) out += ` ${post}`; }
