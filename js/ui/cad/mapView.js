@@ -5,6 +5,7 @@ import { DEPT_BY_ID, TYPE_BY_ID } from '../../data/departments.js';
 import { UNIT_STATUS_COLORS } from '../../data/incidentTypes.js';
 import { EVENT_KINDS } from '../../sim/cityEvents.js';
 import { SCALE } from '../../data/city.js';
+import { COUNTY_BBOX } from '../../data/geo.js';
 import { drawGround, drawRail, drawSettlement, drawBridges, drawOverlays, drawSites, SITE_KINDS, setMapTheme } from './mapDetail.js';
 
 const ZONE_FILL = { residential: '#13202f', commercial: '#18233a', downtown: '#1b2741', industrial: '#1d272b', park: '#10301f', forest: '#0d2918', institutional: '#1b2240', airport: '#182130', water: null };
@@ -55,7 +56,7 @@ export class MapRenderer {
     // world-space viewport for culling
     const vx0 = -ox / s, vy0 = -oy / s, vx1 = (w - ox) / s, vy1 = (h - oy) / s;
     const inView = (x0, y0, x1, y1, pad = 0) => x1 >= vx0 - pad && x0 <= vx1 + pad && y1 >= vy0 - pad && y0 <= vy1 + pad;
-    const showsOutside = vx0 < -60 || vy0 < -60 || vx1 > 11300 || vy1 > 10560;
+    const showsOutside = vx0 < COUNTY_BBOX.x0 - 60 || vy0 < COUNTY_BBOX.y0 - 60 || vx1 > COUNTY_BBOX.x1 - 900 || vy1 > COUNTY_BBOX.y1 - 400;
     const fine = detail > 0 && !fast;
 
     ctx.fillStyle = P.outside; ctx.fillRect(0, 0, w, h);
@@ -138,7 +139,7 @@ export class MapRenderer {
     const gx0 = Math.max(REGION_BOUNDS.x0, Math.floor(vx0 / F) * F), gy0 = Math.max(REGION_BOUNDS.y0, Math.floor(vy0 / F) * F);
     const gx1 = Math.min(REGION_BOUNDS.x1, vx1), gy1 = Math.min(REGION_BOUNDS.y1, vy1);
     for (let fx = gx0; fx < gx1; fx += F) for (let fy = gy0; fy < gy1; fy += F) {
-      if (fx >= -10 && fy >= -10 && fx + F <= 11300 && fy + F <= 10500) continue;
+      if (fx >= COUNTY_BBOX.x0 - 10 && fy >= COUNTY_BBOX.y0 - 10 && fx + F <= COUNTY_BBOX.x1 && fy + F <= COUNTY_BBOX.y1 && insidePoly(fx + F / 2, fy + F / 2)) continue;
       for (let q = 0; q < 4; q++) {
         const qx = fx + (q % 2) * F / 2, qy = fy + Math.floor(q / 2) * F / 2;
         const hsh = ((qx * 73856093) ^ (qy * 19349663)) >>> 0;
@@ -426,3 +427,9 @@ export class MapRenderer {
 function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 
 export { DISTRICTS };
+
+function insidePoly(x, y) {
+  let inside = false; const P = COUNTY_LINE;
+  for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside; }
+  return inside;
+}

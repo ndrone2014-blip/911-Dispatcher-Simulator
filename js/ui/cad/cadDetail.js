@@ -4,7 +4,7 @@
 //
 // Everything here is computed on demand and deterministic per address, so it never
 // changes the simulation or save files and stays consistent across sessions.
-import { city, SCALE, miles, nearestFacility, TOWNS } from '../../data/city.js';
+import { city, SCALE, miles, nearestFacility, TOWNS, gameToGeo } from '../../data/city.js';
 import { TOWNSHIPS } from './mapDetail.js';
 
 const PD_TOWNS = { carmi: 'Police – Carmi', norris: 'Police – Norris City', grayville: 'Police – Grayville', crossville: 'Police – Crossville', enfield: 'Police – Enfield' };
@@ -15,9 +15,9 @@ const dist = (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay);
 
 /** Sheriff patrol district (matches the briefing-room whiteboard). */
 function sheriffDistrict(x, y) {
-  if (x < 4600 && y > 6800) return 'D2 · Norris City / Herald';
-  if (x > 8300 && y < 4200) return 'D3 · Grayville / Phillipstown';
-  if (x > 7400 && y >= 4200) return 'D4 · Crossville / Emma / Maunie';
+  if (x < 5000 && y > 8200) return 'D2 · Norris City / Herald';
+  if (x > 7600 && y < 3400) return 'D3 · Grayville / Phillipstown';
+  if (x > 6600 && y >= 3400 || y > 9800) return 'D4 · Crossville / Emma / Maunie';
   return 'D1 · Carmi / Hawthorne';
 }
 
@@ -32,9 +32,9 @@ export function jurisdiction(x, y) {
   const lawFac = nearestFacility(x, y, law.startsWith('White') ? ['sheriff'] : ['police_hq', 'precinct']);
   const fi = city.facilities.filter((f) => f.kind === 'fire').indexOf(fire);
   const esn = 100 + Math.max(0, fi) * 10 + (law.startsWith('White') ? 1 : 0) + (t ? 0 : 5);
-  const grid = `${String.fromCharCode(65 + Math.max(0, Math.min(11, Math.floor(x / 1000))))}-${1 + Math.max(0, Math.min(10, Math.floor(y / 1000)))}`;
-  // Carmi city center ≈ 38.0909 N, 88.1587 W; game meters × SCALE = real meters
-  const lat = 38.0909 - ((y - 6200) * SCALE) / 111320, lon = -88.1587 + ((x - 6000) * SCALE) / 87660;
+  const grid = `${String.fromCharCode(65 + Math.max(0, Math.min(13, Math.floor(x / 1000))))}-${1 + Math.max(0, Math.min(13, Math.floor(y / 1000)))}`;
+  // game coordinates are a projection of real latitude/longitude
+  const { lat, lon } = gameToGeo(x, y); void SCALE;
   let twp = TOWNSHIPS[0]; let bd = Infinity; for (const tw of TOWNSHIPS) { const d = dist(x, y, tw[1], tw[2]); if (d < bd) { bd = d; twp = tw; } }
   const d = (f) => (f ? `${miles(dist(x, y, f.x, f.y)).toFixed(1)} mi` : '—');
   return {

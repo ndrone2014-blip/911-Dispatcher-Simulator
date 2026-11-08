@@ -6,7 +6,8 @@
 // the simulation, addresses or saves. Every layer is culled to the viewport and only
 // drawn above a zoom threshold, and the CAD map caches its base layer, so the extra
 // detail costs nothing while units move – only when you pan or zoom.
-import { city, TOWNS, RIVERS, ROADS, townAt, nearRiver } from '../../data/city.js';
+import { city, TOWNS, RIVERS, ROADS, townAt, nearRiver, moveOld } from '../../data/city.js';
+import { g2 } from '../../data/geo.js';
 
 let cache = null;
 export function mapDetail() { return (cache ||= build()); }
@@ -66,13 +67,13 @@ function segInter(a, b, c, d) {
 
 // Roughly where White County's townships sit (labels only).
 export const TOWNSHIPS = [
-  ['MILL SHOALS TWP', 1900, 900], ['BURNT PRAIRIE TWP', 4300, 1500], ['GRAY TWP', 9900, 1000], ['INDIAN CREEK TWP', 1600, 3800],
-  ['ENFIELD TWP', 2700, 5000], ['CARMI TWP', 6100, 4800], ['PHILLIPS TWP', 9600, 3500], ['HERALDS PRAIRIE TWP', 3700, 8300],
-  ['HAWTHORNE TWP', 7600, 6700], ['EMMA TWP', 9300, 8000],
-];
+  ['MILL SHOALS TWP', 38.205, -88.320], ['BURNT PRAIRIE TWP', 38.205, -88.200], ['GRAY TWP', 38.218, -88.050], ['ENFIELD TWP', 38.090, -88.320],
+  ['CARMI TWP', 38.115, -88.205], ['PHILLIPS TWP', 38.169, -88.049], ['HAWTHORNE TWP', 38.070, -88.095], ['INDIAN CREEK TWP', 37.974, -88.320],
+  ['HERALDS PRAIRIE TWP', 37.975, -88.202], ['EMMA TWP', 37.988, -88.085],
+].map(([n, la, lo]) => [n, ...g2(la, lo)]);
 
 // Decorative rail line (east–west through the south side of Carmi, then north-east to the Wabash).
-const RAIL = [[-500, 6900], [1400, 6870], [3000, 6820], [4600, 6760], [5600, 6720], [6900, 6700], [7700, 6250], [8300, 5600], [8900, 4900], [9600, 3700], [10300, 2600], [10900, 2000], [11320, 1650], [12450, 1300]];
+const RAIL = [[-500, 6900], [1400, 6870], [3000, 6820], [4600, 6760], [5600, 6720], [6900, 6700], [7700, 6250], [8300, 5600], [8900, 4900], [9600, 3700], [10300, 2600], [10900, 2000], [11320, 1650], [12450, 1300]].map(([x, y]) => moveOld(x, y));
 
 function build() {
   const r = rng(20261107);

@@ -15,7 +15,7 @@ export class HUD {
       <div id="topbar"></div><div id="break-banner" hidden>☕ On break – new calls are covered by coworkers. Talk to Karen or sit at your desk to return.</div>
       <div id="hint-box"></div>
       <div id="click-to-play" hidden><b>Click to look around</b><div class="dim" style="font-size:.85em;margin-top:4px">WASD to move · E to interact · Tab for your console · Esc to pause</div></div>
-      <div id="fps" hidden></div>`;
+      <div id="fps" hidden></div><div id="captions" aria-live="polite"></div>`;
     this.$ = (id) => this.root.querySelector(`#${id}`);
     bindActions(this.root, { cad: () => this.game.goToDesk(), pause: () => this.game.togglePauseMenu(), answer: () => { this.game.goToDesk(); setTimeout(() => this.game.cad.answerNext(), 600); } });
     this.$('click-to-play').addEventListener('click', () => this.game.lockPointer());
@@ -26,6 +26,14 @@ export class HUD {
       this.game.world?.player.setupTouch(this.mobile.querySelector('#joy'), this.mobile.querySelector('#look-zone'));
     }
     this.setVisible(false);
+  }
+
+  /** Subtitle line for something said nearby (roll call, overheard coworkers). */
+  caption(who, text, dur = 4.5) {
+    const box = this.$?.('captions'); if (!box || this.game.settings.data.ui.captions === false) return;
+    const el = document.createElement('div'); el.className = 'cap'; el.innerHTML = `<b>${esc(who)}:</b> ${esc(text)}`;
+    box.appendChild(el); while (box.children.length > 2) box.firstChild.remove();
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 400); }, Math.max(2000, dur * 1000));
   }
 
   setVisible(v) {

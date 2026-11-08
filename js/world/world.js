@@ -4,7 +4,10 @@ import { Renderer } from '../engine/renderer.js';
 import { MeshBuilder } from '../engine/geometry.js';
 import { makeTextures, makeCanvas, makeEnvironment, makeBlob, makeFace } from '../engine/textures.js';
 import { forwardOf, rayAABB, trs, mat4 } from '../engine/math.js';
-import { buildCenter, consoleList, PLAYER_CONSOLE, BUILDING_BOUNDS } from './building.js';
+import { buildCenter, consoleList, PLAYER_CONSOLE, BUILDING_BOUNDS, OUTDOOR_BOUNDS } from './building.js';
+import { PD } from './policeDept.js';
+import { DynamicDoors } from './doors.js';
+import { Weather3D } from './weather3d.js';
 import { makeSignAtlas } from './exterior.js';
 import { ScreenPainter } from './screens.js';
 import { NPCManager } from './npcs.js';
@@ -27,7 +30,7 @@ export class World {
   constructor(canvas, game) {
     this.canvas = canvas; this.game = game; this.failed = false; this.lost = false; this.items = []; this.flash = 0; this.nextFlash = 10;
     this.player = new Player(this); this.target = null; this.time = 0; this.frame = 0;
-    this.static = []; this.screens = {}; this.ownedTex = []; this.blobs = [];
+    this.static = []; this.screens = {}; this.ownedTex = []; this.blobs = []; this.shadowLevel = 0; this.lastLevel = 0;
     this.perf = { ema: 1 / 60, slow: 0, fast: 0, warmup: 4, frameMs: 0 };
     this.adaptiveNote = '';
   }
@@ -72,7 +75,12 @@ export class World {
       sphere: this.renderer.createMesh(new MeshBuilder().sphere(0, 0, 0, 1, 14, 10).build()),
       disc: this.renderer.createMesh(new MeshBuilder().disc(0, 0, 0, 1, 20).build()),
       torso: this.renderer.createMesh(taperedTorso()),
+      cube: this.renderer.createMesh(new MeshBuilder().box(0, 0, 0, 1, 1, 1, { uv: 0 }).build()),
+      limb: this.renderer.createMesh(new MeshBuilder().rbox(0, 0, 0, 1, 1, 1, { r: 0.3, seg: 2, uv: 0 }).build()),
+      shoe: this.renderer.createMesh(shoeMesh()),
     };
+    this.sky = { mesh: this.renderer.createMesh(skyDome(), {}), colors: null, last: -9 };
+    this.weather3d = new Weather3D(this);
     this.renderer.setEnvironment(makeEnvironment(256), 1.0);
     this.renderer.configureShadow(BUILDING_BOUNDS, [0.06, -1, 0.04]);
     this.build();
@@ -90,6 +98,7 @@ export class World {
     this.tex.extSigns = tex(makeSignAtlas(), { repeat: false });
     this.tex.rangeTarget = tex(this.targetCanvas(), { repeat: false });
     this.tex.vend = tex(this.vendCanvas()); this.tex.rack = tex(this.rackCanvas()); this.tex.books = tex(this.booksCanvas());
+    for (const k of ['pdBriefing', 'pdTraining']) this.tex[k] = this.tex[k] || tex(T[k], { repeat: false });
     this.texSize = size;
     this.mats = this.makeMaterials();
   }
@@ -118,13 +127,20 @@ export class World {
     const m = (o) => ({ color: [1, 1, 1], specular: 0.12, shininess: 20, ...o });
     const glow = (rgb, o = {}) => m({ color: [0, 0, 0], emissive: rgb, unlit: true, noCast: true, ...o });
     return {
-      carpet: m({ map: t.carpet, specular: 0.015, shininess: 8 }), carpetDark: m({ map: t.carpet, color: [0.82, 0.8, 0.78], specular: 0.015, shininess: 8 }),
-      ceiling: m({ map: t.ceiling, specular: 0, noCast: true }), wall: m({ map: t.wall, specular: 0.05, shininess: 14 }), accent: m({ map: t.accent, specular: 0.03 }),
-      wood: m({ map: t.wood, specular: 0.3, shininess: 40, reflect: 0.05 }), woodDark: m({ map: t.wood, color: [0.58, 0.5, 0.45], specular: 0.28, shininess: 36, reflect: 0.04 }), laminate: m({ map: t.laminate, specular: 0.28, shininess: 46, reflect: 0.05 }),
-      fabric: m({ map: t.fabric, specular: 0.02 }), mesh: m({ map: t.mesh, specular: 0.08, shininess: 18 }),
-      fabricBlue: m({ map: t.fabric, color: [0.55, 0.75, 1.3], specular: 0.02 }), fabricWarm: m({ map: t.fabric, color: [1.6, 1.15, 0.8], specular: 0.02 }),
-      metal: m({ map: t.metal, specular: 0.6, shininess: 50, reflect: 0.2 }), chrome: m({ color: [0.75, 0.77, 0.8], specular: 1.0, shininess: 110, reflect: 0.55 }),
-      tile: m({ map: t.tile, specular: 0.4, shininess: 60, reflect: 0.1 }), concrete: m({ map: t.concrete, specular: 0.05 }),
+      carpet: m({ map: t.carpet, specular: 0.015, shininess: 8, bump: 0.004 }), carpetDark: m({ map: t.carpet, color: [0.82, 0.8, 0.78], specular: 0.015, shininess: 8, bump: 0.004 }),
+      ceiling: m({ map: t.ceiling, specular: 0, noCast: true, bump: 0.002 }), wall: m({ map: t.wall, specular: 0.05, shininess: 14, bump: 0.0012 }), accent: m({ map: t.accent, specular: 0.03, bump: 0.0012 }),
+      wood: m({ map: t.wood, specular: 0.3, shininess: 40, reflect: 0.05, bump: 0.0015 }), woodDark: m({ map: t.wood, color: [0.58, 0.5, 0.45], specular: 0.28, shininess: 36, reflect: 0.04, bump: 0.0015 }), laminate: m({ map: t.laminate, specular: 0.28, shininess: 46, reflect: 0.05, bump: 0.0008 }),
+      fabric: m({ map: t.fabric, specular: 0.02, bump: 0.003 }), mesh: m({ map: t.mesh, specular: 0.08, shininess: 18, bump: 0.003 }),
+      fabricBlue: m({ map: t.fabric, color: [0.55, 0.75, 1.3], specular: 0.02, bump: 0.003 }), fabricWarm: m({ map: t.fabric, color: [1.6, 1.15, 0.8], specular: 0.02, bump: 0.003 }),
+      metal: m({ map: t.metal, specular: 0.6, shininess: 50, reflect: 0.2, bump: 0.0008 }), chrome: m({ color: [0.75, 0.77, 0.8], specular: 1.0, shininess: 110, reflect: 0.55 }),
+      tile: m({ map: t.tile, specular: 0.4, shininess: 60, reflect: 0.1, bump: 0.0015 }), concrete: m({ map: t.concrete, specular: 0.05, bump: 0.003 }),
+      // Police Department finishes
+      terrazzo: m({ map: t.terrazzo, specular: 0.55, shininess: 80, reflect: 0.16, bump: 0.0008 }), officeCarpet: m({ map: t.officeCarpet, specular: 0.015, shininess: 8, bump: 0.004 }),
+      ceramic: m({ map: t.ceramic, specular: 0.7, shininess: 90, reflect: 0.1, bump: 0.0015 }), plank: m({ map: t.plank, specular: 0.32, shininess: 44, reflect: 0.06, bump: 0.002 }),
+      glassDoor: m({ color: [0.55, 0.7, 0.8], opacity: 0.22, specular: 1.0, shininess: 120, transparent: true, doubleSided: true, reflect: 0.3 }),
+      stallDoor: m({ color: [0.5, 0.56, 0.63], specular: 0.35, shininess: 40, reflect: 0.05 }), fridgeDoor: m({ color: [0.9, 0.9, 0.9], specular: 0.5, shininess: 50, reflect: 0.1 }),
+      woodDoor: m({ color: [0.52, 0.36, 0.22], specular: 0.25, shininess: 30 }),
+      pdBriefing: m({ color: [0.02, 0.02, 0.02], emissiveMap: t.pdBriefing, emissive: [1, 1, 1], reflect: 0.06, shininess: 90 }), pdTraining: m({ color: [0.06, 0.06, 0.06], emissiveMap: t.pdTraining, emissive: [0.95, 0.95, 0.95], noCast: true }),
       counter: m({ map: t.laminate, color: [0.95, 0.94, 0.92], specular: 0.3, shininess: 50, reflect: 0.06 }), counterTop: m({ map: t.tile, color: [0.45, 0.43, 0.42], specular: 0.5, shininess: 70, reflect: 0.12 }),
       cabinet: m({ map: t.cabinet, specular: 0.2, shininess: 30, reflect: 0.03 }),
       // shared solid-colour batches (colour comes from the vertices)
@@ -161,6 +177,17 @@ export class World {
       blob: { color: [0, 0, 0], map: t.blob, unlit: true, opacity: 0.42, transparent: true, noCast: true },
       // outdoors: unlit (lighting baked in the vertices), tinted per frame for time of day + weather, with outdoor haze
       ext: { color: [1, 1, 1], unlit: true, noCast: true, receive: false, fogMode: 2 },
+      ext2: { color: [1, 1, 1], unlit: true, noCast: true, receive: false, fogMode: 2 },
+      extBrick: { color: [1, 1, 1], map: t.brick, unlit: true, noCast: true, receive: false, fogMode: 2 },
+      extRoof: { color: [1, 1, 1], map: t.roof, unlit: true, noCast: true, receive: false, fogMode: 2 },
+      extAsphalt: { color: [1, 1, 1], map: t.asphalt, unlit: true, noCast: true, receive: false, fogMode: 2 },
+      extWalk: { color: [1, 1, 1], map: t.sidewalk, unlit: true, noCast: true, receive: false, fogMode: 2 },
+      extGrass: { color: [1, 1, 1], map: t.grass, unlit: true, noCast: true, receive: false, fogMode: 2 },
+      extBark: { color: [1, 1, 1], map: t.bark, unlit: true, noCast: true, receive: false, fogMode: 2 },
+      extLeaves: { color: [1, 1, 1], map: t.leaves, unlit: true, noCast: true, receive: false, fogMode: 2 },
+      extGlow2: { color: [0.2, 0.25, 0.3], unlit: true, noCast: true, receive: false, fogMode: 2 },
+      sky: { color: [0.82, 0.84, 0.88], unlit: true, noCast: true, receive: false, fogMode: 1, order: -100, doubleSided: true },
+      rain: { color: [0.75, 0.8, 0.88], unlit: true, noCast: true, receive: false, fogMode: 2, opacity: 0.38, transparent: true, doubleSided: true },
       extGlow: { color: [0.2, 0.25, 0.3], unlit: true, noCast: true, receive: false, fogMode: 2 },
       extSigns: { color: [1, 1, 1], map: t.extSigns, unlit: true, noCast: true, receive: false, fogMode: 2 },
       extFlagUS: { color: [1, 1, 1], map: t.flagUS, unlit: true, noCast: true, receive: false, fogMode: 2, doubleSided: true },
@@ -204,6 +231,7 @@ export class World {
       this.screens[s.key] = { def: s, canvas, texture, mat, last: -99 };
     }
     for (const [key, b] of Object.entries(center.batches)) {
+      if (key.startsWith('scr_sky')) continue; // the old painted sky planes – the sky dome replaces them
       const mesh = this.renderer.createMesh(b.build());
       const [base, zone] = key.split('@');
       const mat = this.mats[base] || this.screens[base]?.mat || this.mats.satin;
@@ -217,17 +245,30 @@ export class World {
     }
     const extra = g.career.has('extra_staff', mode);
     const prevTalk = this.npcs?.talkingTo;
-    this.npcs = new NPCManager(this, { count: this.preset.npcs, extraStaff: extra });
+    this.walk = center.walk; this.seats = center.seats;
+    this.doors = new DynamicDoors(this, center.doors, this.doors);
+    this.npcs = new NPCManager(this, { count: this.preset.npcs, extraStaff: extra, nav: center.nav });
     this.npcs.talkingTo = prevTalk;
-    this.points = center.lights.map((l) => ({ pos: l.pos, color: [1, 1, 1], range: l.room === 'floor' ? 7.5 : 6.5, room: l.room }));
+    this.points = center.lights.map((l) => ({ pos: l.pos, color: [1, 1, 1], range: l.range || (l.room === 'floor' ? 7.5 : 6.5), room: l.room, dim: l.dim || 1 }));
     this.renderer.shadowDirty = true;
   }
+
+  /** Which story the player is on: 0 = ground, 1 = Police Department second floor. */
+  level() { return this.player.feet > PD.F2 * 0.62 ? 1 : 0; }
+  inPD(p = this.player.pos) { return p[0] > PD.x0 - 0.2 && p[0] < PD.x1 + 0.2 && p[2] > PD.z0 - 0.2 && p[2] < PD.z1 + 0.05; }
+  /** Is a point outside the building (out on the grounds)? */
+  outside(p = this.player.pos) {
+    const x = p[0], z = p[2];
+    const rects = [[PD.x0, PD.z0, PD.x1, PD.z1], [-12, -8, 12, 16], [-12, 16, -3, 18], [-42, -2, -12, 18], [-30, -8, -12, -2], [-22, -26, -12, -8]];
+    return !rects.some(([x0, z0, x1, z1]) => x > x0 - 0.05 && x < x1 + 0.05 && z > z0 - 0.05 && z < z1 + 0.05);
+  }
+  inStairwell(p = this.player.pos) { return (p[0] > 5 && p[0] < 8.6 && p[2] > -15 && p[2] < -8) || (p[0] > -12 && p[0] < -8.6 && p[2] > -25.6 && p[2] < -19.4); }
 
   seatPose() {
     const c = consoleList()[PLAYER_CONSOLE];
     return { pos: [c.x, 1.2, c.z + 0.92], yaw: 0, pitch: -0.18 };
   }
-  teleportNearDesk() { const c = consoleList()[PLAYER_CONSOLE]; this.player.pos = [c.x, 1.65, c.z + 1.9]; this.player.yaw = 0; this.player.pitch = -0.1; }
+  teleportNearDesk() { const c = consoleList()[PLAYER_CONSOLE]; this.player.pos = [c.x, 1.65, c.z + 1.9]; this.player.feet = 0; this.player.yaw = 0; this.player.pitch = -0.1; }
 
   setTalking(id) { if (this.npcs) this.npcs.talkingTo = id; }
   npc(id) { return this.npcs?.npcs.find((n) => n.id === id); }
@@ -247,10 +288,10 @@ export class World {
     const l = Math.hypot(...sunDir);
     const night = 1 - day;
     const lightI = 1.25 - night * 0.18;
-    const tint = { floor: [1.0, 0.97, 0.92], corridor: [1.0, 0.95, 0.88], break: [1.0, 0.9, 0.78], super: [1.0, 0.94, 0.86], radio: [0.92, 0.96, 1.0], director: [1.0, 0.92, 0.82] };
+    const tint = { floor: [1.0, 0.97, 0.92], corridor: [1.0, 0.95, 0.88], break: [1.0, 0.9, 0.78], super: [1.0, 0.94, 0.86], radio: [0.92, 0.96, 1.0], director: [1.0, 0.92, 0.82], armory: [0.96, 0.98, 1.0], brief: [1.0, 0.95, 0.88], garage: [0.95, 0.97, 1.0] };
     for (const p of this.points) {
       const base = p.room === 'floor' ? 1 : 0.9; const c = tint[p.room] || tint.floor;
-      p.color = [lightI * base * c[0], lightI * base * c[1], lightI * base * c[2]];
+      const k2 = lightI * base * (p.dim || 1); p.color = [k2 * c[0], k2 * c[1], k2 * c[2]];
     }
     this.mats.lightpanel.emissive = [1.5 - night * 0.2, 1.45 - night * 0.2, 1.35 - night * 0.2];
     // outdoor scene: daylight tint (warm at dawn/dusk, blue-dark at night, grey when overcast) + street/window lights
@@ -261,8 +302,22 @@ export class World {
     const grey = overcast * 0.5; const avg = (tintO[0] + tintO[1] + tintO[2]) / 3; tintO = tintO.map((c) => c + (avg - c) * grey);
     const fl = this.flash * 0.9; this.mats.ext.color = tintO.map((c) => c + fl); this.mats.extSigns.color = tintO.map((c) => Math.max(c, night * 0.35) + fl);
     this.mats.extFlagUS.color = this.mats.ext.color; this.mats.extFlagIL.color = this.mats.ext.color;
+    for (const k of ['ext2', 'extBrick', 'extRoof', 'extAsphalt', 'extWalk', 'extGrass', 'extBark', 'extLeaves']) this.mats[k].color = this.mats.ext.color;
+    // wet ground and walls darken while it rains, then dry out over a couple of minutes
+    const wetTarget = ['rain', 'thunderstorm', 'severe'].includes(wx) ? 1 : wx === 'snow' ? 0.35 : 0;
+    this._wet = (this._wet ?? wetTarget) + (wetTarget - (this._wet ?? wetTarget)) * Math.min(1, dtE * (wetTarget > (this._wet ?? 0) ? 0.08 : 0.02));
+    for (const k of ['extAsphalt', 'extWalk', 'extRoof']) this.mats[k].wet = this._wet; this.mats.extBrick.wet = this._wet * 0.5; this.mats.extGrass.wet = this._wet * 0.3;
+    this.wetness = this._wet;
+    // sky dome colours (match the painted sky backdrops)
+    { const dk = Math.max(0, Math.min(1, Math.sin(((hr - 6) / 12) * Math.PI) * 1.4)); const mixc = (a, b, q) => a.map((v, i) => v + (b[i] - v) * q);
+      let top = mixc([6, 9, 24], [48, 112, 200], dk), mid = mixc([14, 20, 40], [118, 168, 224], dk);
+      if (dusk > 0) { top = mixc(top, [70, 60, 120], dusk * 0.6); mid = mixc(mid, [205, 125, 120], dusk * 0.55); }
+      const oc = { clear: 0, rain: 0.7, thunderstorm: 0.88, snow: 0.6, fog: 0.85, severe: 0.94 }[wx] ?? 0; const grey = (v) => v.map((x) => x * (0.3 + dk * 0.7));
+      top = mixc(top, grey([84, 90, 100]), oc); mid = mixc(mid, grey([110, 115, 124]), oc);
+      this.skyCols = { top: top.map((v) => (v / 255) ** 2 * (1 + this.flash)), mid: mid.map((v) => (v / 255) ** 2 * (1 + this.flash)) }; }
     const lights = Math.min(1, night * 1.4 + overcast * 0.3);
     this.mats.extGlow.color = [0.2 + (1.15 - 0.2) * lights, 0.26 + (1.15 - 0.26) * lights, 0.42 + (1.15 - 0.42) * lights].map((c, i) => c * (lights > 0.3 ? 1 : 0.8 + day * 0.2));
+    this.mats.extGlow2.color = this.mats.extGlow.color;
     const hz = [0.66 + day * 0.14, 0.72 + day * 0.14, 0.84 + day * 0.12].map((c) => c * bright);
     const fogW = wx === 'fog' ? [6, 75] : wx === 'snow' ? [14, 150] : ['rain', 'thunderstorm', 'severe'].includes(wx) ? [22, 240] : [70, 520];
     this.outFog = { color: hz.map((c, i) => (wx === 'fog' ? c * 1.1 + 0.05 * bright : c)), near: fogW[0], far: fogW[1] };
@@ -281,6 +336,7 @@ export class World {
     let budget = this.perf.ema > 1 / 30 ? 1 : 3; // limit texture uploads per frame (fewer when the device is struggling)
     for (const s of Object.values(this.screens)) {
       const rate = hz[s.def.kind] ?? 0; if (!rate) continue;
+      if (s.def.kind === 'exterior' && s.def.sky) continue; // painted sky planes are no longer drawn (sky dome)
       if (s.def.kind === 'exterior' && this.flash <= 0 && now - s.last < 2) continue; // sky changes slowly
       if (s.def.kind === 'rainfx') { const wx = g.sim?.weather.current(); const wet = ['rain', 'thunderstorm', 'severe', 'snow'].includes(wx); if (!wet && s.dry) continue; s.dry = !wet; }
       if (now - s.last < 1 / rate) continue;
@@ -293,18 +349,30 @@ export class World {
 
   updateInteraction() {
     this.target = null;
-    if (this.player.seated || this.player.transition) return;
+    if (this.player.transition) return;
+    if (this.player.seated) { if (this.player.freeSeat) this.target = { kind: 'stand', label: 'Stand up' }; return; }
     const o = this.player.pos, d = forwardOf(this.player.yaw, this.player.pitch);
+    const lv = this.level(); const feet = this.player.feet;
     let best = null, bd = 2.6;
-    for (const it of [...this.interactablesStatic, ...this.npcs.interactables()]) {
+    const consider = (it) => {
+      if (it.max[1] < feet - 0.4 || it.min[1] > feet + 2.4) return; // other floor
       const t = rayAABB(o, d, it.min, it.max);
       if (t >= 0 && (t < bd - 0.15 || (best && Math.abs(t - bd) < 0.15 && (it.pri || 0) > (best.pri || 0)))) { bd = t; best = it; }
-    }
+    };
+    for (const it of this.interactablesStatic) { if (it.dynamic) continue; consider(it); }
+    for (const it of this.npcs.interactables()) consider(it);
+    for (const it of this.doors.interactables()) consider(it);
+    void lv;
     if (best?.kind === 'console') {
       const occupant = this.npcs.npcs.find((n) => n.consoleIndex === best.consoleIndex && n.sitting);
       if (occupant) best = { ...best, kind: 'npc', npc: occupant.id, label: `Talk to ${occupant.name} (${occupant.role})` };
       else best = { ...best, label: `Console ${best.consoleIndex + 1} (unstaffed)` };
     }
+    if (best?.kind === 'seat') {
+      const st = this.seats[best.seat]; const occ = this.npcs.npcs.find((n) => n.sitting && Math.hypot(n.x - st.x, n.z - st.z) < 0.4 && Math.abs((n.y || 0) - (st.y > 3 ? PD.F2 : 0)) < 1);
+      if (occ) best = { ...best, kind: 'npc', npc: occ.id, label: `Talk to ${occ.name} (${occ.role})`, pri: 3 };
+    }
+    if (best?.kind === 'fridge') { const dr = this.doors.byId[best.id]; if (dr) best = { ...best, label: dr.target > 0.5 ? 'Grab something from the fridge (E) · close it from the side' : 'Open the fridge' }; }
     this.target = best;
   }
 
@@ -347,6 +415,9 @@ export class World {
     return { preset: this.presetName, quality: r.qualityName, scale: r.renderScale, width: r.stats.width, height: r.stats.height, draws: r.stats.draws, tris: Math.round(r.stats.tris), fps: Math.round(1 / Math.max(0.001, this.perf.ema)), frameMs: Math.round(this.perf.frameMs * 10) / 10, shadows: !!r.shadow, post: !!r.q.post, msaa: r.q.msaa, bloom: !!r.q.bloom, note: this.adaptiveNote };
   }
 
+  /** Static + dynamic colliders for the player. */
+  allColliders() { return this.doors ? this.colliders.concat(this.doors.colliders()) : this.colliders; }
+
   update(dt) {
     if (this.failed) return;
     this.time += dt; this.frame++;
@@ -358,8 +429,9 @@ export class World {
       if (this.nextFlash <= 0) { this.flash = 1; this.nextFlash = 7 + Math.random() * 18; this.game.audio?.thunder(0.6 + Math.random() * 2.5); }
     }
     this.flash = Math.max(0, this.flash - dt * 2.8);
-    this.player.update(dt, this.colliders);
+    this.player.update(dt, this.allColliders(), this.walk, OUTDOOR_BOUNDS);
     this.npcs.update(dt * (sim && !sim.paused ? 1 : 0.0), this.player);
+    this.doors.update(dt);
     this.updateInteraction();
     if (this.lost) return;
     // render (throttle while the CAD covers the screen)
@@ -368,23 +440,100 @@ export class World {
     if (!this.game.cad?.open) this.adapt(dt);
     this.updateScreens(dt);
     const items = []; const all = [];
-    // Zone culling: the Sheriff's wing is only visible from the corridor or from inside it
-    const p = this.player.pos; const wingVisible = p[2] > 7.3 || p[0] < -11.4;
-    const outVisible = !(p[0] < -12.2 && p[2] < 8); // deep inside the Sheriff's wing no window looks outside
-    const rangeVisible = p[0] < -11.4 && p[2] < 1.2; // the range is only visible from the armory or inside it
-    for (const s of this.static) { if (s.zone !== 'out') all.push(s); if ((s.zone !== 'wing' || wingVisible) && (s.zone !== 'out' || outVisible) && (s.zone !== 'range' || rangeVisible)) items.push(s); }
+    // ---- zone culling: draw only what can be seen from where you stand ----
+    const p = this.player.pos; const lv = this.level(); const out = this.outside(); const stair = this.inStairwell(); const inPD = this.inPD();
+    if (lv !== this.shadowLevel) { this.shadowLevel = lv; this.renderer.shadowDirty = true; } // the baked shadow map is per floor
+    const up = lv === 1 && !stair;                              // upstairs (outside the stairwells) the ground floor is hidden
+    const wingVisible = out || (!up && (p[2] > 7.3 || p[0] < -11.4));
+    const outVisible = !(p[0] < -12.2 && p[2] < 8 && !out);     // deep inside the Sheriff's wing no window looks outside
+    const rangeVisible = !up && ((p[0] < -11.4 && p[2] < 1.2) || (inPD && p[0] < -6.4 && p[2] > -15.2 && p[2] < -8));
+    const wingVisible2 = wingVisible || rangeVisible; // the range's shell (walls/floor) lives in the wing batches
+    const pd1Visible = out || (!up && (p[2] < 1 || inPD));
+    const pd2Visible = out || lv === 1 || stair;
+    // the dispatch floor and the sheriff's side can't be seen from the PD rooms away from the connecting door
+    const groundVisible = out || (!up && !(inPD && p[2] < -15.2 && p[0] < 8.6) && !(inPD && p[2] < -28.2));
+    for (const s of this.static) {
+      const z = s.zone;
+      if (this.debugZones) { if (this.debugZones.includes(z || 'main')) items.push(s); continue; } // dev tool: draw exactly these zones
+      if (z === 'pd2' ? lv === 1 || this.shadowLevel === 1 : z !== 'out') all.push(s);
+      if (z === 'wing' && !wingVisible2) continue; if (z === 'out' && !outVisible) continue; if (z === 'range' && !rangeVisible) continue;
+      if (z === 'pd1' && !pd1Visible) continue; if (z === 'pd2' && !pd2Visible) continue; if (!z && !groundVisible) continue;
+      items.push(s);
+    }
+    // the sky dome follows the camera (it sits behind everything else outdoors)
+    if (outVisible) { this._envNow = this.env(); this.updateSky(); if (this.sky.item) items.push(this.sky.item); }
     const before = items.length;
-    this.npcs.draw(items, this.unit, (color, spec = 0.12) => ({ color, specular: spec, shininess: 20 }));
-    for (let i = before; i < items.length; i++) all.push(items[i]);
-    // soft contact shadow under every person
-    this.npcs.npcs.forEach((n, i) => {
-      const b = (this.blobs[i] ||= { model: mat4(), mesh: this.unit.disc, mat: this.mats.blob, order: -5 });
+    this.npcs.draw(items, this.unit, (color, spec = 0.12) => ({ color, specular: spec, shininess: 20 }), { level: lv, out, up, pos: p, yaw: this.player.yaw });
+    this.doors.draw(items);
+    for (let i = before; i < items.length; i++) if (items[i].castShadow !== false) all.push(items[i]);
+    // soft contact shadow under every visible person
+    let bi = 0;
+    for (const n of this.npcs.npcs) {
+      if (!n.drawn) continue;
+      const b = (this.blobs[bi++] ||= { model: mat4(), mesh: this.unit.disc, mat: this.mats.blob, order: -5 });
       b.mesh = this.unit.disc; b.mat = this.mats.blob;
-      trs(b.model, n.x, 0.009, n.z, 0, 0, n.sitting ? 0.42 : 0.32, 1, n.sitting ? 0.42 : 0.32); items.push(b);
-    });
+      trs(b.model, n.x, (n.y || 0) + 0.009, n.z, 0, 0, n.sitting ? 0.42 : 0.32, 1, n.sitting ? 0.42 : 0.32); items.push(b);
+    }
+    this.weather3d.update(dt, items, { out, wx, pos: p });
     const cam = { pos: this.player.pos, yaw: this.player.yaw, pitch: this.player.pitch, fov: this.game.settings.data.graphics.fov || 72, near: 0.04, far: 320 };
-    this.renderer.render({ items, shadowItems: all, env: this.env(), points: this.points }, cam);
+    this.renderer.render({ items, shadowItems: all, env: outVisible && this._envNow ? this._envNow : this.env(), points: this.points }, cam);
   }
+
+  updateSky() {
+    const sk = this.sky; const c = this.skyCols; if (!c) return;
+    if (!sk.canvas) { sk.canvas = makeCanvas(512, 128); sk.tex = this.renderer.createTexture(sk.canvas, { repeat: true, mipmap: false }); }
+    if (!sk.item) sk.item = { mesh: sk.mesh, mat: { ...this.mats.sky, map: sk.tex }, model: mat4(), order: -100 };
+    sk.item.mat.map = sk.tex;
+    trs(sk.item.model, this.player.pos[0], -2, this.player.pos[2], this.time * 0.002, 0, 1, 1, 1); // clouds drift slowly
+    const clk = this.game.sim ? this.game.sim.clock() : 0; const wxNow = this.game.sim?.weather.current();
+    if (this.time - sk.last > 1.5 || Math.abs(clk - sk.clk) > 3 || wxNow !== sk.wx || (this.flash > 0 && this.time - sk.last > 0.1)) { sk.last = this.time; sk.clk = clk; sk.wx = wxNow; this.paintSkyDome(sk.canvas); this.renderer.updateTexture(sk.tex, sk.canvas); }
+  }
+
+  /** Sky texture for the dome: zenith → horizon gradient, sun glow, layered clouds, overcast, haze at the horizon. */
+  paintSkyDome(cv) {
+    const g = cv.getContext('2d'); const W = cv.width, H = cv.height; const c = this.skyCols; const sim = this.game.sim;
+    const hr = (sim ? sim.clock() : 720) / 60; const wx = sim?.weather.current() || 'clear';
+    const oc = { clear: 0.1, rain: 0.75, thunderstorm: 0.92, snow: 0.7, fog: 0.85, severe: 0.95 }[wx] ?? 0.1;
+    const toCss = (v, k = 1) => `rgb(${v.map((x) => Math.round(Math.min(1, Math.sqrt(Math.max(0, x)) * k) * 255)).join(',')})`;
+    const hz = this.outFog?.color || c.mid;
+    const grd = g.createLinearGradient(0, 0, 0, H); grd.addColorStop(0, toCss(c.top)); grd.addColorStop(0.62, toCss(c.mid)); grd.addColorStop(0.92, toCss(hz.map((v) => v * v * 1.1))); grd.addColorStop(1, toCss(hz.map((v) => v * v)));
+    g.fillStyle = grd; g.fillRect(0, 0, W, H);
+    // sun / moon glow
+    const day = Math.max(0, Math.min(1, Math.sin(((hr - 6) / 12) * Math.PI)));
+    const su = ((hr - 6) / 12) * 0.5; const sx = ((su % 1) + 1) % 1 * W, sy = H * (0.86 - day * 0.46); // keep the sun off the dome's pole so it doesn't smear
+    if (day > 0.02) { const r = g.createRadialGradient(sx, sy, 0, sx, sy, 26); r.addColorStop(0, `rgba(255,248,225,${0.8 * (1 - oc)})`); r.addColorStop(0.2, `rgba(255,236,190,${0.3 * (1 - oc)})`); r.addColorStop(1, 'rgba(255,230,180,0)'); g.fillStyle = r; g.fillRect(sx - 30, sy - 30, 60, 60); }
+    else { g.fillStyle = `rgba(230,236,255,${0.8 * (1 - oc)})`; g.beginPath(); g.arc(W * 0.3, H * 0.35, 4, 0, 6.283); g.fill(); for (let i = 0; i < 90; i++) { const x = (i * 97.3) % W, y = (i * 53.7) % (H * 0.75); g.fillStyle = `rgba(255,255,255,${(0.25 + (i % 5) * 0.12) * (1 - oc)})`; g.fillRect(x, y, 1.2, 1.2); } }
+    // clouds: soft overlapping blobs, more and greyer when overcast
+    const n = Math.round(7 + oc * 38); const light = Math.max(0.12, day); const grey = Math.round((150 + 100 * light) * (1 - oc * 0.35));
+    for (let i = 0; i < n; i++) {
+      const x = ((i * 137.5 + this.time * 0.4) % (W + 120)) - 60, y = H * (0.2 + ((i * 0.618) % 1) * 0.55); const rw = 26 + (i * 37) % 46 + oc * 40, rh = 5 + (i * 13) % 8 + oc * 8;
+      for (let k = 0; k < 4; k++) { const cx = x + (k - 1.5) * rw * 0.45, cy = y + Math.sin(i + k) * rh * 0.4; const r = g.createRadialGradient(cx, cy, 0, cx, cy, rw * 0.5); const a = (0.16 + oc * 0.45) * (k === 1 || k === 2 ? 1 : 0.7);
+        r.addColorStop(0, `rgba(${grey},${grey},${Math.min(255, grey + 8)},${a})`); r.addColorStop(1, `rgba(${grey},${grey},${grey},0)`); g.fillStyle = r; g.fillRect(cx - rw, cy - rh * 3, rw * 2, rh * 6); }
+    }
+    if (this.flash > 0) { g.fillStyle = `rgba(230,235,255,${this.flash * 0.6})`; g.fillRect(0, 0, W, H); }
+  }
+}
+
+// Sky dome: hemisphere (radius 280) whose vertex colours fade horizon → zenith.
+const SKY_T = [];
+function skyDome() {
+  const b = new MeshBuilder(); const R = 280, segs = 24, rings = 8; SKY_T.length = 0;
+  for (let y = 0; y <= rings; y++) {
+    const v = y / rings, phi = (1 - v) * Math.PI / 2 + (v === 0 ? -0.08 : 0);
+    for (let x = 0; x <= segs; x++) {
+      const th = (x / segs) * Math.PI * 2; const cx = Math.cos(phi) * Math.cos(th), cy = Math.sin(phi), cz = Math.cos(phi) * Math.sin(th);
+      b.p.push(cx * R, cy * R, cz * R); b.n.push(-cx, -cy, -cz); b.uv.push((x / segs) * 2, 1 - Math.max(0, cy) ** 0.7); b.c.push(1, 1, 1); SKY_T.push(Math.min(1, Math.max(0, cy)) ** 0.6);
+    }
+  }
+  for (let y = 0; y < rings; y++) for (let x = 0; x < segs; x++) { const a = y * (segs + 1) + x, c = a + segs + 1; b.i.push(a, c, a + 1, a + 1, c, c + 1); }
+  return b.build();
+}
+
+/** Rounded shoe: toe box, heel and sole in one mesh (unit size, toe toward -z). */
+function shoeMesh() {
+  const b = new MeshBuilder();
+  b.rbox(0, 0.1, -0.08, 0.9, 0.55, 0.85, { r: 0.35, seg: 2, uv: 0 }); b.rbox(0, 0.25, 0.25, 0.85, 0.75, 0.5, { r: 0.3, seg: 2, uv: 0 }); b.rbox(0, -0.42, 0, 1.0, 0.18, 1.0, { r: 0.08, seg: 1, uv: 0, color: [0.4, 0.4, 0.4] });
+  return b.build();
 }
 
 /** Unit torso: rounded box that widens toward the shoulders and slims at the waist. */

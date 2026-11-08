@@ -122,6 +122,16 @@ export const STORIES = {
     'I helped a family push their car out of a snowbank on Christmas Eve, and they gave me a whole plate of cookies. I shared them with dispatch. Mostly.',
     'Got called to a loose bull on IL-1. Spent forty minutes with three neighbors and a bucket of feed getting him home. Bull didn\'t even say thank you.',
   ],
+  officer: [
+    'First week on patrol I locked my keys in the squad with the engine running. Dispatch sent the sergeant with the spare and did not let me forget it for a year.',
+    'We had a shoplifter at the grocery store who tried to hide a frozen turkey under his jacket. In July. He was shivering when I got there.',
+    'Best call I ever took: a lost four-year-old at the fair. Dispatch had her description out before I even got out of the car. Found her at the funnel cake stand, totally fine, very sticky.',
+    'Foot chase down Main Cross Street at two in the morning. Guy jumped a fence, landed in a kiddie pool, and just sat there. Easiest arrest of my career.',
+    'People think the job is chases. Mostly it\'s checking on Mrs. Henderson because her porch light is off, and she\'s fine, and she gives you a cookie. I like those calls.',
+    'We did a "coffee with a cop" morning at the diner. A kid asked if my handcuffs were real, then asked if he could arrest his sister. I said no. He was disappointed.',
+    'One night shift the radio went quiet for an hour and a half. Dead silence. Every officer in the building was nervous. Then the bars let out.',
+    'I pulled a car over for a burned-out headlight and it was the Chief\'s brother-in-law. He got a warning, same as anybody. The Chief laughed about it for a week.',
+  ],
 };
 
 export const SHARED_STORIES = [

@@ -260,6 +260,74 @@ export function makeTextures(size = 256) {
     ['• BOLO: dark green pickup, dented tailgate (IL-14 thefts)', '• Deer activity high – river bottoms after dusk', '• Harvest traffic on IL-1 & IL-14', '• Grain bin safety checks – Enfield area', '• Courthouse security: 0800–1700'].forEach((l, i) => g.fillText(l, 18, 78 + i * 34));
     g.fillStyle = '#64d2ff'; g.font = '700 14px system-ui'; g.fillText('BE SAFE · WEAR YOUR VEST · CHECK YOUR RADIO', 18, 270); T.briefing = c; }
 
+  // ---------------- Police Department + exterior materials ----------------
+  // Face brick, running bond: 4 courses x 2 bricks per tile (tile = 0.6 m wide x 0.3 m tall when uv = 0.6).
+  T.brick = paint(S, (x, y, n, r) => {
+    const rows = 4, cols = 2; const ch = S / rows, cw = S / cols;
+    const row = Math.floor(y / ch); const off = row % 2 ? cw / 2 : 0; const bx = Math.floor(((x + off) % S) / cw);
+    const lx = (x + off) % cw, ly = y % ch; const mortar = lx < 3 * k || ly < 3 * k;
+    const id = (row * 7 + bx * 13) % 11; const tone = [0, 10, -8, 16, -14, 6, -4, 20, -18, 3, 12][id];
+    if (mortar) { const m = 168 + (n - 0.5) * 30; return [clamp(m), clamp(m - 4), clamp(m - 12)]; }
+    const edge = Math.min(lx, cw - lx, ly, ch - ly) < 6 * k ? -10 : 0;
+    const v = (n - 0.5) * 34 + (r() - 0.5) * 26 + tone + edge;
+    return [clamp(146 + v), clamp(70 + v * 0.6), clamp(52 + v * 0.45)];
+  }, { offset: 21 });
+  // Asphalt: aggregate speckle over soft patches, a few dark patches and cracks.
+  T.asphalt = paint(S, (x, y, n, r) => {
+    const sp = r(); const crack = Math.abs(Math.sin(x * 0.045 / k + Math.sin(y * 0.03 / k) * 3) * 40 - y * 0.06 / k % 40) < 0.5 && n > 0.6 ? -28 : 0;
+    const v = 64 + (n - 0.5) * 26 + (sp > 0.93 ? 30 : sp < 0.06 ? -20 : 0) + (sp - 0.5) * 12 + crack;
+    return [clamp(v), clamp(v + 1), clamp(v + 4)];
+  }, { offset: 22 });
+  // Broom-finished concrete with tooled control joints every tile.
+  T.sidewalk = paint(S, (x, y, n, r) => {
+    const joint = x < 2 * k || y < 2 * k ? -42 : 0; const broom = Math.sin(y * 1.7 / k + n * 6) * 4;
+    const v = 170 + (n - 0.5) * 36 + (r() - 0.5) * 14 + broom + joint;
+    return [clamp(v), clamp(v - 2), clamp(v - 7)];
+  }, { offset: 23 });
+  // Lawn: blade streaks over mottled green.
+  T.grass = paint(S, (x, y, n, r) => {
+    const blade = Math.sin(x * 2.3 / k + Math.sin(y * 0.9 / k) * 2) * 0.5 + 0.5; const sp = r();
+    const v = (n - 0.5) * 50 + blade * 14 + (sp - 0.5) * 30;
+    return [clamp(92 + v * 0.7), clamp(128 + v), clamp(58 + v * 0.5)];
+  }, { offset: 24 });
+  // Ballasted / membrane flat roof.
+  T.roof = paint(S, (x, y, n, r) => { const v = 120 + (n - 0.5) * 40 + (r() - 0.5) * 40 + (y % (S / 4) < 2 * k ? -18 : 0); return [clamp(v), clamp(v), clamp(v + 3)]; }, { offset: 25 });
+  // Polished terrazzo for the lobby and corridors (reflective).
+  T.terrazzo = paint(S, (x, y, n, r) => {
+    const chip = r(); const c = chip > 0.92 ? [70, 66, 62] : chip > 0.84 ? [214, 206, 192] : chip > 0.8 ? [150, 110, 80] : null;
+    const base = 186 + (n - 0.5) * 22; const strip = x % (S / 2) < 2 * k || y % (S / 2) < 2 * k;
+    if (strip) return [176, 160, 120];
+    return c ? c.map((v) => clamp(v + (n - 0.5) * 20)) : [clamp(base), clamp(base - 3), clamp(base - 9)];
+  }, { offset: 26 });
+  // Office carpet tile (charcoal blue with a fine loop pattern).
+  T.officeCarpet = paint(S, (x, y, n, r) => {
+    const loop = ((x >> 1) + (y >> 1)) % 4 === 0 ? 6 : 0; const seam = x % (S / 2) < 1 || y % (S / 2) < 1 ? -10 : 0;
+    const v = 52 + (n - 0.5) * 18 + (r() - 0.5) * 16 + loop + seam;
+    return [clamp(v * 0.82), clamp(v * 0.92), clamp(v * 1.12)];
+  }, { offset: 27 });
+  // Glazed ceramic wall tile for restrooms (0.3 m squares with grout).
+  T.ceramic = paint(S, (x, y, n, r) => {
+    const g = S / 2; const grout = x % g < 2 * k || y % g < 2 * k; if (grout) return [150, 150, 146];
+    const v = 226 + (n - 0.5) * 10 + (r() - 0.5) * 4; return [clamp(v - 6), clamp(v), clamp(v + 2)];
+  }, { offset: 28 });
+  // Vinyl plank floor (break room / training room).
+  T.plank = paint(S, (x, y, n, r) => {
+    const pw = S / 4; const row = Math.floor(y / pw); const off = (row * 97) % S; const seam = y % pw < 2 * k || (x + off) % S < 2 * k;
+    const grain = Math.sin((x + off) * 0.25 / k + n * 9 + row) * 8; const v = 150 + (n - 0.5) * 30 + grain + (row % 3) * 9 + (seam ? -40 : 0);
+    return [clamp(v), clamp(v * 0.78), clamp(v * 0.56)];
+  }, { offset: 29 });
+  // Tree bark (vertical fissures).
+  T.bark = paint(S, (x, y, n, r) => { const f = Math.abs(Math.sin(x * 0.22 / k + n * 5)) ; const v = 70 + f * 40 + (n - 0.5) * 30 + (r() - 0.5) * 10; return [clamp(v * 0.85), clamp(v * 0.7), clamp(v * 0.55)]; }, { offset: 30 });
+  // City Police roll-call slide and the training-room projector slide
+  const slide = (title, accent, lines, foot) => { const c = cv(512, 288); const g = c.getContext('2d'); const grd = g.createLinearGradient(0, 0, 0, 288); grd.addColorStop(0, '#102038'); grd.addColorStop(1, '#08101d'); g.fillStyle = grd; g.fillRect(0, 0, 512, 288);
+    g.fillStyle = accent; g.fillRect(0, 0, 512, 40); g.fillStyle = '#08101d'; g.font = '900 22px system-ui'; g.fillText(title, 14, 28);
+    g.fillStyle = '#dfe8f5'; g.font = '700 17px system-ui'; lines.forEach((l, i) => g.fillText(l, 18, 76 + i * 33));
+    g.fillStyle = '#64d2ff'; g.font = '700 14px system-ui'; g.fillText(foot, 18, 272); return c; };
+  T.pdBriefing = slide('CITY POLICE · ROLL CALL', '#3da5ff', ['• Patrol priorities: downtown, schools at dismissal', '• Catalytic converter thefts – check parked trucks', '• Harvest traffic: IL-1 / IL-14 after dark', '• BOLO board updated 0600 – read before patrol', '• Body cams ON every contact'], 'SAFE SHIFT · CHECK YOUR GEAR · BACK EACH OTHER UP');
+  T.pdTraining = slide('IN-SERVICE TRAINING · DE-ESCALATION', '#2fd08a', ['1. Slow it down: time, distance, cover', '2. Listen first – one officer talks', '3. Crisis Intervention Team referral', '4. Use-of-force reporting refresher', '5. CPR / AED recertification at 1400'], 'STATE-MANDATED TRAINING HOURS · SIGN IN AT THE DOOR');
+  // Foliage clumps (used with alpha-free shading on leaf masses).
+  T.leaves = paint(S, (x, y, n, r) => { const sp = r(); const v = (n - 0.5) * 80 + (sp - 0.5) * 70; return [clamp(180 + v), clamp(190 + v), clamp(170 + v)]; }, { offset: 31 });
+
   return T;
 }
 

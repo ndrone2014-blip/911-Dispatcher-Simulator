@@ -44,6 +44,9 @@ function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 10139
 
 export function buildExterior({ D = 1 } = {}) {
   const ext = new MeshBuilder(), glow = new MeshBuilder(), signs = new MeshBuilder(), flagUS = new MeshBuilder(), flagIL = new MeshBuilder();
+  // textured ground surfaces (world-space UVs) + bark/leaf masses for trees
+  const asphalt = new MeshBuilder(), walk = new MeshBuilder(), grass = new MeshBuilder(), bark = new MeshBuilder(), leaves = new MeshBuilder();
+  const cols = []; const col = (x0, z0, x1, z1, h = 3) => cols.push([Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1), 0, h]);
   const r = rng(6180911);
   const S = season();
   const C = {
@@ -61,7 +64,13 @@ export function buildExterior({ D = 1 } = {}) {
   };
   const pick = (a) => a[Math.floor(r() * a.length)];
   const box = (x, y, z, sx, sy, sz, color, o = {}) => ext.box(x, y, z, sx, sy, sz, { color, uv: 0, ...o });
-  const flat = (x0, z0, x1, z1, y, color) => box((x0 + x1) / 2, y, (z0 + z1) / 2, x1 - x0, 0.02, z1 - z0, color, { faces: 'Y' });
+  const flat = (x0, z0, x1, z1, y, color) => {
+    // roads, sidewalks and lawns get real textures; everything else stays a flat colour
+    const isA = color === C.asphalt || color === C.asphalt2, isW = color === C.concrete, isG = color === C.grass || color === C.grass2;
+    if (isA || isW || isG) { const mb = isA ? asphalt : isW ? walk : grass; const tint = isA ? (color === C.asphalt2 ? [1.05, 1.05, 1.05] : [0.95, 0.95, 0.95]) : isG ? (color === C.grass2 ? C.grass2.map((v) => v / 0.4) : C.grass.map((v) => v / 0.4)) : [1, 1, 1];
+      mb.box((x0 + x1) / 2, y, (z0 + z1) / 2, x1 - x0, 0.02, z1 - z0, { color: tint.map((v) => Math.min(1.4, v)), faces: 'Y', uv: isA ? 3.2 : isW ? 1.5 : 4 }); return; }
+    box((x0 + x1) / 2, y, (z0 + z1) / 2, x1 - x0, 0.02, z1 - z0, color, { faces: 'Y' });
+  };
 
   // Gable roof over a rectangle. Ridge runs along x when alongX, else along z.
   const roof = (cx, cz, w, d, y0, rise, color, alongX = true, over = 0.35) => {
@@ -80,22 +89,31 @@ export function buildExterior({ D = 1 } = {}) {
   };
   const tree = (x, z, h = 7 + r() * 5, kind) => {
     const ever = kind === 'ever' || (kind == null && r() < 0.12);
-    ext.cylinder(x, h * 0.22, z, 0.16 + h * 0.012, h * 0.44, 5, { color: C.trunk, caps: false });
+    const tr = 0.16 + h * 0.012;
+    bark.cylinder(x, h * 0.22, z, tr, h * 0.44, D >= 2 ? 8 : 6, { color: [1, 0.95, 0.9], caps: false, r2: tr * 0.7 });
+    if (D >= 1 && !ever) for (let i = 0; i < 3; i++) { const a = r() * 6.28; bark.box(x + Math.cos(a) * h * 0.08, h * (0.42 + i * 0.07), z + Math.sin(a) * h * 0.08, 0.07, h * 0.22, 0.07, { color: [1, 0.95, 0.9], uv: 0, rotY: a }); }
+    if (Math.abs(x) < 70 && Math.abs(z) < 70) col(x - tr - 0.05, z - tr - 0.05, x + tr + 0.05, z + tr + 0.05, h);
     if (ever) { for (let i = 0; i < 3; i++) ext.cylinder(x, h * (0.35 + i * 0.2), z, h * (0.28 - i * 0.07), h * 0.32, 8, { color: C.evergreen.map((v) => v * (0.9 + i * 0.08)), r2: 0.05 }); return; }
     if (S === 'winter' && r() < 0.7) { // bare branches
       for (let i = 0; i < 5; i++) { const a = i * 1.3; ext.box(x + Math.cos(a) * h * 0.12, h * 0.62, z + Math.sin(a) * h * 0.12, 0.08, h * 0.38, 0.08, { color: C.trunk, uv: 0, rotY: a }); }
       ext.sphere(x, h * 0.72, z, h * 0.3, 7, 5, { color: [0.3, 0.25, 0.2], sy: 0.9 }); return;
     }
     const base = pick(C.leaves); const R = h * (0.26 + r() * 0.08);
-    const seg = D >= 2 ? 8 : 6, rings = D >= 2 ? 5 : 4;
-    ext.sphere(x, h * 0.66, z, R, seg, rings, { color: base, sy: 0.85 });
-    ext.sphere(x + R * 0.45, h * 0.58, z + R * 0.2, R * 0.7, seg, rings, { color: base.map((v) => v * 0.9) });
-    if (D >= 2) ext.sphere(x - R * 0.35, h * 0.78, z - R * 0.25, R * 0.62, seg, rings, { color: base.map((v) => Math.min(1, v * 1.12)) });
+    const far = Math.hypot(x, z) > 85; // distant tree lines need far fewer triangles
+    const seg = far ? 5 : D >= 2 ? 7 : 6, rings = far ? 3 : D >= 2 ? 5 : 4;
+    // a canopy of several lumpy leaf masses (jittered spheres) instead of one ball
+    const clump = (cx, cy, cz, rr, col2) => { const k0 = leaves.vcount; leaves.sphere(cx, cy, cz, rr, seg, rings, { color: col2, sy: 0.85 }); for (let v = k0; v < leaves.vcount; v++) { const j = 0.82 + 0.3 * Math.abs(Math.sin(v * 12.9898 + cx) * 43758.5453 % 1); leaves.p[v * 3] = cx + (leaves.p[v * 3] - cx) * j; leaves.p[v * 3 + 1] = cy + (leaves.p[v * 3 + 1] - cy) * j; leaves.p[v * 3 + 2] = cz + (leaves.p[v * 3 + 2] - cz) * j; } };
+    const lc = base.map((v) => v * 2.2);
+    clump(x, h * 0.66, z, R, lc);
+    clump(x + R * 0.45, h * 0.58, z + R * 0.2, R * 0.7, lc.map((v) => v * 0.88));
+    if (D >= 1 && !far) clump(x - R * 0.35, h * 0.78, z - R * 0.25, R * 0.62, lc.map((v) => Math.min(2.4, v * 1.1)));
+    if (D >= 2 && !far) clump(x - R * 0.2, h * 0.55, z + R * 0.45, R * 0.55, lc.map((v) => v * 0.95));
   };
   const shrub = (x, z, s = 1) => ext.sphere(x, 0.35 * s, z, 0.55 * s, 6, 4, { color: S === 'winter' ? C.evergreen : [0.16, 0.32, 0.13], sy: 0.75 });
   // Sedan / pickup / patrol car with rounded body, sloped glasshouse, wheels and lamps. rot = 0 faces +x.
   const car = (x, z, rot, color, kind = 'sedan') => {
     const pickup = kind === 'pickup'; const L = pickup ? 5.5 : 4.85, W = 1.86; const cr = Math.cos(rot), sr = Math.sin(rot);
+    { const hx = (Math.abs(cr) * L + Math.abs(sr) * W) / 2, hz = (Math.abs(sr) * L + Math.abs(cr) * W) / 2; col(x - hx, z - hz, x + hx, z + hz, 1.6); }
     const P = (dx, dz) => [x + dx * cr + dz * sr, z - dx * sr + dz * cr];
     const seg = D >= 2 ? 2 : 1;
     ext.rbox(x, 0.6, z, L, 0.56, W, { color, rotY: rot, r: 0.16, seg, uv: 0 });                                   // lower body
@@ -118,6 +136,7 @@ export function buildExterior({ D = 1 } = {}) {
     }
   };
   const streetLight = (x, z, armDir, h = 8) => {
+    col(x - 0.18, z - 0.18, x + 0.18, z + 0.18, h);
     ext.cylinder(x, h / 2, z, 0.1, h, 6, { color: C.pole, caps: false });
     box(x + armDir[0] * 1.1, h, z + armDir[1] * 1.1, armDir[0] ? 2.2 : 0.12, 0.12, armDir[1] ? 2.2 : 0.12, C.pole);
     glow.box(x + armDir[0] * 2.1, h - 0.1, z + armDir[1] * 2.1, 0.7, 0.14, 0.35, { color: [1.3, 1.05, 0.72], uv: 0, faces: 'yxXzZ' });
@@ -181,12 +200,12 @@ export function buildExterior({ D = 1 } = {}) {
   box(150, -0.1, -40, 240, 0.02, 0.24, C.yellow, { faces: 'Y' });
   flat(39, -46, 270, -44, -0.11, C.concrete); flat(39, -36, 270, -34, -0.11, C.concrete);
   // traffic signal at the corner
-  ext.cylinder(39.6, 3, -34.6, 0.12, 6, 6, { color: [0.2, 0.2, 0.22], caps: false }); box(37.4, 5.8, -34.6, 4.4, 0.14, 0.14, [0.2, 0.2, 0.22]);
+  ext.cylinder(39.6, 3, -34.6, 0.12, 6, 6, { color: [0.2, 0.2, 0.22], caps: false }); box(37.4, 5.8, -34.6, 4.4, 0.14, 0.14, [0.2, 0.2, 0.22]); col(39.4, -34.8, 39.8, -34.4, 6);
   box(35.6, 5.3, -34.6, 0.36, 1.0, 0.36, [0.12, 0.12, 0.08]);
   glow.box(35.41, 5.6, -34.6, 0.02, 0.2, 0.2, { color: [0.9, 0.1, 0.05], uv: 0, faces: 'x' }); glow.box(35.41, 5.0, -34.6, 0.02, 0.2, 0.2, { color: [0.1, 0.9, 0.3], uv: 0, faces: 'x' });
   // utility poles with wires along the far side of the street
   const poles = []; for (let z = -120; z <= 140; z += 32) poles.push(z);
-  for (const z of poles) { ext.cylinder(39.6, 5, z, 0.14, 10, 6, { color: C.wood, caps: false }); box(39.6, 9.4, z, 2.2, 0.16, 0.16, C.wood); }
+  for (const z of poles) { ext.cylinder(39.6, 5, z, 0.14, 10, 6, { color: C.wood, caps: false }); box(39.6, 9.4, z, 2.2, 0.16, 0.16, C.wood); col(39.4, z - 0.2, 39.8, z + 0.2, 10); }
   if (D >= 1) for (let i = 0; i < poles.length - 1; i++) for (const dx of [-0.9, 0.9]) {
     const z0 = poles[i], z1 = poles[i + 1]; const n = 6;
     for (let k = 0; k < n; k++) { const a = k / n, b = (k + 1) / n; const sag = (t) => 9.5 - Math.sin(t * Math.PI) * 0.6; box(39.6 + dx, (sag(a) + sag(b)) / 2, z0 + (z1 - z0) * (a + b) / 2, 0.03, 0.03, (z1 - z0) / n, [0.08, 0.08, 0.08]); }
@@ -266,7 +285,7 @@ export function buildExterior({ D = 1 } = {}) {
   // flag poles on the lawn (properly proportioned flags; the texture maps 1:1 so nothing is squished)
   for (const [px, mb, h] of [[-9.5, flagUS, 10], [-6.5, flagIL, 8.8]]) {
     ext.cylinder(px, h / 2, 24.5, 0.07, h, 8, { color: [0.85, 0.86, 0.88], caps: false }); ext.sphere(px, h + 0.12, 24.5, 0.14, 8, 6, { color: [0.85, 0.7, 0.25] });
-    box(px, 0.15, 24.5, 1.2, 0.3, 1.2, [0.6, 0.59, 0.56]);
+    box(px, 0.15, 24.5, 1.2, 0.3, 1.2, [0.6, 0.59, 0.56]); col(px - 0.6, 23.9, px + 0.6, 25.1, h);
     const fw = h > 9 ? 2.85 : 2.5, fh = fw / (h > 9 ? 1.9 : 1.667); const strips = D >= 1 ? 6 : 1;
     for (let k = 0; k < strips; k++) { // gentle wave: alternate slight yaw per strip
       const a = k / strips, b = (k + 1) / strips; const wv = (t) => Math.sin(t * Math.PI * 2.2) * 0.12;
@@ -275,17 +294,39 @@ export function buildExterior({ D = 1 } = {}) {
       mb.quad([x0, yB, z0], [x1, yB, z1], [x1, yT, z1], [x0, yT, z0], [0, 0, -1], [[a, 1], [b, 1], [b, 0], [a, 0]], [1, 1, 1]);
     }
   }
-  box(-8, 0.35, 21.2, 4.2, 0.7, 0.4, [0.62, 0.6, 0.56]); // low sign wall (blank – the building isn't branded as an official agency)
+  box(-8, 0.35, 21.2, 4.2, 0.7, 0.4, [0.62, 0.6, 0.56]); col(-10.1, 21.0, -5.9, 21.4, 0.7); // low sign wall (blank – the building isn't branded as an official agency)
   for (const [tx, tz] of [[-20, 26], [-1, 27], [6, 22]]) tree(tx, tz, 9 + r() * 2);
-  if (D >= 1) { box(-14, 0.75, 26.5, 1.9, 0.06, 0.8, C.wood); box(-14, 0.45, 26.0, 1.9, 0.05, 0.3, C.wood); box(-14, 0.45, 27.0, 1.9, 0.05, 0.3, C.wood); } // picnic table
+  if (D >= 1) { box(-14, 0.75, 26.5, 1.9, 0.06, 0.8, C.wood); box(-14, 0.45, 26.0, 1.9, 0.05, 0.3, C.wood); box(-14, 0.45, 27.0, 1.9, 0.05, 0.3, C.wood); } col(-15, 25.8, -13, 27.2, 0.8); // picnic table
   for (let hx = -80; hx < 150; hx += 15 + r() * 6) { house(hx, 50 + r() * 3, 9 + r() * 3, 7 + r() * 2, 'z', r() < 0.4); if (r() < 0.8) tree(hx + 7, 45 + r() * 2); }
   if (D >= 1) for (let hx = -70; hx < 150; hx += 17 + r() * 6) house(hx, 68 + r() * 3, 9, 8, 'z', r() < 0.3);
   for (const x of [-40, 0, 40, 80]) streetLight(x, 31.4, [0, 1], 8);
   for (let xx = -90; xx < 180; xx += ring * 2 + r() * ring) tree(xx, 178 + r() * 14, 11 + r() * 7);
 
-  bake(ext);
-  return { ext, glow, signs, flagUS, flagIL };
+  // ================= west & north of the building (walkable grounds) =================
+  flat(-260, -230, -90, 270, -0.14, C.grass);
+  // Police Department frontage: entrance plaza, staff lot north of the PD with a drive to the street
+  flat(12.1, -38.6, 15.3, -29.4, -0.115, C.concrete);
+  flat(-14, -60, 15.3, -44, -0.115, C.asphalt); box(0.6, -0.06, -44, 29.4, 0.14, 0.18, C.curb); box(0.6, -0.06, -60, 29.4, 0.14, 0.18, C.curb);
+  flat(15.3, -60, 31, -52, -0.114, C.asphalt2);                                       // drive out to Main Cross St
+  flat(-14, -44, 12.1, -40.3, -0.12, C.grass2); flat(-14, -40.3, 12.1, -40.1, -0.11, C.concrete);
+  for (let k = 0; k < 11; k++) { const x = -12 + k * 2.6; box(x, -0.1, -52, 0.1, 0.02, 15.6, C.white, { faces: 'Y' }); if (k < 10 && r() < 0.7) car(x + 1.3, k % 2 ? -47.6 : -56.4, k % 2 ? Math.PI / 2 : -Math.PI / 2, k < 4 ? [0.08, 0.1, 0.18] : pick(C.car), k < 3 ? 'patrol' : r() < 0.3 ? 'pickup' : 'sedan'); }
+  for (const z of [-46, -58]) streetLight(2, z, [1, 0], 8);
+  for (let x = -12; x < 12; x += 3.2) shrub(x + 1.2, -42.2, 0.8);
+  // bollards at the entrance plaza + a bike rack
+  for (const z of [-38.2, -36.6, -31.4, -29.8]) { ext.cylinder(15.0, 0.45, z, 0.11, 0.9, 10, { color: [0.85, 0.83, 0.79] }); col(14.85, z - 0.15, 15.15, z + 0.15, 1); }
+  for (let i = 0; i < 4; i++) ext.box(13.0, 0.45, -39.4 + i * 0.5, 0.04, 0.8, 0.5, { color: [0.3, 0.32, 0.35], uv: 0 }); col(12.8, -39.7, 13.2, -37.7, 1);
+  // west: lawn and trees beyond the sally port and range, a farm field and tree line on the horizon
+  for (let i = 0; i < (D >= 1 ? 26 : 10); i++) { const x = -48 - r() * 30, z = -60 + r() * 100; tree(x, z, 8 + r() * 5); }
+  flat(-140, -150, -80, 150, -0.13, [0.42, 0.36, 0.22].map((v) => v * (S === 'summer' ? 0.8 : 1.1)));
+  for (let zz = -220; zz < 240; zz += ring * 2 + r() * ring) tree(-170 - r() * 14, zz, 10 + r() * 7, r() < 0.2 ? 'ever' : undefined);
+  for (let xx = -170; xx < 60; xx += ring * 2 + r() * ring) tree(xx, -200 - r() * 12, 10 + r() * 6);
+  flat(-62, -46, -44, -40, -0.115, C.concrete); // walkway north of the range
+  bake(ext); bakeTex(asphalt); bakeTex(walk); bakeTex(grass); bake(bark); bake(leaves);
+  return { ext, glow, signs, flagUS, flagIL, asphalt, walk, grass, bark, leaves, colliders: cols };
 }
+
+/** Ground textures: lighting is uniform on flat ground, so just a gentle overall factor. */
+function bakeTex(mb) { for (let i = 0; i < mb.c.length; i++) mb.c[i] *= 0.92; }
 
 /** Bake simple sun + sky lighting into the vertex colours (lighting is static outside). */
 function bake(mb) {

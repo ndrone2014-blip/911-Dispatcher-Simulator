@@ -51,7 +51,7 @@ export class DepartmentSchedule {
   describeNext(npc) {
     const n = this.next(); if (!n) return 'Nothing on the schedule right now.';
     const rest = SCHEDULE.filter((e) => e[0] !== n.id).slice(0, 0);
-    const who = n.kind === 'rollcall' ? `${LEADERS.captain.short} and ${LEADERS.watch.short} run it in the briefing room` : n.kind === 'training' ? `${LEADERS.range.short} runs it at the range` : n.kind === 'meeting' ? `${LEADERS.fireChief.short} comes over for it` : n.kind === 'briefing' ? `${LEADERS.watch.short} handles that one` : 'it comes over the PA';
+    const who = n.kind === 'rollcall' ? `${LEADERS.watch.short} runs it in the Police Department roll call room, with ${LEADERS.captain.short}` : n.kind === 'training' ? `${LEADERS.range.short} runs it at the range` : n.kind === 'meeting' ? `${LEADERS.fireChief.short} comes over for it in the PD conference room upstairs` : n.kind === 'briefing' ? `${LEADERS.watch.short} handles that one in the roll call room` : 'it comes over the PA';
     const lead = npc?.id === 'captain' ? 'On my schedule: ' : npc?.id === 'watch' ? 'Next up on the watch: ' : 'Next on the schedule: ';
     return `${lead}${n.title} at ${hhmm(n.at)}, about ${n.inMin} minutes from now – ${who}. The full day is on the shift board in the corridor.${rest.length ? '' : ''}`;
   }
@@ -95,19 +95,47 @@ export class DepartmentSchedule {
     const L = [];
     const say = (who, text) => L.push({ who, text });
     if (kind === 'rollcall') {
-      say(W, pick(['Alright, grab a seat, everybody. Let\'s get started.', 'Phones down, coffee up. Roll call.', 'Let\'s go, folks. Roll call.']));
-      say(C, pick([`Good ${ev.id.endsWith('am') ? 'morning' : 'evening'}, everyone. Thanks for being here.`, `Evening, folks. ${LEADERS.captain.name}, for anybody new.`, 'Alright. Let\'s make this a good shift.']));
-      say(C, `Here's where we stand: ${open.length ? `${open.length} open incident${open.length > 1 ? 's' : ''} on the board` : 'nothing open on the board right now'}, and the weather is ${wx}.${['rain', 'thunderstorms', 'snow', 'fog', 'severe weather'].includes(wx) ? ' Slow down out there and leave room on the county roads.' : ''}`);
-      if (events.length) say(C, `Dispatch has ${events.length} active situation${events.length > 1 ? 's' : ''} affecting the roads: ${events.slice(0, 2).map((e) => e.title || e.label || e.kind.replace(/_/g, ' ')).join(', ')}. Plan your routes around it.`);
-      if (major) say(C, `Good work on ${major.number} – the ${major.typeLabel.toLowerCase()}. ${pick(['That was a team effort from dispatch on up.', 'Dispatch kept everybody coordinated. Thank them when you see them.'])}`);
-      if (deputies.length) say(C, `Assignments. ${deputies.map((u, i) => `${u.callsign}, ${DISTRICTS[i % DISTRICTS.length]}.`).join(' ')} Everybody else, float and back each other up.`);
-      say(W, pick([
-        `Updates from the watch: ${nov ? 'harvest\'s still going – watch for combines and grain trucks on IL-14 and IL-1 after dark' : 'watch for farm equipment on the state routes'}, and the deer are moving in the river bottoms.`,
-        'Couple of updates: there\'s been catalytic converter thefts around Carmi and Norris City – check parked trucks on your patrol. And remember, county roads ice up first by the creeks.',
-        `From the watch: ${bolo ? `be on the lookout tied to ${bolo.number} – check the CAD notes for the description.` : 'no BOLOs right now, but read the board before you head out.'} Keep your radios on the right talkgroup.`,
+      const am = ev.id ? ev.id.endsWith('am') : true;
+      const officers = [['jake', 'Morrison'], ['ramsey', 'Ramsey'], ['tate', 'Tate'], ['lin', 'Lin']];
+      // 1. welcome
+      say(W, pick([`Alright, good ${am ? 'morning' : 'evening'}, everybody. Grab a seat. Welcome to ${am ? 'day' : 'night'} shift.`, `Okay, phones down, coffee up. Good ${am ? 'morning' : 'evening'} – let's get started.`, `Let's go, folks, have a seat. Good ${am ? 'morning' : 'evening'}.`]));
+      // 2. attendance
+      say(W, 'Roll call. Sergeant Vaughn.'); say('vaughn', pick(['Here.', 'Present.']));
+      for (const [id, last] of officers) { say(W, `${last}.`); say(id, pick(['Here.', 'Here, sir.', 'Present.', 'Yep.'])); }
+      // 3. department updates (Captain)
+      say(C, pick([`Good ${am ? 'morning' : 'evening'}. Couple of department updates from upstairs.`, `Thanks, Lieutenant. Quick updates from the Chief's office.`, 'Morning, everyone. I\'ll keep this short.']));
+      say(C, pick([
+        'The new body-camera policy takes effect Monday. Cameras on before you arrive on scene, not when you get out of the car. Read the memo in your box.',
+        'De-escalation in-service is upstairs in the training room this week. Everybody gets their eight hours by the end of the month – Nadia has the sign-up sheet.',
+        'The Chief wants to thank everybody for the work at the fall festival. Zero incidents and a lot of happy kids. Good job.',
+        'We have a new officer starting field training next week. Be patient, answer questions, and remember your first week.',
+        nov ? 'Thanksgiving potluck is Thursday in the break room. The Watch Commander is bringing his chili. That is not optional.' : 'The new radio batteries came in – swap your old ones in the charger by the gun room.',
       ]));
-      say(W, pick([`Range is open at 10:00 for anybody who still needs to qualify – see ${LEADERS.range.short}.`, 'Reports are due before end of shift. I mean it this time.', 'Body cams on, every contact. No exceptions.']));
-      say(C, pick(['To our dispatchers on the floor – thank you. You\'re the first voice people hear. Alright, be safe, be kind, and come home.', 'That\'s it. Be safe, be kind, come home.', 'Look out for each other tonight. Let\'s go to work.']));
+      // 4. ongoing problems
+      say(W, `Ongoing problems. ${pick(['Catalytic converter thefts are still hitting Carmi and Norris City – check parked trucks behind businesses after midnight.', 'We\'re getting speeding complaints on College Boulevard by the high school. I want a car sitting there at dismissal.', 'Mailbox thefts on the north side – the post office asked us for extra patrols on Robinson and Fair Street.', 'Somebody\'s been breaking into vehicles at the Supercenter lot. Walk it at least once a shift.'])}`);
+      // 5. important incidents
+      say(W, `${open.length ? `Dispatch has ${open.length} open incident${open.length > 1 ? 's' : ''} on the board right now.` : 'The board is clear right now – let\'s keep it that way.'}${major ? ` And good work on ${major.number}, the ${major.typeLabel.toLowerCase()} – dispatch had everybody coordinated.` : ''}${bolo ? ` BOLO tied to ${bolo.number}: read the CAD notes for the description before you head out.` : ''}`);
+      // 6. questions from the room
+      const q = pick([
+        [['jake', 'Sarge, anything new on that stolen trailer out of Crossville?'], [W, 'Detectives think it went south on IL-1. Calloway has the case – if you see a flatbed with a fresh paint job, call it in.']],
+        [['ramsey', 'Are we still doing the traffic detail on IL-14 this week?'], [W, 'Tuesday and Thursday, oh-seven-hundred to nine. Lin is lead on that.']],
+        [['tate', 'Who has the evidence room key tonight? I\'ve got property to book.'], [W, 'Garrity\'s in until four. After that, the temp lockers by the evidence window.']],
+        [['lin', 'Any word on the new radar units?'], [W, 'Two came in, they\'re being certified. Next week.']],
+      ]); for (const [who, text] of q) say(who, text);
+      // 7. patrol priorities
+      say(W, `Patrol priorities: ${pick(['school zones at drop-off and dismissal', 'the courthouse square on foot at least twice', 'the bars on Main Street at closing'])}, ${pick(['traffic enforcement on IL-14 west of town', 'business checks in the industrial park', 'the river access by the boat ramp after dark'])}, and ${am ? 'be visible downtown around lunch' : 'watch for impaired drivers on IL-1 after midnight'}.`);
+      // 8. assignments
+      say(W, 'Assignments. Morrison, Beat 1, downtown and the square. Ramsey, Beat 2, north side and the high school. Tate, Beat 3, east of the river. Lin, traffic car. Sergeant Vaughn has the street.');
+      // 9. staffing
+      say(W, pick(['Staffing: we\'re down two on nights this week – the overtime sign-up is on my door.', 'Staffing: Pruitt is on vacation, so Vaughn is the only sergeant on days. Back her up.', 'Staffing: we\'re at minimums today. Nobody gets tied up on a report call for two hours – write it up and get back out.']));
+      // 10. shift briefing
+      say(W, `Shift briefing: weather is ${wx}.${['rain', 'thunderstorms', 'snow', 'fog', 'severe weather'].includes(wx) ? ' Slow down and leave room on the county roads.' : ''}${events.length ? ` Road issues: ${events.slice(0, 2).map((e) => e.title || e.label || e.kind.replace(/_/g, ' ')).join(', ')}.` : ''} ${nov ? 'Harvest is going – combines and grain trucks on IL-1 and IL-14 after dark.' : 'Watch for farm equipment on the state routes.'}`);
+      say('vaughn', pick(['And reports are due before end of shift. I will find you.', 'One more thing – body cams on, every contact. No exceptions.', 'Range is open at ten if you still need to qualify. See Sergeant Hale.']));
+      // 11. closing + dismissal
+      say(C, pick(['To our dispatchers on the floor – thank you. You\'re the first voice people hear. Be safe out there.', 'Look out for each other. Be safe, be kind, come home.', 'That\'s all I have. Be safe.']));
+      say(W, pick(['Alright, that\'s it. Hit the street.', 'That\'s it – go to work. Stay safe.', 'Dismissed. Let\'s have a good shift.']));
+      L.assign = { jake: 'patrol', ramsey: 'patrol', tate: 'patrol', lin: 'patrol', vaughn: 'patrol', okafor_sgt: 'reports' };
+      void deputies; void DISTRICTS;
       return L;
     }
     if (kind === 'shift') {

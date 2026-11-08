@@ -27,7 +27,7 @@ import { reportHTML } from './ui/report.js';
 import { modal, toast, anyModalOpen, closeTopModal, setToastFilter, confirmBox } from './ui/dom.js';
 import { WEATHER_TYPES } from './sim/weather.js';
 import { DepartmentSchedule, LEADERS } from './sim/department.js';
-import { openBriefing, openSchedule } from './ui/rollCall.js';
+import { openBriefing, openSchedule, LiveBriefing } from './ui/rollCall.js';
 import { openArmory, openRange } from './ui/range.js';
 
 const PA_LINES = [
@@ -170,7 +170,8 @@ export class Game {
     if (this.state !== 'playing') return;
     if (this.pauseModal) this.togglePauseMenu();
     if (this.world.failed) { this.openCAD(); return; }
-    if (this.world.player.seated) { this.openCAD(); return; }
+    if (this.world.player.seated && !this.world.player.freeSeat) { this.openCAD(); return; }
+    if (this.world.player.freeSeat) { this.world.player.seated = false; this.world.player.freeSeat = null; this.world.player.transition = null; }
     this.world.teleportNearDesk(); this.openCAD();
   }
 
@@ -207,12 +208,24 @@ export class Game {
         if (this.career.has('supervisor_office', sim.state.mode)) { this.openCAD(); setTimeout(() => this.cad.showScreen('supervisor'), 450); }
         else toast('The supervisor console unlocks at the Dispatch Supervisor rank.', { level: 'info' });
         break;
-      case 'npc': { const npc = STAFF.find((s) => s.id === t.npc); if (npc) { this.releasePointer(); openStaffChat(this, npc); } break; }
+      case 'npc': { const npc = STAFF.find((s) => s.id === t.npc); if (npc) { this.releasePointer(); openStaffChat(this, npc); } else if (t.civilian) toast(rng.pick(['"Hi – I\'m just waiting to talk to the front desk about a report."', '"Oh, sorry, I\'m here to pick up a copy of an accident report."', '"Is this where I file a report for a stolen bike?"']), { level: 'info' }); break; }
       case 'coffee': this.audio.coffee(); toast(this.career.has('espresso', sim.state.mode) ? 'A double espresso. The good stuff.' : rng.pick(['You pour a cup of coffee. It\'s… fine.', 'Coffee acquired. Burnt, but hot.', 'You top off your mug.']), { level: 'good' }); break;
       case 'fridge': this.audio.door(); toast(rng.pick(['Someone labeled every yogurt "TYLER – DO NOT EAT".', 'There\'s a birthday cake with three slices left.', 'Leftover pizza from the night shift. Tempting.']), { level: 'info' }); break;
-      case 'vending': this.audio.vend(); toast(rng.pick(['You buy a bag of pretzels.', 'The machine eats your dollar, then drops two candy bars. Even trade.', 'Granola bar. Healthy-ish.']), { level: 'good' }); break;
+      case 'vending': this.releasePointer(); this.openVending(t); break;
       case 'water': toast('Stay hydrated.', { level: 'info' }); break;
-      case 'couch': toast('You sit for a minute and take a breath. Take as long as you need – ask Karen if you want an official break.', { level: 'good', duration: 6000 }); break;
+      case 'seat': this.sitDown(t); break;
+      case 'stand': this.standFromSeat(); break;
+      case 'door': { const open = this.world.doors?.toggle(t.door); toast(open ? 'You open the stall door.' : 'You close and latch the stall door.', { level: 'info', duration: 1600 }); break; }
+      case 'fridge': this.useFridge(t); break;
+      case 'microwave': this.audio.notify?.('request'); toast(rng.pick(['Two minutes on high. Everyone in the break room now smells your popcorn.', 'You warm up some leftover chili. Someone yells "who\'s microwaving fish?" It isn\'t you.', 'The microwave beeps three times. Lunch is served.']), { level: 'info' }); break;
+      case 'frontdesk': { const n = this.world.npc('danny'); if (n && n.sitting && !n.away) { this.releasePointer(); openStaffChat(this, STAFF.find((x) => x.id === 'danny')); } else toast('The front desk window is unattended right now – the desk officer must be on a break. A sign says: "Ring for service."', { level: 'info', duration: 5000 }); break; }
+      case 'report_kiosk': this.releasePointer(); this.openReportKiosk(); break;
+      case 'records': toast('Records: rows of case files, warrant binders and a sign that says "ALL RECORDS REQUESTS IN WRITING – BRENDA".', { level: 'info', duration: 5000 }); break;
+      case 'interview': toast('Observation room: two camera feeds of the interview rooms, the recorder is armed. Both rooms are empty right now.', { level: 'info', duration: 5000 }); break;
+      case 'investigation': toast(rng.pick(['Case board: a map of Carmi with red pins for the catalytic converter thefts, photos of a dark pickup, and a timeline in three colors of marker.', 'Case board: bank statements, a flow chart of shell accounts and a note in big letters: "FOLLOW THE MONEY".', 'Case board: a stolen flatbed trailer, three possible routes south on IL-1 and a list of farm-supply stores to canvass.']), { level: 'info', duration: 7000 }); break;
+      case 'training': toast('Today\'s in-service: de-escalation – time, distance, cover, and listening first. CPR/AED recertification at 1400.', { level: 'info', duration: 6000 }); break;
+      case 'pd_desk': toast(`${t.who}'s desk: ${rng.pick(['a stack of reports to sign, a coffee mug and a framed photo from academy graduation.', 'budget printouts, a city map with patrol beats and a sticky note that says "CALL THE COUNCIL BACK".', 'a neat inbox, a challenge-coin collection and a radio scanner turned low.'])}`, { level: 'info', duration: 6000 }); break;
+      case 'pd_lockers': toast('Officer lockers – names on every door, duty bags on the bench, and somebody\'s spare boots by the door.', { level: 'info' }); break;
       case 'tv': toast(`Channel 8: ${this.world.painter.headline(sim)}`, { level: 'info', duration: 6000 }); break;
       case 'radio_room': toast('Radio racks: P25 trunked system, 9 talkgroups, all repeaters online. Backup generator tested Tuesday.', { level: 'info', duration: 6000 }); break;
       case 'director_desk': toast(`Helen's desk: budget reports, a framed photo of the 2019 dispatch team, and your file – "${this.career.rank().name}".`, { level: 'info', duration: 6000 }); break;
@@ -231,6 +244,46 @@ export class Game {
   }
 
   releasePointer() { if (document.pointerLockElement) { this.intentionalUnlock = true; document.exitPointerLock(); } }
+
+  // ---------------- furniture & fixtures ----------------
+  sitDown(t) {
+    const w = this.world; const seat = w.seats?.[t.seat]; if (!seat) return;
+    if (seat.consoleIndex != null && w.npcs.npcs.some((n) => n.consoleIndex === seat.consoleIndex && n.sitting)) { toast('Someone is working at that console.', { level: 'info' }); return; }
+    w.player.sitInSeat(seat, w.allColliders());
+    if (!this.seatHinted) { this.seatHinted = true; toast(`${seat.toilet ? 'Taking a seat.' : 'You sit down.'} Look around freely – press ${this.touch ? 'USE' : 'E'} or start walking to get up.`, { level: 'info', duration: 4500 }); }
+  }
+
+  standFromSeat() { const p = this.world.player; if (p.seated && p.freeSeat) p.standUp(); }
+
+  useFridge(t) {
+    const d = this.world.doors?.byId[t.id];
+    if (!d) { this.audio.door(); toast(rng.pick(['Someone labeled every yogurt "TYLER – DO NOT EAT".', 'There\'s a birthday cake with three slices left.', 'Leftover pizza from the night shift. Tempting.']), { level: 'info' }); return; }
+    if (d.target < 0.5) { this.world.doors.set(t.id, true); this.audio.door(); toast(rng.pick(['Inside: lunch bags with names on them, a pie with one slice left, sodas and a suspicious tupperware from last week.', 'Inside: energy drinks (Tyler\'s), a veggie tray, coffee creamer and somebody\'s birthday cake.', 'Inside: bottled water, a gallon of milk, leftover pizza and a sticky note: "LABEL YOUR FOOD – MGMT".']), { level: 'info', duration: 5500 }); }
+    else { this.world.doors.set(t.id, false); this.audio.door(); toast(rng.pick(['You grab a cold soda and close the fridge.', 'You take your lunch and shut the door.', 'You grab a bottle of water.']), { level: 'good' }); }
+  }
+
+  openVending(t) {
+    const items = t.label?.includes('drink') ? [['🥤', 'Cola', 1.75], ['💧', 'Bottled water', 1.5], ['🧃', 'Iced tea', 1.75], ['⚡', 'Energy drink', 2.5], ['☕', 'Cold brew', 2.75]] : [['🥨', 'Pretzels', 1.25], ['🍫', 'Chocolate bar', 1.5], ['🍪', 'Cookies', 1.5], ['🥜', 'Trail mix', 1.75], ['🌾', 'Granola bar', 1.25], ['🍿', 'Popcorn', 1.5]];
+    const body = `<div class="dim" style="margin-bottom:8px">Pick something (exact change appreciated).</div><div class="grid2" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">${items.map(([e, n, p], i) => `<button class="btn" data-act="buy${i}">${e} ${n} <span class="dim">$${p.toFixed(2)}</span></button>`).join('')}</div>`;
+    const m = modal({ title: t.label?.includes('drink') ? '🥤 Drink machine' : '🍫 Snack machine', body, foot: [{ act: 'close', label: 'Never mind' }],
+      onAction: (a) => {
+        if (a.startsWith('buy')) { const [e, n] = items[+a.slice(3)]; this.audio.vend(); m.close(); toast(Math.random() < 0.08 ? `The ${n.toLowerCase()} gets stuck. You give the machine a gentle nudge… it drops. Victory.` : `${e} ${n} – thunk. Enjoy.`, { level: 'good' }); }
+        else m.close();
+      } });
+  }
+
+  openReportKiosk() {
+    const types = ['Theft from a vehicle', 'Lost or found property', 'Vandalism / criminal damage', 'Stolen bicycle', 'Fraud or scam', 'Traffic complaint (non-emergency)'];
+    const body = `<div class="dim" style="margin-bottom:8px">Self-service report kiosk · non-emergency only. For emergencies, call 911.</div>
+      <div class="col">${types.map((ty, i) => `<button class="btn" data-act="t${i}">${ty}</button>`).join('')}</div>`;
+    const m = modal({ title: '🗂 File a police report', body, foot: [{ act: 'close', label: 'Cancel' }],
+      onAction: (a) => {
+        if (!a.startsWith('t')) { m.close(); return; }
+        const ty = types[+a.slice(1)]; const num = `RPT-${new Date().getFullYear()}-${String(Math.floor(1000 + Math.random() * 8999))}`; m.close();
+        (this.sim.state.walkinReports ||= []).push({ number: num, type: ty, time: this.sim.clock() });
+        toast(`Report ${num} (${ty.toLowerCase()}) filed. The front desk will review it and an officer will follow up if needed.`, { level: 'good', title: 'Report filed', duration: 7000 });
+      } });
+  }
 
   // ---------------- Pause / break / save ----------------
   togglePause() { if (!this.sim) return; this.sim.setPaused(!this.sim.paused); toast(this.sim.paused ? 'Paused' : 'Resumed', { level: 'info', duration: 1200 }); }
@@ -376,6 +429,7 @@ export class Game {
       }
       this.updatePA(dt);
       this.department?.update();
+      if (this.liveEvent && this.sim && !this.sim.paused && this.state === 'playing') { this.liveEvent.update(dt); if (this.liveEvent.done) this.liveEvent = null; }
     } catch (e) { console.error(e); }
     requestAnimationFrame((tt) => this.loop(tt));
   }
@@ -387,10 +441,10 @@ export class Game {
     this.audio.pa?.();
     // the department hears it on the radio too, so it's part of the shift log
     for (const l of ev.lines.slice(0, 3)) { const w = { captain: LEADERS.captain, watch: LEADERS.watch, chief: LEADERS.fireChief, karen: LEADERS.supervisor, hale: LEADERS.range }[l.who] || lead; this.sim.radio.push({ channel: l.who === 'chief' ? 'fire' : 'sheriff', from: w.short, text: l.text, kind: 'info' }); }
-    this.world?.npcs?.gather?.(ev.kind);
     const attendable = ['rollcall', 'training', 'briefing', 'meeting'].includes(ev.kind);
+    if (attendable && !this.world.failed) this.liveEvent = new LiveBriefing(this, ev); // people walk over and it plays out in the building
     if (attendable) {
-      const where = ev.kind === 'training' ? 'at the range' : 'in the briefing room';
+      const where = ev.kind === 'training' ? 'at the range' : ev.kind === 'meeting' ? 'in the Police Department conference room (2nd floor)' : 'in the Police Department roll call room';
       setTimeout(() => this.speech.speak(`Attention all personnel. ${ev.title} ${where}${ev.kind === 'rollcall' ? ' in five minutes' : ''}.`, { key: lead.id, sex: lead.sex, pitch: lead.pitch, rate: lead.rate, category: 'staff' }), 1200);
       toast(`${ev.title} ${where}. Click to attend.`, { level: 'info', title: `📢 ${lead.short}`, duration: 15000, onClick: () => this.attendEvent(ev) });
     } else {
@@ -402,14 +456,19 @@ export class Game {
 
   attendEvent(ev) {
     if (this.state !== 'playing') return;
-    if (this.cad.open) this.closeCAD?.();
-    if (!this.world.failed) {
-      const p = this.world.player; p.seated = false;
-      if (ev.kind === 'training') { p.pos = [-15.5, 1.65, -9.6]; p.yaw = 0; } else { p.pos = [-15.2, 1.65, 6.6]; p.yaw = Math.PI / 2 + 0.1; }
-      p.pitch = 0.02;
-    }
-    this.releasePointer();
-    openBriefing(this, ev, { live: true });
+    if (this.cad.open) this.closeCAD?.(true);
+    if (this.world.failed) { this.releasePointer(); openBriefing(this, ev, { live: true }); return; }
+    const w = this.world; const p = w.player; p.seated = false; p.freeSeat = null; p.transition = null;
+    // take a free chair in the room (or stand at the back of the range)
+    const near = (x, z, y, r) => w.seats.map((s, i) => ({ s, i })).filter(({ s }) => Math.hypot(s.x - x, s.z - z) < r && Math.abs(s.y - y - 0.47) < 0.3 && !w.npcs.npcs.some((n) => n.sitting && Math.hypot(n.x - s.x, n.z - s.z) < 0.4) && !w.npcs.reserved.has(w.npcs.nearestNode(s.x, s.z, y).id));
+    let pick = null;
+    if (ev.kind === 'training') { p.pos = [-15.5, 1.65, -9.6]; p.feet = 0; p.yaw = 0; }
+    else if (ev.kind === 'meeting') { pick = near(8.2, -34.2, 4, 3.4).sort((a, b) => b.s.z - a.s.z)[0]; p.pos = [10.6, 5.65, -31]; p.feet = 4; }
+    else { pick = near(2, -20.4, 0, 3.6).sort((a, b) => b.s.z - a.s.z)[0]; p.pos = [3.8, 1.65, -18.4]; p.feet = 0; p.yaw = 0.2; }
+    p.pitch = 0.02;
+    if (pick) p.sitInSeat(pick.s, w.allColliders());
+    this.lockPointer();
+    toast(`${ev.title}: take a seat and listen in – the shift keeps running. Walk away any time.`, { level: 'info', duration: 5000 });
   }
 
   updatePA(dt) {

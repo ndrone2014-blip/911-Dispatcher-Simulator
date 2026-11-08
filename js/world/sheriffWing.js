@@ -172,7 +172,10 @@ export function buildSheriffWing(k) {
   const mbWing = mb; if (k.mbZone) mb = k.mbZone('range');
   //   six lanes, firing line at z ≈ -10.6, targets out to z -24, rubber-block backstop at z -25.6
   floor(-22, -26, -12, -8, 'concrete', 2.5); ceiling(-22, -26, -12, -8);
-  wallSeg(-22, -26, -22, -8, 'concrete'); wallSeg(-12, -26, -12, -8, 'concrete'); wallSeg(-22, -26, -12, -26, 'concrete');
+  wallSeg(-22, -26, -22, -8, 'concrete'); wallSeg(-22, -26, -12, -26, 'concrete');
+  // east wall: a door from the Police Department's gun room opens behind the firing line
+  wallSeg(-12, -26, -12, -10.6, 'concrete'); wallSeg(-12, -9.4, -12, -8, 'concrete'); wallSeg(-12, -10.6, -12, -9.4, 'concrete', 2.3, H, false);
+  screen('sign_range_pd', 'sign', -12.12, 2.55, -10, 1.3, 0.24, 'x', -1, 0, { text: 'POLICE GUN ROOM' });
   for (const [x0, x1, z] of [[-13.9, -12.7, -8]]) { mb('frame').box(x0, 1.15, z, 0.08, 2.3, 0.22); mb('frame').box(x1, 1.15, z, 0.08, 2.3, 0.22); mb('frame').box((x0 + x1) / 2, 2.32, z, x1 - x0 + 0.08, 0.06, 0.22); }
   mb('metal').box(-13.3, 1.12, -8.16, 1.12, 2.22, 0.05); // heavy range door, held open
   for (const z of [-11.5, -17, -22.5]) light(-17, z, 'armory', H - 0.05, 1.4, 0.5);
@@ -249,17 +252,16 @@ export function buildSheriffWing(k) {
     mb('mirror').panel(sx + face * 0.012, 1.55, 11.8, 1.7, 0.9, 'x', face);
     mb('satin').rbox(sx + face * 0.06, 1.35, 13.2, 0.12, 0.28, 0.24, { r: 0.03, color: [0.8, 0.8, 0.8] }); // hand dryer
     col(Math.min(sx, sx + face * 0.5), 10.85, Math.max(sx, sx + face * 0.5), 12.75);
-    // stalls along the back (z 14.6 wall)
-    const stalls = men ? 2 : 3; const w = (x1 - x0 - 0.2) / (stalls + (men ? 1 : 0));
+    // toilet stalls along the back (z 14.6 wall) with real doors that open and close
+    const stalls = men ? 2 : 3; const w = men ? 0.95 : (x1 - x0 - 0.3) / 3;
+    const F = { mb, col: (a, b, c, d, y0, y1) => col(Math.min(a, c), Math.min(b, d), Math.max(a, c), Math.max(b, d), y0, y1), seat: (st) => k.seats?.push({ ...st, zone: 'wing' }), D };
     for (let i = 0; i < stalls; i++) {
-      const cx = x1 - 0.1 - w * (i + 0.5) * (men ? 1 : 1);
-      mb('satin').box(cx - w / 2, 1.0, 13.9, 0.03, 1.7, 1.3, { color: PART });
-      mb('gloss').rbox(cx, 0.22, 14.25, 0.38, 0.4, 0.5, { r: 0.08, color: PORC }); mb('gloss').rbox(cx, 0.55, 14.5, 0.4, 0.3, 0.16, { r: 0.04, color: PORC });
-      mb('satin').box(cx, 1.0, 13.26, w * 0.4, 1.7, 0.03, { color: PART, rotY: 0 });
+      const sx0 = x1 - 0.12 - w * (i + 1);
+      const d = k.toiletStall(F, sx0, 14.58, 1.4, w, -1, 0, { id: `so_stall_${men ? 'm' : 'w'}${i}`, accessible: i === 0 });
+      k.doors?.push(d); k.nav?.stalls.push({ id: d.id, gender: men ? 'm' : 'w', x: sx0 + w / 2, z: 13.85, door: [sx0 + w / 2, 12.7] });
     }
-    mb('satin').box(x1 - 0.1 - w * stalls, 1.0, 13.9, 0.03, 1.7, 1.3, { color: PART });
-    if (men) for (let i = 0; i < 2; i++) mb('gloss').rbox(x0 + 0.5 + i * 0.45, 0.85, 14.48, 0.38, 0.6, 0.22, { r: 0.08, color: PORC });
-    col(x0 + 0.1, 13.2, x1 - 0.1, 14.6);
+    if (men) for (let i = 0; i < 2; i++) { mb('gloss').rbox(x0 + 0.5 + i * 0.5, 0.85, 14.48, 0.36, 0.6, 0.22, { r: 0.08, color: PORC }); mb('satin').box(x0 + 0.75 + i * 0.5, 1.0, 14.3, 0.02, 1.1, 0.5, { color: PART }); }
+    if (men) col(x0, 14.2, x0 + 1.3, 14.6);
     interactables.push({ id: men ? 'restroom_m' : 'restroom_w', kind: 'restroom', label: men ? "Use the men's restroom" : "Use the women's restroom", min: [x0, 0, 10.7], max: [x1, 2, 14.5], pri: 0 });
   }
 

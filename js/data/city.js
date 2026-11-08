@@ -3,19 +3,27 @@
 // routes follow the real corridors (I-64, US-45, IL-1, IL-14, IL-141); town street
 // grids use real Carmi street names, arranged approximately.
 import { RNG, dist, clamp } from '../core/util.js';
+import { GEO as GEO_REAL, COUNTY_POLY, COUNTY_BBOX, WABASH_PTS, LOWER_LW_PTS, TOWN_GEO, OLD_TOWN_POS, warp, g2 } from './geo.js';
 
 export const CITY_NAME = 'Carmi';
 export const COUNTY_NAME = 'White County';
 export const STATE_NAME = 'Illinois';
 export const SCALE = 3.2; // real meters per game meter
 export const B = 115; // Carmi block size (kept for compatibility)
-export const MAP_BOUNDS = { x0: -500, y0: -500, x1: 12450, y1: 11000 };
-export const COUNTY_LINE = [[0, 0], [11320, 0], [11500, 1600], [11350, 3200], [11550, 4800], [11400, 6400], [11650, 8000], [11500, 9400], [11300, 10500], [0, 10500]];
+// The real shape of White County (see geo.js): straight lines on the west, north and south,
+// the Wabash River down the east side and the Little Wabash at the southern tip.
+export const COUNTY_LINE = COUNTY_POLY;
+export const MAP_BOUNDS = { x0: COUNTY_BBOX.x0 - 500, y0: COUNTY_BBOX.y0 - 500, x1: COUNTY_BBOX.x1 + 500, y1: COUNTY_BBOX.y1 + 400 };
 
+// The original map was drawn inside a 11,320 × 10,500 box. Everything below that was drawn in
+// that box is moved into the real county shape with warp() (towns move as a whole so their
+// street grids stay square and every road still meets its town exactly).
+const W = (pts) => pts.map(([x, y]) => warp(x, y));
+const lw = W([[3600, -500], [3700, 0], [4300, 1800], [5200, 3600], [6300, 4900], [6580, 5600], [6620, 6300], [6750, 7000], [7400, 8200]]);
 export const RIVERS = [
-  { name: 'Wabash River', width: 110, points: [[11320, -500], [11320, 0], [11500, 1600], [11350, 3200], [11550, 4800], [11400, 6400], [11650, 8000], [11500, 9400], [11300, 10500], [11200, 11000]] },
-  { name: 'Little Wabash River', width: 46, points: [[3600, -500], [3700, 0], [4300, 1800], [5200, 3600], [6300, 4900], [6580, 5600], [6620, 6300], [6750, 7000], [7400, 8200], [8600, 9400], [9800, 10300], [11300, 10500]] },
-  { name: 'Skillet Fork', width: 26, points: [[-500, 3550], [0, 3600], [1500, 3900], [3200, 4300], [4800, 4700], [6300, 4900]] },
+  { name: 'Wabash River', width: 110, points: [g2(38.2850, -87.9750), ...WABASH_PTS] },
+  { name: 'Little Wabash River', width: 46, points: [...lw, ...LOWER_LW_PTS] },
+  { name: 'Skillet Fork', width: 26, points: W([[-500, 3550], [0, 3600], [1500, 3900], [3200, 4300], [4800, 4700], [6300, 4900]]) },
 ];
 
 // ---------------- Towns ----------------
@@ -44,6 +52,21 @@ export const TOWNS = [
   { id: 'brownsville', name: 'Brownsville', x: 3570, y: 7930, block: 90, blockY: 90, mainNS: 1, mainEW: 1, weight: 0.015, ns: ['West St', 'Main St', 'East St'], ew: ['North St', 'Church St', 'South St'] },
 ];
 export const TOWN_BY_ID = Object.fromEntries(TOWNS.map((t) => [t.id, t]));
+// remember where each town's grid sat on the original map, then move the town to its real place
+const OLD_BOX = {};
+for (const t of TOWNS) {
+  const w0 = t.x - t.mainNS * t.block, w1 = t.x + (t.ns.length - 1 - t.mainNS) * t.block, h0 = t.y - t.mainEW * t.blockY, h1 = t.y + (t.ew.length - 1 - t.mainEW) * t.blockY;
+  const [nx, ny] = TOWN_GEO[t.id] ? g2(...TOWN_GEO[t.id]) : warp(t.x, t.y);
+  OLD_BOX[t.id] = { x0: w0, x1: w1, y0: h0, y1: h1, dx: nx - t.x, dy: ny - t.y };
+  t.x = nx; t.y = ny;
+}
+void OLD_TOWN_POS;
+/** Move a point drawn on the original map: points on a town's grid move with the town, the rest are warped. */
+function moveOld(x, y) {
+  for (const id in OLD_BOX) { const b = OLD_BOX[id]; if (x >= b.x0 - 30 && x <= b.x1 + 30 && y >= b.y0 - 30 && y <= b.y1 + 30) return [Math.round(x + b.dx), Math.round(y + b.dy)]; }
+  return warp(x, y);
+}
+export { moveOld };
 for (const t of TOWNS) {
   t.xs = t.ns.map((_, i) => t.x + (i - t.mainNS) * t.block);
   t.ys = t.ew.map((_, j) => t.y + (j - t.mainEW) * t.blockY);
@@ -86,13 +109,14 @@ const ROAD_DEFS = [
   { name: 'Brownsville Rd', kind: 'county', pts: [[3660, 7930], [4200, 7930], [4700, 7930]] },
   { name: 'Brownsville Rd', kind: 'county', pts: [[3480, 7930], [2950, 7930]] },
 ];
+for (const d of ROAD_DEFS) d.pts = d.pts.map(([x, y]) => moveOld(x, y));
 const SPEED = { interstate: 2.7, us: 2.25, state: 2.15, county: 1.7, township: 1.45, street: 1.0 };
 
 // ---------------- Projection & surrounding region ----------------
 // Game coordinates are a plain projection of real latitude/longitude at SCALE (x = east from
 // the west county line, y = south from the north county line). These helpers place real
 // places on the map; they're also handy when adding more locations.
-export const GEO = { lon0: -88.375, lat0: 38.270, xPerDeg: 27400, yPerDeg: 34690 };
+export const GEO = GEO_REAL;
 export function geoToGame(lat, lon) { return [Math.round((lon - GEO.lon0) * GEO.xPerDeg), Math.round((GEO.lat0 - lat) * GEO.yPerDeg)]; }
 export function gameToGeo(x, y) { return { lat: GEO.lat0 - y / GEO.yPerDeg, lon: GEO.lon0 + x / GEO.xPerDeg }; }
 
@@ -132,20 +156,25 @@ export const NEIGHBOR_COUNTIES = [
   ['VANDERBURGH CO., IN', 22300, 4400], ['KENTUCKY', 9200, 20500],
 ];
 // Approximate neighbouring county lines (drawn only).
+const NW = COUNTY_POLY[0], SW = COUNTY_POLY[COUNTY_POLY.length - 1], NE = WABASH_PTS[0];
+// Approximate neighbouring county lines (drawn only).
 export const NEIGHBOR_LINES = [
-  [[0, 0], [-9500, 0]], [[0, 10500], [-9500, 10500]], [[0, 10500], [0, 21500]], [[0, 0], [0, -7500]],
-  [[6160, 0], [6160, -7500]], [[11320, 0], [10850, -2600], [10900, -7500]],
+  [NW, [-9500, NW[1]]], [[NW[0], g2(37.9520, -88.3715)[1]], [-9500, g2(37.9520, -88.3715)[1]]], [SW, [SW[0], 21500]], [NW, [NW[0], -7500]],
+  [[6160, NW[1]], [6160, -7500]], [NE, g2(38.3300, -88.0050), [10900, -7500]],
   [[12900, 1900], [24500, 1900]], [[19900, 1900], [19900, 11300]],
 ];
 // Display-only rivers outside the county (the Wabash north of Grayville and south of the county, and the Ohio).
+const WABASH_NORTH = [NE, g2(38.2850, -87.9750), [12100, -1900], [13600, -2900], [15400, -3700], [16900, -4800], [17500, -6200], [17800, -7500]];
+const WABASH_SOUTH = [WABASH_PTS[WABASH_PTS.length - 1], g2(37.8750, -88.0750), g2(37.8550, -88.0600), g2(37.8350, -88.0450), g2(37.8150, -88.0330), [9450, 16300]];
+const OHIO = [[24500, 11300], [22400, 10900], [20100, 11900], [17600, 12700], [15200, 12300], [13150, 12100], [11400, 13900], [10200, 15400], [9450, 16300], [8100, 17400], [6900, 18500], [5600, 19500], [4300, 20600], [3200, 21500]];
 export const OUTER_RIVERS = [
-  { name: 'Wabash River', width: 110, points: [[11320, 0], [11320, -500], [12100, -1900], [13600, -2900], [15400, -3700], [16900, -4800], [17500, -6200], [17800, -7500]] },
-  { name: 'Wabash River', width: 120, points: [[11300, 10500], [11200, 11000], [10900, 12600], [10400, 14200], [9800, 15600], [9450, 16300]] },
-  { name: 'Ohio River', width: 260, points: [[24500, 11300], [22400, 10900], [20100, 11900], [17600, 12700], [15200, 12300], [13150, 12100], [11400, 13900], [10200, 15400], [9450, 16300], [8100, 17400], [6900, 18500], [5600, 19500], [4300, 20600], [3200, 21500]] },
+  { name: 'Wabash River', width: 110, points: WABASH_NORTH },
+  { name: 'Wabash River', width: 120, points: WABASH_SOUTH },
+  { name: 'Ohio River', width: 260, points: OHIO },
 ];
 // Indiana / Kentucky (east of the Wabash, south of the Ohio) — filled darker on the map.
 export const STATE_AREAS = [
-  { name: 'Indiana', pts: [[11320, -500], [12100, -1900], [13600, -2900], [15400, -3700], [16900, -4800], [17500, -6200], [17800, -7500], [24500, -7500], [24500, 11300], [22400, 10900], [20100, 11900], [17600, 12700], [15200, 12300], [13150, 12100], [11400, 13900], [10200, 15400], [9450, 16300], [9800, 15600], [10400, 14200], [10900, 12600], [11200, 11000], [11300, 10500], [11500, 9400], [11650, 8000], [11400, 6400], [11550, 4800], [11350, 3200], [11500, 1600], [11320, 0]] },
+  { name: 'Indiana', pts: [...WABASH_NORTH, [24500, -7500], ...OHIO.slice(0, 9), ...WABASH_SOUTH.slice().reverse().slice(1), ...WABASH_PTS.slice().reverse().slice(1)] },
   { name: 'Kentucky', pts: [[24500, 11300], [24500, 21500], [3200, 21500], [4300, 20600], [5600, 19500], [6900, 18500], [8100, 17400], [9450, 16300], [10200, 15400], [11400, 13900], [13150, 12100], [15200, 12300], [17600, 12700], [20100, 11900], [22400, 10900]] },
 ];
 // Highways leaving the county toward the nearby towns and hospitals (routable, outside the jurisdiction).
@@ -164,9 +193,11 @@ const OUTER_ROAD_DEFS = [
   { name: 'IN-69', kind: 'state', pts: [[12060, 4860], [13000, 7000], [13150, 11700]] },
   { name: 'IN-66', kind: 'state', pts: [[13150, 11700], [16500, 11300], [19500, 10800], [22400, 10300]] },
 ];
+// roads leaving the county start on the old box edge: warp them (far ends are real places and stay put)
+for (const d of OUTER_ROAD_DEFS) d.pts = d.pts.map(([x, y]) => moveOld(x, y));
 // Real smaller communities (no street grid in the game, shown as named places).
 export const HAMLETS = [
-  ['Stokes', 3120, 8380], ['Roland', 3500, 10250], ['Epworth', 7900, 6950], ['Calvin', 9900, 2930],
+  ['Stokes', 3120, 8380], ['Roland', 3500, 10250], ['Epworth', 7900, 6950], ['Calvin', ...warp(9900, 2930)],
 ];
 export const ROAD_KINDS = SPEED;
 
@@ -204,7 +235,7 @@ function buildCity(defs) {
   // Carmi's Main St carries IL-14/IL-1 and Oak St carries IL-1 (display aliases)
   for (const e of edges) if (e.town === 'carmi' && e.kind === 'street') {
     if (e.name === 'Main St') e.alias = 'IL-14 / IL-1';
-    if (e.name === 'Oak St' && nodes[e.a].y >= 6200) e.alias = 'IL-1';
+    if (e.name === 'Oak St' && nodes[e.a].y >= TOWN_BY_ID.carmi.y) e.alias = 'IL-1';
   }
 
   // blocks (for map drawing and location generation)
@@ -298,18 +329,19 @@ function gridRoadDefs(named) {
     }
     return true;
   };
-  const nx = Math.floor(11700 / MILE), ny = Math.floor(10500 / MILE);
+  const X1 = COUNTY_BBOX.x1, Y1 = COUNTY_BBOX.y1;
+  const nx = Math.floor(X1 / MILE), ny = Math.floor(Y1 / MILE);
   const run = (name, pts) => { if (pts.length > 1) out.push({ name, kind: 'township', grid: true, pts: pts.map(([x, y]) => [Math.round(x), Math.round(y)]) }); };
   for (let i = 1; i <= nx; i++) { // north–south roads ("E" numbers)
     const x = i * MILE; const name = `County Road ${i * 100 + 500} E`; let cur = [];
     for (let j = 0; j < ny + 1; j++) {
-      const y0 = j * MILE, y1 = Math.min(10500, (j + 1) * MILE); if (y1 - y0 < 50) continue;
+      const y0 = j * MILE, y1 = Math.min(Y1, (j + 1) * MILE); if (y1 - y0 < 50) continue;
       if (ok(x, y0, x, y1)) { if (!cur.length) cur.push([x, y0]); cur.push([x, y1]); } else { run(name, cur); cur = []; }
     }
     run(name, cur);
   }
   for (let j = 1; j <= ny; j++) { // east–west roads ("N" numbers)
-    const y = j * MILE; const name = `County Road ${Math.round((10500 - y) / MILE) * 100 + 300} N`; let cur = [];
+    const y = j * MILE; const name = `County Road ${Math.round((Y1 - y) / MILE) * 100 + 100} N`; let cur = [];
     for (let i = 0; i < nx + 2; i++) {
       const x0 = i * MILE, x1 = (i + 1) * MILE;
       if (ok(x0, y, x1, y)) { if (!cur.length) cur.push([x0, y]); cur.push([x1, y]); } else { run(name, cur); cur = []; }
@@ -352,7 +384,8 @@ function buildNetwork() {
   let defs = nodeRoads([...named, ...gridRoadDefs(ROAD_DEFS)]);
   let c = buildCity(defs);
   // drop section-road runs that ended up cut off from the network (islands between rivers)
-  const start = c.nodes.reduce((b, n) => (Math.hypot(n.x - 6000, n.y - 6200) < Math.hypot(b.x - 6000, b.y - 6200) ? n : b), c.nodes[0]).id;
+  const cx = TOWN_BY_ID.carmi.x, cy = TOWN_BY_ID.carmi.y;
+  const start = c.nodes.reduce((b, n) => (Math.hypot(n.x - cx, n.y - cy) < Math.hypot(b.x - cx, b.y - cy) ? n : b), c.nodes[0]).id;
   const seen = new Uint8Array(c.nodes.length); const stack = [start]; seen[start] = 1;
   while (stack.length) { const u = stack.pop(); for (const { to } of c.adj[u]) if (!seen[to]) { seen[to] = 1; stack.push(to); } }
   const bad = new Set(c.edges.filter((e) => e.grid && !seen[e.a]).map((e) => e.road));
@@ -418,7 +451,7 @@ const FACILITY_DEFS = [
   ['precinct', 'Town Police – Crossville', ...T('crossville', 2, 2, -35, 30), 'Police – Crossville'],
   ['precinct', 'Town Police – Enfield', ...T('enfield', 2, 2, 35, -30), 'Police – Enfield'],
   ['sheriff', "County Sheriff's Office", ...T('carmi', 6, 4, 45, -35), 'Sheriff'],
-  ['federal', 'Federal Field Office – I-64 staging', 12320, 1480, 'Federal'],
+  ['federal', 'Federal Field Office – I-64 staging', ...moveOld(12320, 1480), 'Federal'],
   ['eoc', 'Regional 911 Center (your center)', ...T('carmi', 4, 3, 40, 40), '911 / EMA'],
   ['fire', 'Fire Station 1 – Carmi', ...T('carmi', 4, 4, -40, 35), 'Fire 1 – Carmi'],
   ['fire', 'Fire Station 2 – Carmi', ...T('carmi', 8, 6, 40, 30), 'Fire 2 – Carmi'],
@@ -440,13 +473,13 @@ const FACILITY_DEFS = [
   ['hospital', 'Saline Valley Hospital (Eldorado)', -1620, 15700, 'Saline Valley Hosp.', { trauma: 3, outside: true }],
   ['hospital', 'Prairie View Hospital (Fairfield)', 520, -3640, 'Prairie View Hosp.', { trauma: 3, outside: true }],
   ['hospital_helipad', 'Riverbend Medical Center Helipad', ...T('carmi', 2, 6, 25, 75), 'Helipad'],
-  ['airport', 'Carmi Municipal Airport', 5880, 7360, 'Carmi Airport'],
+  ['airport', 'Carmi Municipal Airport', ...moveOld(5880, 7360), 'Carmi Airport'],
   ['marina', 'Grayville Wabash River Boat Ramp', ...T('grayville', 4, 2, 60, 0), 'Boat Ramp'],
-  ['coastguard', 'Wabash River Station (IL-14 landing)', 11380, 4820, 'River Station'],
+  ['coastguard', 'Wabash River Station (IL-14 landing)', ...moveOld(11380, 4820), 'River Station'],
   ['sar', 'County Search & Rescue', ...T('carmi', 7, 6, 40, 30), 'SAR'],
   ['public_works', 'Carmi Public Works / County Highway Dept', ...T('carmi', 8, 1, 40, 30), 'Public Works'],
   ['animal_control', 'County Animal Control', ...T('carmi', 6, 7, 40, 30), 'Animal Ctrl'],
-  ['dot', 'State Highway Maintenance Yard (Carmi)', 5180, 6230, 'State DOT'],
+  ['dot', 'State Highway Maintenance Yard (Carmi)', ...moveOld(5180, 6230), 'State DOT'],
   ['utility', 'Electric Co-op Operations Center', ...T('carmi', 7, 0, 40, 30), 'Electric Co-op'],
 ];
 
@@ -474,11 +507,11 @@ const POI_DEFS = [
   ['Carmi Grain Elevator', ...T('carmi', 8, 0, 55, 40), 'industrial', 'factory'],
   ['Oil Field Supply & Service', ...T('carmi', 8, 2, 55, 40), 'industrial', 'chemical'],
   ['Carmi Rail Spur', ...T('carmi', 8, 1, 60, 60), 'industrial', 'railyard'],
-  ['Little Wabash River Boat Access', 6520, 6240, 'commercial', 'boardwalk'],
+  ['Little Wabash River Boat Access', ...moveOld(6520, 6240), 'commercial', 'boardwalk'],
   ['Carmi Office Plaza', ...T('carmi', 6, 3, 55, 45), 'downtown', 'office'],
   ['Southern Prairie High School', ...T('norris', 0, 1, 50, 45), 'residential', 'school'],
   ['Norris City Dollar Store', ...T('norris', 2, 2, -45, -40), 'commercial', 'store'],
-  ['Grayville Truck Stop (I-64 Exit 130)', 10560, 1700, 'commercial', 'gas'],
+  ['Grayville Truck Stop (I-64 Exit 130)', ...moveOld(10560, 1700), 'commercial', 'gas'],
   ['Grayville Riverfront Park', ...T('grayville', 4, 1, 60, 40), 'park', 'park'],
   ['Grayville Grocery', ...T('grayville', 2, 2, -45, 40), 'commercial', 'grocery'],
   ['Crossville Community Park', ...T('crossville', 0, 3, 45, 45), 'park', 'park'],
@@ -487,12 +520,12 @@ const POI_DEFS = [
   ['Enfield Grain Co-op', ...T('enfield', 3, 0, 45, 45), 'industrial', 'factory'],
   ['Mill Shoals Grain Elevator', ...T('millshoals', 3, 0, 45, 45), 'industrial', 'factory'],
   ['Burnt Prairie Church', ...T('burntprairie', 1, 1, 45, 45), 'residential', 'church'],
-  ['Maunie Boat Ramp', 11300, 8480, 'park', 'boardwalk'],
+  ['Maunie Boat Ramp', ...g2(38.0340, -88.0480), 'park', 'boardwalk'],
   ['Emma General Store', ...T('emma', 0, 0, 45, 45), 'commercial', 'store'],
-  ['Little Wabash River Bottoms', 7050, 7600, 'forest', 'forest'],
-  ['Skillet Fork Bottoms', 3300, 4500, 'forest', 'forest'],
-  ['Wabash River Bottoms (Phillipstown)', 11050, 3600, 'forest', 'forest'],
-  ['Calvin', 9900, 2930, 'residential', 'village'],
+  ['Little Wabash River Bottoms', ...moveOld(7050, 7600), 'forest', 'forest'],
+  ['Skillet Fork Bottoms', ...moveOld(3300, 4500), 'forest', 'forest'],
+  ['Wabash River Bottoms (Phillipstown)', ...moveOld(11050, 3600), 'forest', 'forest'],
+  ['Calvin', ...moveOld(9900, 2930), 'residential', 'village'],
   ['Brownsville Church', ...T('brownsville', 1, 0, 45, 40), 'residential', 'church'],
   ['Brownsville Cemetery', ...T('brownsville', 0, 1, -60, 30), 'park', 'park'],
   ['Stokes', 3120, 8380, 'residential', 'village'],
@@ -504,6 +537,9 @@ export const FACILITIES = FACILITY_DEFS.map(([kind, name, x, y, short, extra], i
 city.facilities = FACILITIES;
 city.pois = POI_DEFS.map(([name, x, y, zone, kind], i) => ({ id: `poi_${i}`, name, x, y, zone, kind }));
 for (const [i, w] of city.wells.entries()) w.name = `Oil well tank battery #${i + 1}`;
+
+// I-64 mile markers: 117 near Burnt Prairie, 130 at the Wabash (Grayville)
+const MM_X0 = warp(4500, 2350)[0], MM_X1 = warp(10500, 1750)[0];
 
 // ---------------- Addresses ----------------
 export function nearestTown(x, y) {
@@ -552,7 +588,7 @@ export function addressFor(x, y) {
   const rel = relTown(x, y);
   const district = townAt(x, y, 100)?.name || RURAL;
   if (e.kind === 'interstate') {
-    const mm = Math.round(117 + ((near.qx - 4500) / 6000) * 13);
+    const mm = Math.round(117 + ((near.qx - MM_X0) / (MM_X1 - MM_X0)) * 13);
     return { kind: 'highway', street: 'I-64', number: null, cross: `mile marker ${mm}`, district, full: `I-64 near mile marker ${mm} (${rel})`, short: `I-64 MM ${mm}`, rel, mm };
   }
   const label = e.kind === 'county' || e.kind === 'township' ? rd.name : rd.name.replace('IL-', 'IL Route ').replace('US-', 'US Hwy ');

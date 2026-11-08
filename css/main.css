@@ -213,3 +213,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .range-stage canvas { position: absolute; inset: 0; cursor: crosshair; }
 .range-hud { position: absolute; left: 10px; top: 8px; padding: 4px 10px; border-radius: 8px; background: rgba(0,0,0,.6); font-size: .9em; pointer-events: none; }
 .range-msg { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 16px; gap: 4px; }
+
+/* subtitles for nearby speech (roll call, coworkers talking) */
+#captions { position: absolute; left: 50%; bottom: 13%; transform: translateX(-50%); width: min(760px, 92vw); display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; z-index: 6; }
+#captions .cap { background: rgba(6, 10, 18, .78); color: #eef3fa; padding: 6px 12px; border-radius: 8px; font-size: calc(15px * var(--text-scale, 1)); line-height: 1.35; text-align: center; transition: opacity .4s; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+#captions .cap b { color: #8fd0ff; font-weight: 700; }
+#captions .cap.out { opacity: 0; }

@@ -9,6 +9,14 @@ A first-person 3D emergency communications center simulator that runs entirely i
 > **This is an independently developed fictional emergency dispatch simulator inspired by White County, Illinois. It is not affiliated with, endorsed by, or operated by White County or any real emergency services agency.** All characters, calls, units and storylines are made up.
 
 ## What's new in this update
+- **Carmi Police Department, rebuilt:** a two-story PD next to dispatch. Ground floor: lobby with front desk/reception, public waiting room and report-filing counter, records, the dispatch center link, two interview rooms, investigations, evidence/property intake, roll-call room, training room, break room, men's and women's restrooms and locker rooms, and the equipment & gun room leading to the range. Upstairs (two staircases): offices for the Chief, Assistant Chief, Captain, Watch Commander, Sergeant and Detectives, admin offices and a conference room. The Sheriff's wing keeps its own rooms (sally port, deputy briefing, armory, Sheriff's office), so the two agencies feel different rather than copied.
+- **Everything works:** sit in any chair, sofa or bench (E to sit / stand), use the vending machine, open and close the fridge, sit at the break-room tables, open and latch bathroom stall doors (each stall has a real toilet, paper holder and partitions), walk both floors by the stairs, and walk out the automatic front doors to explore the lot and street.
+- **Living NPCs:** officers, deputies, detectives, records clerks, supervisors and dispatchers follow daily routines — office work, breaks, restroom trips, range time, supervisor check-ins, investigations, conversations you can overhear (captions) — and head back to their posts afterwards. Seats and stalls are reserved so nobody sits on top of anyone.
+- **Watch Commander roll call:** the WC waits for the shift to gather, then runs a real briefing — welcome, attendance, staffing and assignments, recent incidents, open problems, priorities and BOLOs, shift notes — with officers answering and asking questions before dismissal.
+- **Graphics:** new materials with surface relief (brick, tile, carpet, wood), wet-pavement darkening in rain, a painted sky dome with sun, clouds and stars, falling rain/snow outdoors, better lighting, furniture, characters, roads, sidewalks and trees, plus level-of-detail and room-based culling so phones stay smooth.
+- **Real White County shape:** the CAD map now uses the actual county outline (Wabash River on the east, the real river bends and Little Wabash), with towns, roads and townships warped onto true geography. Address numbering, the grid and dispatch functions all still work.
+
+### Earlier update
 - **Live map:** every section-line county road across White County (named on the county grid, e.g. *County Road 1200 E*), Brownsville at its real location (plus Stokes, Roland and Epworth), realistic roads with casings, lane and center-line markings, divided interstate, gabled roofs and building shadows, a **Day (aerial)** and **Night (CAD)** style, a place picker, and a 🌐 **region view** that zooms out to the surrounding counties, towns, the Wabash and Ohio rivers – clearly shaded as *outside the jurisdiction* (calls and incidents are only ever generated inside White County).
 - **Station:** a real 3D town outside the windows (patrol lot, Main Cross St, downtown storefronts, houses, church, water tower, grain elevator) under a live sky with rain on the glass, a ceiling coffer with LED cove lighting, wainscoting, pilasters, door details, under-desk lighting, better wood and wall textures, properly proportioned flags, and fixed supervisor/director desks (monitors, chairs and seated characters now face the right way).
 - **Armory & training range:** sign out training gear at the armory cage (eye/ear protection required), then shoot timed bullseye drills on a six-lane indoor range for a qualification score. Deputies use the range too.
@@ -153,7 +161,8 @@ js/data/              departments & units, incident types, White County map (cit
 js/sim/               headless simulation: units, incidents, calls, radio, weather, events, career
 js/ai/                NLU, caller conversation engine, dialogue, staff dialogue, speech, optional LLM
 js/engine/            WebGL renderer, geometry, procedural textures
-js/world/             3D building, NPCs, player controller, screen textures
+js/world/             3D building, police department (policeDept.js, furniture.js, shell.js),
+                      doors, NPC routines, player controller, weather, screen textures
 js/ui/                CAD screens, menus, HUD, tutorial, settings
 js/audio/             procedural audio
 tests/                logic tests (Node) and browser tests (Playwright)

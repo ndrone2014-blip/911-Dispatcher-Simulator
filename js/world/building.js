@@ -12,12 +12,17 @@
 import { MeshBuilder } from '../engine/geometry.js';
 import { buildSheriffWing } from './sheriffWing.js';
 import { buildExterior } from './exterior.js';
+import { buildPoliceDept, pdWalk, PD, DISPATCH_DOOR } from './policeDept.js';
+import { buildShell, shellColliders } from './shell.js';
+import { toiletStall } from './furniture.js';
 
 export const H = 3.6; // ceiling height
 export const CONSOLE_XS = [-8.4, -2.8, 2.8, 8.4];
 export const ROW_ZS = [-3.2, 1.8];
 export const PLAYER_CONSOLE = 1;
-export const BUILDING_BOUNDS = [-42.2, 0, -26.2, 12.2, H, 18.2];
+export const BUILDING_BOUNDS = [-42.2, 0, -40.2, 12.2, 8.0, 18.2];
+// Where you can walk outside: the patrol lot, Main Cross St sidewalk, the lawn and the side streets.
+export const OUTDOOR_BOUNDS = [-62, -62, 40.6, 44.5];
 
 // material key -> [shared batch, vertex colour]
 const SOLID = {
@@ -30,6 +35,7 @@ const SOLID = {
   blackgloss: ['gloss', [0.02, 0.02, 0.025]], bezel: ['gloss', [0.015, 0.015, 0.018]], mug: ['gloss', [0.92, 0.92, 0.9]], fridge: ['gloss', [0.9, 0.9, 0.9]], pot: ['gloss', [0.85, 0.85, 0.82]],
   whiteCeil: ['ceilParts', [0.9, 0.9, 0.9]], ceilMetal: ['ceilParts', [0.7, 0.72, 0.75]],
   plant: ['foliage', [0.16, 0.42, 0.16]], plant2: ['foliage', [0.1, 0.32, 0.12]],
+  stall: ['satin', [0.5, 0.56, 0.63]], porcelain: ['gloss', [0.95, 0.95, 0.93]], acoustic: ['matte', [0.32, 0.34, 0.38]],
 };
 
 export function consoleList() {
@@ -50,7 +56,10 @@ export function buildCenter(opts = {}) {
   };
   let mb = mbZone(null);
   const colliders = []; const interactables = []; const screens = []; const lights = [];
-  const col = (x0, z0, x1, z1) => colliders.push([Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1)]);
+  const seats = []; const doors = []; const nav = { nodes: [], links: [], stalls: [] };
+  // colliders carry a height range so the two floors of the Police Department don't block each other
+  const col = (x0, z0, x1, z1, y0 = 0, y1 = H) => colliders.push([Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1), y0, y1]);
+  const seat = (x, z, yaw, y = 0.5, extra = {}) => seats.push({ x, z, y, yaw, ...extra });
   const wallSeg = (x0, z0, x1, z1, mat = 'wall', y0 = 0, y1 = H, collide = true) => {
     mb(mat).wall(x0, z0, x1, z1, y0, y1, 0.16, { uv: 2 });
     if (D >= 1 && y0 === 0) mb('rubber').wall(x0, z0, x1, z1, 0, 0.1, 0.19, { uv: 0 }); // rubber cove base both sides
@@ -86,7 +95,8 @@ export function buildCenter(opts = {}) {
     }
     col(x - 0.25, z - 0.25, x + 0.25, z + 0.25);
   };
-  const chair = (x, z, rot = 0, hi = false) => {
+  const chair = (x, z, rot = 0, hi = false, opts = {}) => {
+    if (!opts.noSeat) seat(x, z, rot, 0.5, opts.seat || {});
     const cr = Math.cos(rot), sr = Math.sin(rot); const P = (dx, dz) => [x + dx * cr + dz * sr, z - dx * sr + dz * cr];
     if (D === 0) {
       mb('fabric').box(x, 0.5, z, 0.52, 0.09, 0.5, { rotY: rot, uv: 0.5, ao: 0.2 });
@@ -118,6 +128,7 @@ export function buildCenter(opts = {}) {
     }
   };
   const tableChair = (x, z, rot) => {
+    seat(x, z, rot, 0.47);
     const cr = Math.cos(rot), sr = Math.sin(rot);
     if (D >= 1) {
       mb('fabricWarm').rbox(x, 0.47, z, 0.44, 0.06, 0.42, { rotY: rot, r: 0.025, uv: 0.5, ao: 0.2 });
@@ -158,7 +169,9 @@ export function buildCenter(opts = {}) {
   floor(-3, 10.6, 12, 16, 'carpetDark', 1.2); ceiling(-3, 10.6, 12, 16);
 
   // ---------------- Main floor walls ----------------
-  wallSeg(-12, -8, 12, -8, 'accent');
+  // north wall: a door at the east end leads into the Police Department (the clock hangs over it)
+  wallSeg(-12, -8, DISPATCH_DOOR[0], -8, 'accent'); wallSeg(DISPATCH_DOOR[1], -8, 12, -8, 'accent'); wallSeg(DISPATCH_DOOR[0], -8, DISPATCH_DOOR[1], -8, 'accent', 2.3, H, false);
+  if (D >= 1) { const [a, b] = DISPATCH_DOOR; mb('glassDoor').rbox(a - (b - a) / 2 + 0.04, 1.11, -7.84, b - a - 0.08, 2.2, 0.045, { r: 0.008, uv: 0 }); mb('metal').box((a + b) / 2, 0.006, -8, b - a, 0.012, 0.26, { uv: 0.5 }); }
   wallSeg(-12, -8, -12, 8, 'wall');
   // east wall with 3 windows
   const winZ = [[-6.6, -3.0], [-1.8, 1.8], [3.0, 6.6]];
@@ -224,7 +237,10 @@ export function buildCenter(opts = {}) {
   for (const [a, b] of winZ) screen(`rain_e${a}`, 'rainfx', 12.3, 1.85, (a + b) / 2, b - a, 1.9, 'x', -1, 0, { shared: 'scr_rain', unlit: true, transparent: true });
   screen('rain_dir', 'rainfx', 12.3, 1.85, 13.3, 3.8, 1.9, 'x', -1, 0, { shared: 'scr_rain', unlit: true, transparent: true });
   screen('rain_brk', 'rainfx', -7.5, 1.75, 18.3, 5, 1.7, 'z', -1, 0, { shared: 'scr_rain', unlit: true, transparent: true });
-  { const X = buildExterior({ D: opts.extDetail ?? D }); B['ext@out'] = X.ext; B['extGlow@out'] = X.glow; B['extSigns@out'] = X.signs; B['extFlagUS@out'] = X.flagUS; B['extFlagIL@out'] = X.flagIL; }
+  screen('sky_west', 'exterior', -210, 52, 0, 600, 180, 'x', 1, 0, { shared: 'scr_sky', unlit: true, sky: true });
+  { const X = buildExterior({ D: opts.extDetail ?? D }); B['ext@out'] = X.ext; B['extGlow@out'] = X.glow; B['extSigns@out'] = X.signs; B['extFlagUS@out'] = X.flagUS; B['extFlagIL@out'] = X.flagIL;
+    B['extAsphalt@out'] = X.asphalt; B['extWalk@out'] = X.walk; B['extGrass@out'] = X.grass; B['extBark@out'] = X.bark; B['extLeaves@out'] = X.leaves;
+    for (const c of X.colliders) colliders.push(c); }
 
   // ---------------- Lights & ceiling services ----------------
   for (const x of [-7, 0, 7]) for (const z of [-5, -0.4, 4.4]) light(x, z, 'floor', H - 0.05, 1.6, 0.6);
@@ -382,7 +398,7 @@ export function buildCenter(opts = {}) {
       mb('dark').box(x + 0.78, 0.8, z - 0.08, 0.24, 0.08, 0.22, { rotY: -0.3 });
       mb('dark').cylinder(x - 0.4, 0.8, z + 0.2, 0.07, 0.03, 10, { r2: 0.07 });
     }
-    chair(x, z + 0.78, 0, isPlayer && opts.ergoChair);
+    chair(x, z + 0.78, 0, isPlayer && opts.ergoChair, isPlayer ? { noSeat: true } : { seat: { consoleIndex: c.index, label: `Sit at console ${c.index + 1}` } });
     col(x - 1.62, z - 0.56, x + 1.62, z + 0.42);
     if (isPlayer) {
       screen('nameplate', 'sign', x + 0.9, 1.33, z - 0.47, 0.5, 0.12, 'z', 1, 0, { text: 'CONSOLE 2 · YOU', small: true });
@@ -441,7 +457,7 @@ export function buildCenter(opts = {}) {
     for (const s of [-1, 1]) mb('fabricWarm').box(-8 + s * 1.15, 0.5, 17.45, 0.16, 0.36, 0.8, { uv: 0.5 });
   }
   col(-9.3, 17.0, -6.7, 17.9);
-  interactables.push({ id: 'couch', kind: 'couch', label: 'Sit on the couch for a minute', min: [-9.2, 0, 17], max: [-6.8, 1, 17.9], pri: 0 });
+  for (const dx of [-0.75, 0, 0.75]) seat(-8 + dx, 17.35, 0, 0.44, { label: 'Sit on the couch' });
   // break room TV
   mb('blackgloss').box(-3.1, 2.0, 13.8, 0.06, 0.95, 1.6, { uv: 0 });
   screen('tvBreak', 'tv', -3.16, 2.0, 13.8, 1.5, 0.86, 'x', -1, 0, { shared: 'scr_tv' });
@@ -512,12 +528,23 @@ export function buildCenter(opts = {}) {
   buildArchitecture({ mb, col, screen, D });
   if (D >= 1) buildLawEnforcement({ mb, col, D });
   mb = mbZone('wing'); // wing geometry goes in its own batches so it can be culled
-  buildSheriffWing({ mb, mbZone, col, wallSeg, floor, ceiling, light, door, screen, interactables, tableChair, chair, plant, D, H });
+  buildSheriffWing({ mb, mbZone, col, wallSeg, floor, ceiling, light, door, screen, interactables, tableChair, chair, plant, D, H, seats, doors, nav, seat, toiletStall });
   mb = mbZone(null);
+
+  // ---------------- Police Department (two stories, north of the floor) ----------------
+  buildPoliceDept({ mbZone, col, screen, interactables, lights, seats, doors, nav, D });
+  // the outside of the whole complex
+  { const S = buildShell({ D: opts.extDetail ?? D }); B['extBrick@out'] = S.brick; B['extRoof@out'] = S.roof; B['ext2@out'] = S.ext; B['extGlow2@out'] = S.glow;
+    for (const sg of S.signs) screen(sg.id, 'sign', sg.x, sg.y, sg.z, sg.w, sg.h, sg.axis, sg.sign, 0, { text: sg.text });
+    for (const c of shellColliders()) colliders.push(c); }
 
   if (opts.thanksgiving) buildThanksgiving({ mb, col, screen, consoles });
 
-  return { batches: B, colliders, interactables, screens, lights, consoles };
+  // seats become things you can look at and sit on
+  seats.forEach((st, i) => { st.id = `seat_${i}`; interactables.push({ id: st.id, kind: 'seat', seat: i, label: st.label || 'Sit down', min: [st.x - 0.27, st.y - 0.15, st.z - 0.27], max: [st.x + 0.27, st.y + 0.42, st.z + 0.27], pri: 0, zone: st.zone }); });
+  for (const d of doors) if (d.kind === 'stall') interactables.push({ id: d.id, kind: 'door', door: d.id, label: 'Open / close the stall door', min: [0, 0, 0], max: [0, 0, 0], pri: 2, dynamic: true });
+
+  return { batches: B, colliders, interactables, screens, lights, consoles, seats, doors, nav, walk: pdWalk() };
 }
 
 
@@ -640,7 +667,7 @@ function buildThanksgiving({ mb, col, screen, consoles }) {
   garland(-8.4, -6.4, 3.02, -7.8, 0.12); garland(6.4, 8.4, 3.02, -7.8, 0.12);
   // hay bale displays in the front corners of the floor
   let h = bale(-9.9, -7.35, 1.1, 0.5); pumpkin(-10.15, h, -7.35, 0.17); pumpkin(-9.65, h, -7.3, 0.11, 'gourd'); pumpkin(-9.4, 0, -6.85, 0.2);
-  h = bale(9.4, -7.4, 1.0, 0.5); pumpkin(9.2, h, -7.4, 0.15); pumpkin(9.65, h, -7.35, 0.1, 'gourd'); pumpkin(8.7, 0, -7.0, 0.18); col(8.45, -7.25, 8.95, -6.75);
+  h = bale(7.9, -7.4, 1.0, 0.5); pumpkin(7.7, h, -7.4, 0.15); pumpkin(8.15, h, -7.35, 0.1, 'gourd'); pumpkin(7.0, 0, -7.0, 0.18); col(6.75, -7.25, 7.25, -6.75);
   col(-9.65, -7.1, -9.15, -6.6);
   // a little pumpkin on every console desk wing
   for (const c of consoles) pumpkin(c.x - 1.45, 0.765, c.z + 0.25, 0.07);
@@ -666,8 +693,8 @@ function buildThanksgiving({ mb, col, screen, consoles }) {
 }
 
 // ---------------- NPC navigation graph ----------------
-export function buildNavGraph() {
-  const nodes = []; const add = (id, x, z) => nodes.push({ id, x, z, links: [] });
+export function buildNavGraph(extra) {
+  const nodes = []; const add = (id, x, z, more = {}) => nodes.push({ id, x, z, y: 0, links: [], ...more });
   const link = (a, b) => { const A = nodes.find((n) => n.id === a), B2 = nodes.find((n) => n.id === b); if (A && B2) { A.links.push(b); B2.links.push(a); } };
   const xs = [-11, -5.6, 0, 5.6, 11];
   const lanes = { front: -6.2, mid: -0.75, back: 4.9, door: 7.2 };
@@ -722,16 +749,32 @@ export function buildNavGraph() {
   add('brief_seat1', -18.45, 4.6); add('brief_seat2', -18.45, 3.6); add('brief_seat3', -16.05, 4.6); add('brief_seat4', -16.05, 3.6); add('brief_podium', -20.4, 4.9);
   link('brief_seat1', 'brief_a1'); link('brief_seat2', 'brief_seat1'); link('brief_seat3', 'brief_a2'); link('brief_seat4', 'brief_seat3'); link('brief_podium', 'brief_room');
   add('garage_in', -31, 9.3); link('garage_in', 'w_-29'); add('garage', -33, 6.0); link('garage', 'garage_in');
+  // the door into the Police Department + everything the PD builder registered
+  if (extra) {
+    for (const n of extra.nodes) if (!nodes.find((m) => m.id === n.id)) nodes.push({ ...n, links: [] });
+    for (const [a, b] of extra.links) link(a, b);
+    for (const pair of [extra.dispatchLink, extra.rangeLink, ['p_disp', 'front_5.6']]) if (pair) link(pair[0], pair[1]);
+  }
+  for (const n of nodes) n.y ??= 0;
   return nodes;
 }
 
+/** Shortest path (Dijkstra on 3D distance; climbing stairs costs a little extra). */
 export function findPath(nodes, from, to) {
-  const q = [from]; const prev = { [from]: null };
-  while (q.length) {
-    const cur = q.shift(); if (cur === to) break;
-    for (const nb of nodes.find((n) => n.id === cur)?.links || []) if (!(nb in prev)) { prev[nb] = cur; q.push(nb); }
+  const byId = nodes._byId || (nodes._byId = new Map(nodes.map((n) => [n.id, n])));
+  if (!byId.has(from) || !byId.has(to)) return null;
+  const dist = new Map([[from, 0]]); const prev = new Map(); const open = [from]; const done = new Set();
+  while (open.length) {
+    let bi = 0; for (let i = 1; i < open.length; i++) if (dist.get(open[i]) < dist.get(open[bi])) bi = i;
+    const cur = open.splice(bi, 1)[0]; if (cur === to) break; if (done.has(cur)) continue; done.add(cur);
+    const A = byId.get(cur);
+    for (const nb of A.links) {
+      const Bn = byId.get(nb); if (!Bn) continue;
+      const d = dist.get(cur) + Math.hypot(Bn.x - A.x, Bn.z - A.z) + Math.abs((Bn.y || 0) - (A.y || 0)) * 1.5;
+      if (d < (dist.get(nb) ?? Infinity)) { dist.set(nb, d); prev.set(nb, cur); open.push(nb); }
+    }
   }
-  if (!(to in prev)) return null;
-  const path = []; for (let c = to; c != null; c = prev[c]) path.unshift(c);
-  return path.map((id) => nodes.find((n) => n.id === id));
+  if (!dist.has(to)) return null;
+  const path = []; for (let c = to; c != null; c = prev.get(c)) path.unshift(c);
+  return path.map((id) => byId.get(id));
 }

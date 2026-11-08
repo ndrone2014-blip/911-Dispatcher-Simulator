@@ -32,7 +32,7 @@ ${defs}
 in vec3 vWorld; in vec3 vNormal; in vec2 vUV; in vec3 vColor;
 uniform vec3 uColor; uniform sampler2D uMap; uniform int uHasMap;
 uniform vec3 uEmissive; uniform sampler2D uEmMap; uniform int uHasEm;
-uniform float uSpec; uniform float uShine; uniform float uOpacity; uniform int uUnlit; uniform float uRefl;
+uniform float uSpec; uniform float uShine; uniform float uOpacity; uniform int uUnlit; uniform float uRefl; uniform float uBump; uniform float uWet;
 uniform vec3 uSky; uniform vec3 uGround; uniform vec3 uDirDir; uniform vec3 uDirColor;
 uniform int uNumPoints; uniform vec3 uPointPos[MAXL]; uniform vec3 uPointColor[MAXL]; uniform float uPointRange[MAXL];
 uniform vec3 uCamPos; uniform vec3 uFogColor; uniform vec2 uFog; uniform float uExposure; uniform float uFlash;
@@ -69,15 +69,34 @@ float shadowAt(vec3 N) {
 }
 #endif
 
+#ifdef BUMP
+// Surface relief from the albedo texture itself: brightness is treated as height and the
+// normal is tilted along its screen-space gradient (no tangents or extra textures needed).
+vec3 bumpNormal(vec3 N, float h) {
+  vec3 dpx = dFdx(vWorld), dpy = dFdy(vWorld);
+  float dhx = dFdx(h), dhy = dFdy(h);
+  vec3 r1 = cross(dpy, N), r2 = cross(N, dpx);
+  float det = dot(dpx, r1);
+  if (abs(det) < 1e-10) return N;
+  vec3 g = sign(det) * (dhx * r1 + dhy * r2);
+  return normalize(abs(det) * N - g * uBump);
+}
+#endif
+
 void main() {
   vec3 base = uColor * vColor;
   float alpha = uOpacity;
-  if (uHasMap == 1) { vec4 t = texture(uMap, vUV); base *= toLinear(t.rgb); alpha *= t.a; }
+  float hgt = 0.5;
+  if (uHasMap == 1) { vec4 t = texture(uMap, vUV); base *= toLinear(t.rgb); alpha *= t.a; hgt = dot(t.rgb, vec3(0.3, 0.59, 0.11)); }
+  if (uWet > 0.0) base *= 1.0 - uWet * 0.45;
   vec3 col;
   if (uUnlit == 1) {
     col = base;
   } else {
     vec3 N = normalize(vNormal); if (!gl_FrontFacing) N = -N;
+    #ifdef BUMP
+      if (uBump > 0.0 && uHasMap == 1) N = bumpNormal(N, hgt);
+    #endif
     vec3 V = normalize(uCamPos - vWorld);
     float sh = 1.0;
     #ifdef SHADOWS
@@ -87,6 +106,7 @@ void main() {
     vec3 lit = mix(uGround, uSky, N.y * 0.5 + 0.5) * occl;
     lit += uDirColor * max(dot(N, -uDirDir), 0.0);
     vec3 spec = vec3(0.0);
+    { vec3 Hs = normalize(-uDirDir + V); spec += uDirColor * pow(max(dot(N, Hs), 0.0), uShine) * uSpec * max(dot(N, -uDirDir), 0.0) * ((uShine + 8.0) / 40.0); }
     float pointOcc = mix(0.3, 1.0, sh);
     for (int i = 0; i < MAXL; i++) {
       if (i >= uNumPoints) break;
@@ -95,7 +115,8 @@ void main() {
       float nl = max(dot(N, L), 0.0);
       lit += uPointColor[i] * nl * att * pointOcc;
       vec3 H = normalize(L + V);
-      spec += uPointColor[i] * pow(max(dot(N, H), 0.0), uShine) * att * uSpec * pointOcc * (nl > 0.0 ? 1.0 : 0.0);
+      float fres = 0.75 + 0.25 * pow(1.0 - max(dot(H, V), 0.0), 5.0);
+      spec += uPointColor[i] * pow(max(dot(N, H), 0.0), uShine) * att * uSpec * pointOcc * nl * ((uShine + 8.0) / 26.0) * fres;
     }
     lit += vec3(uFlash);
     col = base * lit + spec;
@@ -181,10 +202,10 @@ void main() {
 }`;
 
 export const QUALITY = {
-  low: { shadows: 0, shadowTaps: 1, envmap: false, post: false, msaa: 0, fxaa: false, bloom: false, dynamicShadows: false, aniso: 2 },
-  medium: { shadows: 2048, shadowTaps: 1, envmap: true, post: true, msaa: 0, fxaa: true, bloom: false, dynamicShadows: false, aniso: 4 },
-  high: { shadows: 2048, shadowTaps: 5, envmap: true, post: true, msaa: 4, fxaa: false, bloom: true, dynamicShadows: false, aniso: 8 },
-  ultra: { shadows: 4096, shadowTaps: 9, envmap: true, post: true, msaa: 4, fxaa: false, bloom: true, dynamicShadows: true, aniso: 16 },
+  low: { shadows: 0, shadowTaps: 1, envmap: false, post: false, msaa: 0, fxaa: false, bloom: false, dynamicShadows: false, aniso: 2, bump: false },
+  medium: { shadows: 2048, shadowTaps: 1, envmap: true, post: true, msaa: 0, fxaa: true, bloom: false, dynamicShadows: false, aniso: 4, bump: true },
+  high: { shadows: 2048, shadowTaps: 5, envmap: true, post: true, msaa: 4, fxaa: false, bloom: true, dynamicShadows: false, aniso: 8, bump: true },
+  ultra: { shadows: 4096, shadowTaps: 9, envmap: true, post: true, msaa: 4, fxaa: false, bloom: true, dynamicShadows: true, aniso: 16, bump: true },
 };
 
 export class Renderer {
@@ -232,10 +253,10 @@ export class Renderer {
   }
 
   sceneProgram(q) {
-    const key = `${q.shadows ? `s${q.shadowTaps}` : 'n'}${q.envmap ? 'e' : ''}`;
+    const key = `${q.shadows ? `s${q.shadowTaps}` : 'n'}${q.envmap ? 'e' : ''}${q.bump ? 'b' : ''}`;
     if (this.programs[key]) return this.programs[key];
-    const defs = [q.shadows ? `#define SHADOWS\n#define SHADOW_TAPS ${q.shadowTaps}` : '', q.envmap ? '#define ENVMAP' : ''].join('\n');
-    const names = ['uModel', 'uViewProj', 'uColor', 'uMap', 'uHasMap', 'uEmissive', 'uEmMap', 'uHasEm', 'uSpec', 'uShine', 'uOpacity', 'uUnlit', 'uRefl', 'uSky', 'uGround', 'uDirDir', 'uDirColor',
+    const defs = [q.shadows ? `#define SHADOWS\n#define SHADOW_TAPS ${q.shadowTaps}` : '', q.envmap ? '#define ENVMAP' : '', q.bump ? '#define BUMP' : ''].join('\n');
+    const names = ['uModel', 'uViewProj', 'uColor', 'uMap', 'uHasMap', 'uEmissive', 'uEmMap', 'uHasEm', 'uSpec', 'uShine', 'uOpacity', 'uUnlit', 'uRefl', 'uBump', 'uWet', 'uSky', 'uGround', 'uDirDir', 'uDirColor',
       'uNumPoints', 'uPointPos', 'uPointColor', 'uPointRange', 'uCamPos', 'uFogColor', 'uFog', 'uExposure', 'uFlash', 'uFogMode', 'uOutFogColor', 'uOutFog', 'uShadow', 'uLightVP', 'uShadowTexel', 'uRecv', 'uEnv', 'uEnvStrength'];
     const prog = this.link(VS, fs(defs), names);
     const gl = this.gl; gl.useProgram(prog.p);
@@ -252,7 +273,7 @@ export class Renderer {
     if (q.msaa && this.maxSamples < 2) { q.msaa = 0; q.fxaa = true; }
     q.msaa = Math.min(q.msaa, this.maxSamples);
     try { this.prog = this.sceneProgram(q); }
-    catch (e) { console.warn('Shader tier failed, falling back:', e.message); Object.assign(q, { shadows: 0, envmap: false }); this.prog = this.sceneProgram(q); }
+    catch (e) { console.warn('Shader tier failed, falling back:', e.message); Object.assign(q, { shadows: 0, envmap: false, bump: false }); this.prog = this.sceneProgram(q); }
     this.q = q; this.qualityName = name;
     this.disposeTargets();
     if (this.shadow && this.shadow.size !== q.shadows) this.disposeShadow();
@@ -298,11 +319,11 @@ export class Renderer {
     this.envStrength = strength;
   }
 
-  createMesh(g) {
+  createMesh(g, { dynamic = false } = {}) {
     const gl = this.gl; const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
     const bufs = [];
     const buf = (data, loc, size) => {
-      const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+      const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, dynamic && loc === 0 ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
       gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0); bufs.push(b);
     };
     buf(g.positions, 0, 3); buf(g.normals, 1, 3); buf(g.uvs, 2, 2); buf(g.colors, 3, 3);
@@ -312,6 +333,16 @@ export class Renderer {
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
     gl.bindVertexArray(null);
     return { vao, bufs, count: idx.length, type: big ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT };
+  }
+
+  /** Replace the vertex colours of a mesh (same vertex count). */
+  updateColors(m, colors) {
+    const gl = this.gl; gl.bindBuffer(gl.ARRAY_BUFFER, m.bufs[3]); gl.bufferSubData(gl.ARRAY_BUFFER, 0, colors);
+  }
+
+  /** Replace the vertex positions of a mesh made with { dynamic: true } (same vertex count). */
+  updatePositions(m, positions) {
+    const gl = this.gl; gl.bindBuffer(gl.ARRAY_BUFFER, m.bufs[0]); gl.bufferSubData(gl.ARRAY_BUFFER, 0, positions);
   }
 
   deleteMesh(m) { if (!m) return; const gl = this.gl; for (const b of m.bufs || []) gl.deleteBuffer(b); gl.deleteVertexArray(m.vao); m.count = 0; }
@@ -520,6 +551,7 @@ export class Renderer {
     gl.uniform3fv(L.uEmissive, m.emissive || ZERO);
     gl.uniform1f(L.uSpec, m.specular ?? 0.15); gl.uniform1f(L.uShine, m.shininess ?? 24); gl.uniform1f(L.uOpacity, m.opacity ?? 1); gl.uniform1i(L.uUnlit, m.unlit ? 1 : 0);
     gl.uniform1f(L.uRefl, m.reflect || 0); gl.uniform1i(L.uFogMode, m.fogMode || 0);
+    gl.uniform1f(L.uBump, m.bump || 0); gl.uniform1f(L.uWet, m.wet || 0);
     if (L.uRecv) gl.uniform1i(L.uRecv, this.hasShadow && m.receive !== false ? 1 : 0);
     if (m.doubleSided) gl.disable(gl.CULL_FACE); else gl.enable(gl.CULL_FACE);
     gl.bindVertexArray(it.mesh.vao); gl.drawElements(gl.TRIANGLES, it.mesh.count, it.mesh.type, 0);
