@@ -175,7 +175,7 @@ export function buildSheriffWing(k) {
   wallSeg(-22, -26, -22, -8, 'concrete'); wallSeg(-22, -26, -12, -26, 'concrete');
   // east wall: a door from the Police Department's gun room opens behind the firing line
   wallSeg(-12, -26, -12, -10.6, 'concrete'); wallSeg(-12, -9.4, -12, -8, 'concrete'); wallSeg(-12, -10.6, -12, -9.4, 'concrete', 2.3, H, false);
-  screen('sign_range_pd', 'sign', -12.12, 2.55, -10, 1.3, 0.24, 'x', -1, 0, { text: 'POLICE GUN ROOM' });
+  mb('dark').box(-12.1, 2.55, -10, 0.05, 0.3, 1.35, { uv: 0 }); screen('sign_range_pd', 'sign', -12.127, 2.55, -10, 1.3, 0.24, 'x', -1, 0, { text: 'POLICE GUN ROOM' });
   for (const [x0, x1, z] of [[-13.9, -12.7, -8]]) { mb('frame').box(x0, 1.15, z, 0.08, 2.3, 0.22); mb('frame').box(x1, 1.15, z, 0.08, 2.3, 0.22); mb('frame').box((x0 + x1) / 2, 2.32, z, x1 - x0 + 0.08, 0.06, 0.22); }
   mb('metal').box(-13.3, 1.12, -8.16, 1.12, 2.22, 0.05); // heavy range door, held open
   for (const z of [-11.5, -17, -22.5]) light(-17, z, 'armory', H - 0.05, 1.4, 0.5);

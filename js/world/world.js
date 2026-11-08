@@ -263,6 +263,8 @@ export class World {
     return !rects.some(([x0, z0, x1, z1]) => x > x0 - 0.05 && x < x1 + 0.05 && z > z0 - 0.05 && z < z1 + 0.05);
   }
   inStairwell(p = this.player.pos) { return (p[0] > 5 && p[0] < 8.6 && p[2] > -15 && p[2] < -8) || (p[0] > -12 && p[0] < -8.6 && p[2] > -25.6 && p[2] < -19.4); }
+  /** In or just outside a stairwell door: the other floor is visible through the stair opening. */
+  nearStairwell(p = this.player.pos, m = 3.5) { return (p[0] > 5 - m && p[0] < 8.6 + m && p[2] > -15 - m && p[2] < -8 + m) || (p[0] > -12 - m && p[0] < -8.6 + m && p[2] > -25.6 - m && p[2] < -19.4 + m); }
 
   seatPose() {
     const c = consoleList()[PLAYER_CONSOLE];
@@ -441,7 +443,7 @@ export class World {
     this.updateScreens(dt);
     const items = []; const all = [];
     // ---- zone culling: draw only what can be seen from where you stand ----
-    const p = this.player.pos; const lv = this.level(); const out = this.outside(); const stair = this.inStairwell(); const inPD = this.inPD();
+    const p = this.player.pos; const lv = this.level(); const out = this.outside(); const inPD = this.inPD(); const stair = inPD && this.nearStairwell();
     if (lv !== this.shadowLevel) { this.shadowLevel = lv; this.renderer.shadowDirty = true; } // the baked shadow map is per floor
     const up = lv === 1 && !stair;                              // upstairs (outside the stairwells) the ground floor is hidden
     const wingVisible = out || (!up && (p[2] > 7.3 || p[0] < -11.4));

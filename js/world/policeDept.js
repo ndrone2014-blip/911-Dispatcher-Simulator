@@ -81,7 +81,9 @@ export function buildPoliceDept(k) {
   const F = { ...f }; Object.defineProperty(F, 'mb', { get: () => mb });
   const node = (id, x, z, extra = {}) => nav.nodes.push({ id, x, z, y: extra.y ?? Y, ...extra });
   const link = (...ids) => { for (let i = 0; i < ids.length - 1; i++) nav.links.push([ids[i], ids[i + 1]]); };
-  const sign = (id, text, x, y, z, axis, s, w = 1.4) => screen(id, 'sign', x, y, z, w, 0.24, axis, s, 0, { text, shared: undefined });
+  const sign = (id, text, x, y, z, axis, s, w = 1.4) => { // sign face on a 5 cm plaque that runs back to the wall
+    if (axis === 'z') mb('dark').box(x, y, z - s * 0.026, w + 0.05, 0.3, 0.05, { uv: 0 }); else mb('dark').box(x - s * 0.026, y, z, 0.05, 0.3, w + 0.05, { uv: 0 });
+    screen(id, 'sign', axis === 'x' ? x + s * 0.002 : x, y, axis === 'z' ? z + s * 0.002 : z, w, 0.24, axis, s, 0, { text, shared: undefined }); };
   const sitNode = (id, pose, extra = {}) => node(id, pose[0], pose[1], { sit: pose[2], ...extra });
 
   // ------------------------------------------------ walls
@@ -138,9 +140,9 @@ export function buildPoliceDept(k) {
     lights.push({ pos: [x, Y + CH - 0.4, z], room: roomName, base: 1, range: 5.6, dim: 0.86 });
   };
   const lampsIn = (x0, z0, x1, z1, roomName, nx = 1, nz = 1) => { for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) lamp(x0 + (x1 - x0) * (i + 0.5) / nx, z0 + (z1 - z0) * (j + 0.5) / nz, roomName); };
-  const vent = (x, z) => { if (D >= 1) mb('vent').box(x, Y + CH - 0.008, z, 0.6, 0.016, 0.6, { faces: 'y', uv: 0 }); };
-  const exitSign = (x, z, axis, s) => { if (D < 1) return; if (axis === 'z') { mb('white').box(x, Y + 2.56, z + s * 0.05, 0.4, 0.2, 0.05, { uv: 0 }); mb('exit').panel(x, Y + 2.56, z + s * 0.077, 0.36, 0.15, 'z', s); } else { mb('white').box(x + s * 0.05, Y + 2.56, z, 0.05, 0.2, 0.4, { uv: 0 }); mb('exit').panel(x + s * 0.077, Y + 2.56, z, 0.36, 0.15, 'x', s); } };
-  const wainscot = (x0, z0, x1, z1, mat = 'ceramic', h = 1.4, inward = 1) => { const alongX = z0 === z1; if (alongX) mb(mat).box((x0 + x1) / 2, Y + h / 2, z0 + inward * 0.1, Math.abs(x1 - x0), h, 0.02, { uv: 0.6 }); else mb(mat).box(x0 + inward * 0.1, Y + h / 2, (z0 + z1) / 2, 0.02, h, Math.abs(z1 - z0), { uv: 0.6 }); };
+  const vent = (x, z) => { if (D >= 1) mb('vent').box(x, Y + CH - 0.003, z, 0.6, 0.006, 0.6, { faces: 'y', uv: 0 }); };
+  const exitSign = (x, z, axis, s) => { if (D < 1) return; if (axis === 'z') { mb('white').box(x, Y + 2.56, z + s * 0.045, 0.4, 0.2, 0.05, { uv: 0 }); mb('exit').panel(x, Y + 2.56, z + s * 0.072, 0.36, 0.15, 'z', s); } else { mb('white').box(x + s * 0.045, Y + 2.56, z, 0.05, 0.2, 0.4, { uv: 0 }); mb('exit').panel(x + s * 0.072, Y + 2.56, z, 0.36, 0.15, 'x', s); } };
+  const wainscot = (x0, z0, x1, z1, mat = 'ceramic', h = 1.4, inward = 1) => { const alongX = z0 === z1; if (alongX) mb(mat).box((x0 + x1) / 2, Y + h / 2, z0 + inward * 0.09, Math.abs(x1 - x0), h, 0.02, { uv: 0.6 }); else mb(mat).box(x0 + inward * 0.09, Y + h / 2, (z0 + z1) / 2, 0.02, h, Math.abs(z1 - z0), { uv: 0.6 }); };
 
   // ======================================================================= GROUND FLOOR
   level(0);
@@ -158,7 +160,7 @@ export function buildPoliceDept(k) {
   for (const s of STAIRS) floor(s.box[0], s.box[1], s.box[2], s.box[3], 'terrazzo', 2.4);
   // ceilings over the stairwells are the landings' undersides – stair cores are open to the top
   // exterior walls
-  wall(-12, -40, 12, -40, [[2, 3.4, 'ext', { inSide: 1 }], [5, 7.2, 'ext', { sill: 0.45, head: 3.0 }], [8.2, 11, 'ext', { sill: 0.45, head: 3.0 }]]);
+  wall(-12, -40, 12, -40, [[2, 3.4, 'ext', { inSide: 1 }], [4.6, 6.6, 'ext', { sill: 0.45, head: 3.0 }], [9.6, 11.4, 'ext', { sill: 0.45, head: 3.0 }]]);
   wall(12, -40, 12, -8, [[-39.4, -36, 'ext', { sill: 0.3, head: 3.1 }], [ENTRANCE[0], ENTRANCE[1], 'pass'], [-32, -28.6, 'ext', { sill: 0.3, head: 3.1 }], [-26.4, -23.2, 'ext', { inSide: -1 }], [-20.4, -17.2, 'ext', { inSide: -1 }], [-13.6, -10.6, 'ext', { inSide: -1 }]]);
   wall(-12, -40, -12, -26);
   // interior: corridor M1 north side + lobby south wall
@@ -199,23 +201,23 @@ export function buildPoliceDept(k) {
   mb('rubber').box(10.8, 0.008, -34, 2.0, 0.016, 2.4, { uv: 0 });
   // front desk counter (public side) with bullet-resistant glass above
   mb('woodDark').rbox(4.5, 0.55, -34.4, 0.7, 1.1, 5.8, { r: 0.02, uv: 1, ao: 0.2 }); mb('counterTop').rbox(4.65, 1.12, -34.4, 0.9, 0.05, 5.9, { r: 0.01, uv: 1 }); col(4, -37.4, 4.95, -31.4, 0, 1.2);
-  mb('seal').panel(4.87, 0.6, -34.4, 0.5, 0.5, 'x', 1);
+  mb('seal').panel(4.857, 0.6, -34.4, 0.5, 0.5, 'x', 1);
   sign('pd_sign_frontdesk', 'FRONT DESK · RECORDS · REPORTS', 4.12, 2.75, -34.4, 'x', 1, 3.2);
   f.interact({ id: 'pd_frontdesk', kind: 'frontdesk', label: 'Front desk – speak to the desk officer', min: [4.4, 0.8, -37.2], max: [5.4, 2.0, -31.6], pri: 2 });
   // waiting room: beam seating, magazine table, plant, TV
   beamSeating(F, 7.4, -37.6, Math.PI, 0, 4); beamSeating(F, 7.4, -30.6, 0, 0, 4); beamSeating(F, 10.9, -37.7, Math.PI, 0, 2);
   table(F, 7.4, -34.1, 0, 0, { w: 1.1, d: 0.55, h: 0.42, top: 'woodDark' }); if (D >= 1) { mb('paper').box(7.2, 0.45, -34.1, 0.3, 0.01, 0.22, { rotY: 0.3, uv: 0 }); mb('print2').box(7.6, 0.45, -34, 0.24, 0.012, 0.3, { rotY: -0.2, uv: 0 }); }
   plantPot(F, 11.4, -39.4, 0, 1.1); plantPot(F, 4.9, -28.6, 0, 1.0); plantPot(F, 11.4, -28.6, 0, 0.9);
-  mb('blackgloss').box(8, 2.3, -39.88, 1.7, 1.0, 0.06, { uv: 0 }); screen('pd_lobby_tv', 'tv', 8, 2.3, -39.84, 1.6, 0.9, 'z', 1, 0, { shared: 'scr_tv' });
+  mb('blackgloss').box(8, 2.3, -39.89, 1.7, 1.0, 0.06, { uv: 0 }); screen('pd_lobby_tv', 'tv', 8, 2.3, -39.858, 1.6, 0.9, 'z', 1, 0, { shared: 'scr_tv' });
   // report filing kiosk + brochure rack (north wall, west part)
   mb('satin').rbox(5.4, 0.55, -39.55, 0.9, 1.1, 0.5, { r: 0.03, color: [0.2, 0.24, 0.3] }); mb('satin').rbox(5.4, 1.35, -39.68, 0.7, 0.55, 0.12, { r: 0.02, color: [0.1, 0.1, 0.12], rotX: -0.2 });
   screen('pd_kiosk', 'sign', 5.4, 1.36, -39.6, 0.6, 0.42, 'z', 1, 0, { text: 'FILE A REPORT · TOUCH TO START', small: true });
   col(4.9, -39.85, 5.9, -39.25, 0, 1.6);
   f.interact({ id: 'pd_kiosk', kind: 'report_kiosk', label: 'Report kiosk – file a police report', min: [4.9, 0.6, -39.9], max: [5.9, 1.8, -39.2], pri: 1 });
-  mb('satin').box(6.4, 1.1, -39.9, 0.6, 1.1, 0.12, { color: [0.6, 0.56, 0.5] }); for (let i = 0; i < 6; i++) mb(['print1', 'print2', 'paper'][i % 3]).box(6.25 + (i % 2) * 0.3, 0.75 + Math.floor(i / 2) * 0.32, -39.83, 0.22, 0.28, 0.02, { uv: 0 });
+  mb('satin').box(9.05, 1.1, -39.86, 0.6, 1.1, 0.12, { color: [0.6, 0.56, 0.5] }); for (let i = 0; i < 6; i++) mb(['print1', 'print2', 'paper'][i % 3]).box(8.9 + (i % 2) * 0.3, 0.75 + Math.floor(i / 2) * 0.32, -39.79, 0.22, 0.28, 0.02, { uv: 0 });
   // wall of honor: memorial plaques + framed photos on the south wall, flags by the desk
-  for (let i = 0; i < 5; i++) frame(F, 5.4 + i * 1.1, 1.75, -28.1, 'z', -1, 0.55, 0.7, i % 2 ? 'print2' : 'print1');
-  mb('gold').box(9.1, 2.45, -28.1, 2.6, 0.12, 0.02);
+  for (let i = 0; i < 4; i++) frame(F, 5.0 + i * 1.1, 1.75, -28.08, 'z', -1, 0.55, 0.7, i % 2 ? 'print2' : 'print1');
+  mb('gold').box(9.1, 2.45, -28.095, 2.6, 0.12, 0.03);
   flagStand(F, 5.2, -38.4, 0, 'flagUS', Math.PI / 2); flagStand(F, 5.2, -31.0, 0, 'flagIL', Math.PI / 2);
   sign('pd_sign_lobby', 'CITY POLICE DEPARTMENT · WELCOME', 8, 3.25, -39.89, 'z', 1, 4.2);
   waterCooler(F, 11.6, -32.4, 0);
@@ -234,7 +236,7 @@ export function buildPoliceDept(k) {
   const dRec2 = desk(F, 2.4, -29.6, Math.PI, 0, { w: 1.4, d: 0.7, monitors: 1, screenKey: 'scr_cw2', wood: 'laminate' });
   for (let i = 0; i < 3; i++) shelving(F, 1.6, -39.3 + i * 0.0, 0, 0, { w: 1.0, d: 0.5, h: 2.2 });
   fileCabinet(F, 3.6, -39.6, 0); fileCabinet(F, 1.3, -32.0, Math.PI / 2, 0, { drawers: 4, w: 0.9 }); copier(F, 1.4, -36.4, -Math.PI / 2);
-  sign('pd_sign_records', 'RECORDS', 2.5, 2.55, -28.12, 'z', 1, 1.2);
+  sign('pd_sign_records', 'RECORDS', 2.5, 2.55, -27.9, 'z', 1, 1.2);
   node('p_rec_door', 2.5, -28.6); node('p_rec_mid', 2.5, -32.5); sitNode('p_rec_desk', dRec.chair); sitNode('p_rec_desk2', dRec2.chair);
   node('p_rec_files', 1.9, -38.4, { face: 0 }); node('p_rec_copier', 2.0, -36.4, { face: Math.PI / 2 });
   link('p_rec_door', 'p_rec_desk2'); link('p_rec_door', 'p_rec_mid', 'p_rec_desk'); link('p_rec_mid', 'p_rec_copier', 'p_rec_files');
@@ -244,8 +246,8 @@ export function buildPoliceDept(k) {
   lampsIn(-12, -40, -5, -32, 'radio', 2, 2); lampsIn(-12, -32, -5, -28, 'radio', 2, 1);
   // intake: counter, pass-through temporary lockers on the corridor wall, packaging bench
   mb('satin').rbox(-8.5, 0.48, -30.0, 3.0, 0.96, 0.7, { r: 0.01, color: [0.36, 0.4, 0.46] }); mb('counterTop').rbox(-8.5, 0.98, -30.0, 3.1, 0.05, 0.8, { r: 0.01, uv: 1 }); col(-10.05, -30.4, -6.95, -29.6, 0, 1.05);
-  for (let r = 0; r < 3; r++) for (let q = 0; q < 4; q++) { mb('satin').box(-11.5 + q * 0.5, 0.6 + r * 0.55, -28.12, 0.46, 0.5, 0.02, { color: [0.42, 0.45, 0.5] }); mb('beaconGreen').box(-11.4 + q * 0.5, 0.75 + r * 0.55, -28.14, 0.02, 0.02, 0.005); }
-  mb('satin').box(-10.5, 1.15, -28.35, 2.1, 1.75, 0.42, { faces: 'xXy', color: [0.36, 0.38, 0.42] }); col(-11.6, -28.6, -9.4, -28.1, 0, 2);
+  for (let r = 0; r < 3; r++) for (let q = 0; q < 4; q++) for (const [zz, ss] of [[-27.91, 1], [-28.59, -1]]) { mb('satin').box(-11.25 + q * 0.5, 0.6 + r * 0.55, zz, 0.46, 0.5, 0.02, { color: [0.42, 0.45, 0.5] }); mb('beaconGreen').box(-11.15 + q * 0.5, 0.75 + r * 0.55, zz + ss * 0.012, 0.02, 0.02, 0.005); mb('chrome').box(-11.42 + q * 0.5, 0.6 + r * 0.55, zz + ss * 0.015, 0.02, 0.1, 0.012); }
+  mb('satin').box(-10.5, 1.01, -28.33, 2.1, 2.02, 0.5, { color: [0.36, 0.38, 0.42] }); mb('satin').box(-10.5, 1.01, -27.9, 2.14, 2.06, 0.03, { faces: 'zZ', color: [0.2, 0.21, 0.24] }); col(-11.6, -28.6, -9.4, -28.1, 0, 2);
   mb('paper').box(-8.7, 1.015, -30, 0.32, 0.012, 0.25, { uv: 0 }); mb('paper').rbox(-8.1, 1.06, -29.95, 0.25, 0.1, 0.2, { r: 0.02, uv: 0 });
   sign('pd_sign_evidence', 'EVIDENCE & PROPERTY · AUTHORIZED ONLY', -6.5, 2.7, -27.88, 'z', 1, 3.0);
   // storage cage: chain-link partition + shelving rows + drug/gun safes
@@ -260,10 +262,10 @@ export function buildPoliceDept(k) {
   // ------------------------------------------------ interview suite + investigation room
   lampsIn(-5, -31, 1, -28, 'super', 2, 1); lamp(-3.5, -33.5, 'radio', 0.6, 0.6); lamp(-0.5, -33.5, 'radio', 0.6, 0.6); lampsIn(-5, -40, 1, -36, 'super', 2, 1);
   interviewSet(F, -3.5, -33.8, 0, 0); interviewSet(F, -0.5, -33.8, 0, 0);
-  for (const x of [-4.8, -1.8]) { mb('dark').sphere(x + 0.12, 3.5, -35.8, 0.07, 10, 6, { sy: 0.6 }); mb('acoustic').box(x + 1.4, 1.6, -35.88, 2.6, 2.4, 0.04, { uv: 0.6 }); }
+  for (const x of [-4.8, -1.8]) { mb('dark').sphere(x + 0.12, CH - 0.04, -35.8, 0.07, 10, 6, { sy: 0.6 }); mb('acoustic').box(x + 1.4, 1.6, -35.9, 2.6, 2.4, 0.04, { uv: 0.6 }); }
   // observation: monitors on a counter facing the mirrors
-  mb('laminate').rbox(-2, 0.74, -30.6, 5.6, 0.04, 0.55, { r: 0.01, uv: 1 }); col(-4.8, -30.9, 0.8, -30.3, 0, 0.8);
-  for (const x of [-4.2, -1.3]) { mb('bezel').rbox(x, 1.0, -30.75, 0.5, 0.3, 0.025, { r: 0.006, uv: 0 }); mb('scr_cw1').panel(x, 1.0, -30.735, 0.46, 0.26, 'z', 1); }
+  mb('laminate').rbox(-2, 0.74, -30.645, 5.6, 0.04, 0.55, { r: 0.01, uv: 1 }); mb('satin').box(-2, 0.36, -30.68, 5.5, 0.72, 0.46, { color: [0.3, 0.32, 0.36] }); col(-4.8, -30.9, 0.8, -30.3, 0, 0.8);
+  for (const x of [-4.2, -1.3]) { mb('dark').box(x, 0.765, -30.72, 0.22, 0.012, 0.16, { uv: 0 }); mb('dark').box(x, 0.82, -30.76, 0.04, 0.12, 0.03, { uv: 0 }); mb('bezel').rbox(x, 1.0, -30.74, 0.5, 0.3, 0.025, { r: 0.006, uv: 0 }); mb('scr_cw1').panel(x, 1.0, -30.725, 0.46, 0.26, 'z', 1); }
   for (const x of [-3.4, -0.4]) officeChair(F, x, -29.9, 0, 0);
   sign('pd_sign_interview', 'INTERVIEW · RECORDING IN PROGRESS WHEN LIT', -1, 2.7, -27.88, 'z', 1, 3.2);
   mb('lightRed').box(-1, 2.95, -27.9, 0.2, 0.08, 0.04);
@@ -283,13 +285,13 @@ export function buildPoliceDept(k) {
   if (D >= 1) {
     for (const [a, b] of [[-12, -7], [-6, -1.5], [-0.5, 2], [3, 4]]) mb('woodDark').rbox((a + b) / 2, 0.92, -27.88, b - a, 0.14, 0.05, { r: 0.015, uv: 1 });
     frame(F, 11.88, 1.65, -15.5, 'x', -1, 1.0, 0.7, 'print1'); frame(F, 11.88, 1.65, -21.8, 'x', -1, 1.0, 0.7, 'print2');
-    frame(F, -4, 1.65, -15.12, 'z', -1, 0.8, 0.55, 'print2');
+    frame(F, -5.4, 1.65, -15.08, 'z', -1, 0.8, 0.55, 'print2');
   }
   bench(F, 11.55, -19.0, -Math.PI / 2, 0, 1.6, { seats: 2 }); radioCharger(F, 8.68, 1.35, -12.5, 'x', 1, 8); waterCooler(F, 11.65, -24.8, 0);
-  wallBoard(F, 8.7, 1.6, -16.2, 'x', 1, 1.3, 0.9, 'cork');
-  sign('pd_sign_c', 'POLICE · DISPATCH ↓ · LOBBY ↑', 10.3, 2.85, -8.14, 'z', 1, 2.6);
+  wallBoard(F, 8.68, 1.6, -14.1, 'x', 1, 1.3, 0.9, 'cork');
+  sign('pd_sign_c', 'POLICE · DISPATCH ↓ · LOBBY ↑', 10.3, 2.85, -8.1, 'z', -1, 2.6);
   sign('pd_sign_disp', 'POLICE DEPARTMENT', 9.9, 2.75, -7.86, 'z', 1, 2.2);
-  exitSign(10.3, -8.1, 'z', 1); exitSign(-11.88, -26.8, 'x', 1);
+  exitSign(10.3, -8.1, 'z', 1); exitSign(-11.945, -26.8, 'x', 1);
   // corridor nav
   for (const [id, z] of [['p_c1', -10.3], ['p_c2', -16.2], ['p_c3', -19.3], ['p_c4', -24.1], ['p_c5', -26.8]]) node(id, 10.3, z);
   node('p_disp', 9.9, -8.8); link('p_disp', 'p_c1', 'p_c2', 'p_c3', 'p_c4', 'p_c5', 'p_lob_door');
@@ -313,11 +315,11 @@ export function buildPoliceDept(k) {
     }
     if (men) { urinal(F, x1 - 0.5, -25.5, 1, 0); urinal(F, x1 - 1.3, -25.5, 1, 0); }
     vanity(F, x1 - 0.08, -22.6, -1, 0, 2, 'x');
-    if (D >= 1) { mb('satin').rbox(x1 - 0.12, 1.35, -21.6, 0.12, 0.3, 0.26, { r: 0.03, color: [0.82, 0.82, 0.82] }); mb('satin').rbox(xm, 1.3, -21.32, 0.3, 0.42, 0.1, { r: 0.02, color: [0.8, 0.8, 0.8] }); }
+    if (D >= 1) { mb('satin').rbox(x1 - 0.12, 1.35, -21.6, 0.12, 0.3, 0.26, { r: 0.03, color: [0.82, 0.82, 0.82] }); mb('satin').rbox(x0 + 0.7, 1.3, -21.33, 0.3, 0.42, 0.1, { r: 0.02, color: [0.8, 0.8, 0.8] }); }
     trashCan(F, xm + 0.4, -21.6);
     // locker zone
-    lockerBank(F, xm, -17.65, Math.PI, 0, { n: 9, bench: true });
-    mb('mirror').panel(x0 + 0.1, 1.5, -19.5, 1.0, 1.4, 'x', 1);
+    lockerBank(F, xm, -17.735, Math.PI, 0, { n: 9, bench: true });
+    mb('mirror').panel(x0 + 0.085, 1.5, -19.5, 1.0, 1.4, 'x', 1);
     sign(`pd_sign_rr${tag}`, men ? "MEN'S ♂ · LOCKERS" : "WOMEN'S ♀ · LOCKERS", xm - (men ? 0 : 0.2), 2.55, -25.48, 'z', 1, 1.6);
     f.interact({ id: `pd_restroom_${tag}`, kind: 'restroom', label: men ? "Wash up at the sink" : "Wash up at the sink", min: [x1 - 0.7, 0.8, -23.6], max: [x1, 1.3, -21.6], pri: 0 });
     f.interact({ id: `pd_lockers_${tag}`, kind: 'pd_lockers', label: men ? "Officer lockers (men's)" : "Officer lockers (women's)", min: [x0 + 0.1, 0, -18.0], max: [x1 - 0.1, 2.0, -17.4], pri: 0 });
@@ -330,7 +332,7 @@ export function buildPoliceDept(k) {
   // ------------------------------------------------ roll call room
   lampsIn(-1, -25.6, 5, -17.4, 'super', 2, 3); vent(2, -21.5);
   podium(F, 2.0, -24.7, Math.PI, 0);
-  mb('blackgloss').box(2, 1.9, -25.47, 2.6, 1.5, 0.06, { uv: 0 }); mb('pdBriefing').panel(2, 1.9, -25.43, 2.5, 1.4, 'z', 1);
+  mb('blackgloss').box(2, 1.9, -25.49, 2.6, 1.5, 0.06, { uv: 0 }); mb('pdBriefing').panel(2, 1.9, -25.457, 2.5, 1.4, 'z', 1);
   for (let row = 0; row < 3; row++) table(F, 2.0, -22.8 + row * 1.75, 0, 0, { w: 4.4, d: 0.6, top: 'laminate', chairs: 0 });
   const rcSeats = [];
   for (let row = 0; row < 3; row++) for (let i = 0; i < 5; i++) { const x = 0.25 + i * 0.88, z = -22.15 + row * 1.75; stackChair(F, x, z, 0, 0); rcSeats.push([x, z]); }
@@ -384,8 +386,8 @@ export function buildPoliceDept(k) {
   vendingMachine(F, -0.4, -8.5, -1, 0, { id: 'pd_vending' }); vendingMachine(F, 0.6, -8.5, -1, 0, { id: 'pd_vending2', drinks: true });
   const brSeats = table(F, -3.4, -11.6, 0, 0, { w: 1.8, d: 0.9, top: 'wood', chairs: 6, chairType: 'stack' });
   const brRound = table(F, 0.4, -11.8, 0, 0, { w: 1.0, round: true, top: 'wood', chairs: 4, chairType: 'stack' });
-  sofa(F, 3.9, -11.6, -Math.PI / 2, 0, { w: 2.1 });
-  mb('blackgloss').box(4.92, 2.0, -11.6, 0.06, 0.95, 1.6, { uv: 0 }); screen('pd_break_tv', 'tv', 4.86, 2.0, -11.6, 1.5, 0.86, 'x', -1, 0, { shared: 'scr_tv' });
+  sofa(F, 2.7, -11.6, -Math.PI / 2, 0, { w: 2.1 });
+  mb('blackgloss').box(4.92, 2.0, -11.6, 0.06, 0.95, 1.6, { uv: 0 }); screen('pd_break_tv', 'tv', 4.885, 2.0, -11.6, 1.5, 0.86, 'x', -1, 0, { shared: 'scr_tv' });
   wallBoard(F, -6.38, 1.6, -11.8, 'x', 1, 1.6, 1.0, 'cork'); trashCan(F, 1.5, -8.5, 0, 'recycle'); trashCan(F, -6.1, -9.8); plantPot(F, 4.4, -14.4, 0, 0.9);
   sign('pd_sign_break', 'BREAK ROOM', -1.0, 2.55, -15.12, 'z', -1, 1.4);
   f.interact({ id: 'pd_break_tv', kind: 'tv', label: 'Watch the news', min: [4.7, 1.4, -12.5], max: [5.0, 2.6, -10.7], pri: 0 });
@@ -394,7 +396,7 @@ export function buildPoliceDept(k) {
   link('p_s-3', 'p_br_door1', 'p_br_mid'); link('p_s2', 'p_br_door2', 'p_br_mid'); link('p_br_mid', 'p_br_coffee', 'p_br_micro'); link('p_br_mid', 'p_br_fridge'); link('p_br_mid', 'p_br_vend'); link('p_br_mid', 'p_br_vend2');
   brSeats.forEach((pose, i) => { sitNode(`p_br_t${i}`, pose); link('p_br_mid', `p_br_t${i}`); });
   brRound.forEach((pose, i) => { sitNode(`p_br_r${i}`, pose); link('p_br_mid', `p_br_r${i}`); });
-  node('p_br_sofa', 3.86, -11.6, { sit: -Math.PI / 2 }); link('p_br_mid', 'p_br_sofa'); node('p_br_chat', 1.8, -10.0, { face: Math.PI / 2 }); link('p_br_mid', 'p_br_chat');
+  node('p_br_sofa', 2.66, -11.6, { sit: -Math.PI / 2 }); link('p_br_mid', 'p_br_sofa'); node('p_br_chat', 1.8, -10.0, { face: Math.PI / 2 }); link('p_br_mid', 'p_br_chat');
 
   // ======================================================================= STAIRS
   for (const s of STAIRS) buildStair(s);
@@ -428,10 +430,11 @@ export function buildPoliceDept(k) {
     // fill the slab thickness (3.6 – 4.0) around the stairwell walls and along the open edge of the hole
     for (const [x0, z0, x1, z1] of [[bx0, bz0, bx1, bz0], [bx0, bz1, bx1, bz1], [bx0, bz0, bx0, bz1], [bx1, bz0, bx1, bz1]]) mb('wall').wall(x0, z0, x1, z1, CH, F2, 0.18, { uv: 2 });
     { const ez = Math.abs(hz0 - bz0) < 0.01 ? hz1 : hz0; mb('wall').box((hx0 + hx1) / 2, (CH + F2) / 2, ez, hx1 - hx0, F2 - CH, 0.06, { uv: 2 }); }
-    lights.push({ pos: [cx, F2 / 2 + 1.6, cz], room: 'corridor', base: 1 }); lights.push({ pos: [cx, F2 + CH - 0.4, cz], room: 'corridor', base: 1 });
-    mb('lightpanel').box(cx, F2 + CH - 0.02, cz, 1.0, 0.04, 0.5, { faces: 'y', uv: 0 }); mb('lightpanel').box(cx, F2 / 2 + 2.6, (lz0 + lz1) / 2, 0.9, 0.04, 0.4, { faces: 'y', uv: 0 });
+    lights.push({ pos: [cx, F2 / 2 + 1.6, cz], room: 'corridor', base: 1, range: 5.6, dim: 0.7 }); lights.push({ pos: [cx, F2 + CH - 0.4, cz], room: 'corridor', base: 1, range: 5.6, dim: 0.7 });
+    mb('lightpanel').box(cx, F2 + CH - 0.003, cz, 1.0, 0.006, 0.5, { faces: 'y', uv: 0 });
+    { const wz = Math.abs(s.landing[1] - s.box[1]) < 0.2 ? s.box[1] + 0.11 : s.box[3] - 0.11; mb('lightpanel').box((s.landing[0] + s.landing[2]) / 2, F2 / 2 + 2.2, wz, 0.6, 0.14, 0.06, { uv: 0 }); }
     // stair signs + nav
-    sign(`pd_sign_stair${s.id}`, `STAIR ${s.id} · FLOORS 1–2`, s.id === 'A' ? 8.72 : -10.9, 2.55, s.id === 'A' ? -10.5 : -25.72, s.id === 'A' ? 'x' : 'z', s.id === 'A' ? 1 : 1, 1.6);
+    sign(`pd_sign_stair${s.id}`, `STAIR ${s.id} · FLOORS 1–2`, s.id === 'A' ? 8.68 : -10.9, 2.55, s.id === 'A' ? -10.5 : -25.68, s.id === 'A' ? 'x' : 'z', s.id === 'A' ? 1 : -1, 1.6);
     const f1 = s.flight1, f2 = s.flight2; const sid = `p_st${s.id}`;
     const xm1 = (f1.x0 + f1.x1) / 2, xm2 = (f2.x0 + f2.x1) / 2;
     node(`${sid}_b0`, xm1, f1.at + Math.sign(f1.at - f1.to) * 0.5, { y: 0 }); node(`${sid}_b1`, xm1, f1.to - Math.sign(f1.at - f1.to) * 0.15, { y: F2 / 2 });
@@ -478,8 +481,8 @@ export function buildPoliceDept(k) {
   const dChief = desk(F, -8.5, -38.2, Math.PI, F2, { w: 2.0, d: 0.95, wood: 'woodDark', monitors: 1, screenKey: 'scr_cw2', exec: true, guest: 2, lamp: true });
   credenza(F, -8.5, -39.6, 0, F2, { w: 2.2 }); flagStand(F, -11.3, -39.4, F2, 'flagUS'); flagStand(F, -5.7, -39.4, F2, 'flagIL');
   bookcase(F, -11.75, -35.5, -Math.PI / 2, F2, { w: 1.6, h: 2.1, wood: 'woodDark' }); sofa(F, -6.1, -34.6, Math.PI / 2, F2, { w: 1.9, seats: 2, color: 'fabricBlue' });
-  table(F, -7.4, -34.6, 0, F2, { w: 0.9, d: 0.5, h: 0.42, top: 'woodDark' }); mb('seal').panel(-8.5, F2 + 2.3, -39.88, 0.9, 0.9, 'z', 1);
-  frame(F, -11.88, F2 + 1.6, -37.8, 'x', 1, 0.9, 0.6, 'print1'); plantPot(F, -5.6, -33.6, F2, 1.0);
+  table(F, -7.4, -34.6, 0, F2, { w: 0.9, d: 0.5, h: 0.42, top: 'woodDark' }); mb('seal').panel(-8.5, F2 + 2.3, -39.915, 0.9, 0.9, 'z', 1);
+  frame(F, -11.92, F2 + 1.6, -34.0, 'x', 1, 0.9, 0.6, 'print1'); plantPot(F, -5.4, -33.4, F2, 1.0);
   f.interact({ id: 'pd_chief_desk', kind: 'pd_desk', who: 'Chief of Police', label: "Look at the Chief's desk", min: [-9.5, F2, -38.5], max: [-7.5, F2 + 1.3, -37.5], pri: 0 });
   const dEA = desk(F, -9.5, -30.6, 0, F2, { w: 1.6, d: 0.75, monitors: 2, screenKey: 'scr_cw1' }); fileCabinet(F, -11.6, -29.0, Math.PI / 2, F2, { drawers: 4, w: 0.9 }); beamSeating(F, -6.2, -28.5, Math.PI, F2, 2);
   sign('pd_sign_chief', 'OFFICE OF THE CHIEF OF POLICE', -8.5, F2 + 2.55, -27.88, 'z', 1, 2.6);
@@ -507,7 +510,7 @@ export function buildPoliceDept(k) {
   // ------------------------------------------------ conference room
   lampsIn(4, -40, 12, -28, 'director', 2, 3);
   const confSeats = table(F, 8.2, -34.2, Math.PI / 2, F2, { w: 4.4, d: 1.4, top: 'woodDark', chairs: 10, chairType: 'office' });
-  mb('blackgloss').box(8.2, F2 + 1.8, -39.88, 2.4, 1.36, 0.06, { uv: 0 }); screen('pd_conf_tv', 'tv', 8.2, F2 + 1.8, -39.84, 2.3, 1.28, 'z', 1, 0, { shared: 'scr_tv' });
+  mb('blackgloss').box(8.2, F2 + 1.8, -39.89, 2.4, 1.36, 0.06, { uv: 0 }); screen('pd_conf_tv', 'tv', 8.2, F2 + 1.8, -39.858, 2.3, 1.28, 'z', 1, 0, { shared: 'scr_tv' });
   credenza(F, 11.65, -34.2, -Math.PI / 2, F2, { w: 2.4 }); plantPot(F, 4.6, -39.4, F2, 1.0); plantPot(F, 11.4, -28.6, F2, 0.9);
   sign('pd_sign_conf', 'COMMAND CONFERENCE ROOM', 10.2, F2 + 2.55, -27.88, 'z', 1, 2.4);
   node('p2_conf_door', 10.2, -28.6); node('p2_conf_mid', 10.6, -31.0); node('p2_conf_w', 6.0, -31.0);
@@ -517,8 +520,8 @@ export function buildPoliceDept(k) {
   // ------------------------------------------------ corridors (2nd)
   lampsIn(-12, -28, 8.6, -25.6, 'corridor', 5, 1); lampsIn(8.6, -28, 12, -8, 'corridor', 1, 5); lampsIn(-12, -17.4, 8.6, -15, 'corridor', 5, 1);
   bench(F, 11.55, -21.0, -Math.PI / 2, F2, 1.6, { seats: 2 }); plantPot(F, 11.5, -16.0, F2, 0.9); waterCooler(F, 11.65, -26.6, F2);
-  for (const z of [-24, -13]) frame(F, 11.88, F2 + 1.65, z, 'x', -1, 1.0, 0.7, z < -20 ? 'print2' : 'print1');
-  exitSign(10.3, -8.1, 'z', 1); exitSign(-11.88, -26.8, 'x', 1);
+  for (const z of [-21.8, -15.4]) frame(F, 11.9, F2 + 1.65, z, 'x', -1, 1.0, 0.7, z < -20 ? 'print2' : 'print1');
+  exitSign(10.3, -8.1, 'z', 1); exitSign(-11.945, -26.8, 'x', 1);
   for (const [id, z] of [['p2_c1', -10.3], ['p2_c2', -16.2], ['p2_c3', -19.3], ['p2_c4', -24.1], ['p2_c5', -26.8], ['p2_c6', -28.0 + 0.0 - 0.0]]) node(id, 10.3, z);
   link('p2_c1', 'p2_c2', 'p2_c3', 'p2_c4', 'p2_c5'); link('p2_c5', 'p2_conf_door');
   for (const [id, x] of [['p2_m7', 7.0], ['p2_m2', 2.5], ['p2_m0', 0.0], ['p2_m-2', -1.6], ['p2_m-3', -2.7], ['p2_m-7', -7.1], ['p2_m-8', -8.5], ['p2_m-11', -11.0]]) node(id, x, -26.8);
@@ -534,12 +537,12 @@ export function buildPoliceDept(k) {
   for (let row = 0; row < 3; row++) table(F, -4.8, -22.6 + row * 1.8, 0, F2, { w: 3.6, d: 0.6, top: 'laminate', chairs: 0 });
   const trSeats = [];
   for (let row = 0; row < 3; row++) for (let i = 0; i < 4; i++) { const x = -6.15 + i * 0.9, z = -21.95 + row * 1.8; stackChair(F, x, z, 0, F2); trSeats.push([x, z]); }
-  mb('white').box(-4.8, F2 + 1.9, -25.47, 3.0, 1.7, 0.03, { uv: 0 }); mb('pdTraining').panel(-4.8, F2 + 1.9, -25.44, 2.8, 1.58, 'z', 1);
-  mb('white').rbox(-4.8, F2 + 3.3, -22.5, 0.36, 0.12, 0.3, { r: 0.03, uv: 0 }); mb('chrome').cylinder(-4.8, F2 + 3.45, -22.5, 0.015, 0.28, 6); // projector
+  mb('white').box(-4.8, F2 + 1.9, -25.505, 3.0, 1.7, 0.03, { uv: 0 }); mb('pdTraining').panel(-4.8, F2 + 1.9, -25.487, 2.8, 1.58, 'z', 1);
+  mb('white').rbox(-4.8, F2 + 3.3, -22.5, 0.36, 0.12, 0.3, { r: 0.03, uv: 0 }); mb('chrome').cylinder(-4.8, F2 + 3.45, -22.5, 0.015, 0.28, 6); mb('chrome').box(-4.8, F2 + CH - 0.005, -22.5, 0.12, 0.01, 0.12); // projector on a ceiling mount
   desk(F, -7.6, -24.5, Math.PI, F2, { w: 1.3, d: 0.65, monitors: 1, screenKey: 'scr_cw0', chair: false, wood: 'laminate' });
-  for (let i = 0; i < 3; i++) { const x = -2.0, z = -24.8 + i * 0.75; mb('matte').rbox(x, F2 + 0.12, z, 0.6, 0.18, 0.35, { r: 0.08, color: [0.85, 0.7, 0.55] }); mb('matte').sphere(x - 0.36, F2 + 0.14, z, 0.11, 10, 8, { color: [0.85, 0.7, 0.55] }); } // CPR mannequins
+  for (let i = 0; i < 3; i++) { const x = -2.0, z = -24.8 + i * 0.75; mb('matte').rbox(x, F2 + 0.09, z, 0.6, 0.18, 0.35, { r: 0.08, color: [0.85, 0.7, 0.55] }); mb('matte').sphere(x - 0.36, F2 + 0.11, z, 0.11, 10, 8, { color: [0.85, 0.7, 0.55] }); } // CPR mannequins
   wallBoard(F, -8.48, F2 + 1.6, -21.5, 'x', 1, 2.6, 1.1, 'whiteboard');
-  sign('pd_sign_training', 'TRAINING ROOM', -5.0, F2 + 2.55, -25.72, 'z', 1, 1.6);
+  sign('pd_sign_training', 'TRAINING ROOM', -5.0, F2 + 2.55, -25.68, 'z', -1, 1.6);
   f.interact({ id: 'pd_training', kind: 'training', label: 'Training room – look at today\'s course', min: [-6.3, F2 + 1.0, -25.6], max: [-3.3, F2 + 2.8, -25.3], pri: 1 });
   node('p2_tr_door', -7.1, -25.0); node('p2_tr_door2', -2.7, -25.0); node('p2_tr_front', -4.8, -24.2, { face: Math.PI }); node('p2_tr_aisle', -7.8, -20.6);
   link('p2_m-7', 'p2_tr_door', 'p2_tr_front', 'p2_tr_door2', 'p2_m-3'); link('p2_tr_door', 'p2_tr_aisle');
@@ -549,14 +552,14 @@ export function buildPoliceDept(k) {
   lampsIn(-1, -25.6, 5, -17.4, 'super', 2, 3);
   const cid = cubicles(F, 2.0, -21.3, 0, F2, { n: 2, screenKey: 'scr_cw0' });
   wallBoard(F, 4.88, F2 + 1.6, -21.4, 'x', -1, 2.6, 1.1, 'cork'); copier(F, -0.5, -18.2, Math.PI / 2, F2); fileCabinet(F, -0.6, -24.9, Math.PI / 2, F2, { drawers: 4 });
-  sign('pd_sign_cid', 'CRIMINAL INVESTIGATIONS · DETECTIVES', 2.0, F2 + 2.55, -25.72, 'z', 1, 3.2);
+  sign('pd_sign_cid', 'CRIMINAL INVESTIGATIONS · DETECTIVES', 2.0, F2 + 2.55, -25.68, 'z', -1, 3.2);
   node('p2_cid_door', 0, -25.0); node('p2_cid_door2', 4.1, -17.9); node('p2_cid_aisle', -0.4, -21.3); node('p2_cid_aisle2', 4.4, -21.3);
   link('p2_m0', 'p2_cid_door', 'p2_cid_aisle'); link('p2_s4', 'p2_cid_door2', 'p2_cid_aisle2');
   node('p2_cid_n', 2.0, -23.6); node('p2_cid_s', 2.0, -19.0); link('p2_cid_aisle', 'p2_cid_n', 'p2_cid_aisle2', 'p2_cid_s', 'p2_cid_aisle');
   cid.forEach((pose, i) => { sitNode(`p2_cid_d${i}`, pose); link(`p2_cid_d${i}`, pose[1] < -21.3 ? 'p2_cid_n' : 'p2_cid_s'); });
   node('p2_cid_board', 4.3, -21.4 + 0.0, { face: -Math.PI / 2 }); link('p2_cid_aisle2', 'p2_cid_board');
   lamp(6.8, -23.5, 'super'); lamp(6.8, -19.4, 'super');
-  const dDS = desk(F, 6.6, -24.6, Math.PI, F2, { w: 1.5, d: 0.75, monitors: 2, screenKey: 'scr_cw2', guest: 0, lamp: true }); guestChair(F, 6.4, -22.6, Math.PI, F2); fileCabinet(F, 5.4, -22.4, Math.PI / 2, F2, { drawers: 3 });
+  const dDS = desk(F, 6.6, -24.2, Math.PI, F2, { w: 1.5, d: 0.75, monitors: 2, screenKey: 'scr_cw2', guest: 0, lamp: true }); guestChair(F, 6.4, -22.6, Math.PI, F2); fileCabinet(F, 5.4, -22.4, Math.PI / 2, F2, { drawers: 3 });
   sign('pd_sign_ds', 'DETECTIVE SERGEANT', 8.72, F2 + 2.55, -24.1, 'x', 1, 1.6);
   table(F, 6.8, -19.4, Math.PI / 2, F2, { w: 1.6, d: 0.9, top: 'laminate', chairs: 3, chairType: 'office' }); wallBoard(F, 5.12, F2 + 1.6, -19.4, 'x', 1, 2.6, 1.1, 'cork');
   for (let i = 0; i < 6; i++) mb(['paper', 'print1', 'print2'][i % 3]).box(5.16, F2 + 1.45 + (i % 2) * 0.32, -20.4 + i * 0.38, 0.01, 0.22, 0.28, { uv: 0 });
@@ -569,10 +572,9 @@ export function buildPoliceDept(k) {
 
   // ------------------------------------------------ unisex restroom (2nd floor)
   lamp(-10.3, -18.4, 'break', 0.6, 0.6); wainscot(-12, -19.4, -8.6, -19.4, 'ceramic', 1.5, 1);
-  { const d = toiletStall(F, -11.9, -19.3, 0.0001, 0.0001, 1, F2, { id: 'pd_ws_none' }); void d; }
   mb('porcelain').rbox(-11.55, F2 + 0.2, -18.55, 0.24, 0.4, 0.34, { r: 0.08, uv: 0 }); mb('porcelain').rbox(-11.4, F2 + 0.38, -18.55, 0.5, 0.06, 0.38, { r: 0.12, uv: 0 }); mb('white').rbox(-11.4, F2 + 0.42, -18.55, 0.44, 0.025, 0.38, { r: 0.1, uv: 0 });
   colRaw(-11.9, -18.8, -11.0, -18.3, F2, F2 + 0.45); seats.push({ x: -11.3, y: F2 + 0.44, z: -18.55, yaw: -Math.PI / 2, label: 'Sit down', toilet: true, zone: 'pd2' });
-  vanity(F, -8.7, -18.4, -1, F2, 1, 'x');
+  vanity(F, -8.68, -18.4, -1, F2, 1, 'x');
   sign('pd_sign_ws', 'RESTROOM', -10.65, F2 + 2.55, -17.28, 'z', 1, 1.2);
   node('p2_ws_door', -10.65, -16.8); node('p2_ws_in', -10.0, -18.4, { face: -Math.PI / 2 }); link('p2_s-10', 'p2_ws_door', 'p2_ws_in');
 
@@ -581,7 +583,7 @@ export function buildPoliceDept(k) {
   const mcSeats = table(F, -9.25, -11.5, 0, F2, { w: 2.6, d: 1.2, top: 'laminate', chairs: 6, chairType: 'office' });
   wallBoard(F, -11.88, F2 + 1.6, -11.5, 'x', 1, 4.0, 1.2, 'cork'); wallBoard(F, -9.25, F2 + 1.6, -14.88, 'z', -1, 3.0, 1.1, 'whiteboard');
   for (let i = 0; i < 9; i++) mb(['paper', 'print1', 'print2'][i % 3]).box(-11.84, F2 + 1.3 + (i % 3) * 0.3, -13.2 + i * 0.4, 0.01, 0.22, 0.28, { uv: 0 });
-  mb('blackgloss').box(-6.6, F2 + 1.8, -11.5, 0.06, 0.95, 1.6, { uv: 0 }); screen('pd_case_tv', 'tv', -6.66, F2 + 1.8, -11.5, 1.5, 0.86, 'x', -1, 0, { shared: 'scr_tv' });
+  mb('blackgloss').box(-6.6, F2 + 1.8, -11.5, 0.06, 0.95, 1.6, { uv: 0 }); screen('pd_case_tv', 'tv', -6.635, F2 + 1.8, -11.5, 1.5, 0.86, 'x', -1, 0, { shared: 'scr_tv' });
   sign('pd_sign_mcr', 'INVESTIGATION ROOM 2 · MAJOR CASE', -8.8, F2 + 2.55, -15.12, 'z', -1, 2.8);
   f.interact({ id: 'pd_invest3', kind: 'investigation', label: 'Major case room – look at the case wall', min: [-12, F2 + 0.7, -13.6], max: [-11.7, F2 + 2.3, -9.4], pri: 1 });
   const dDet1 = desk(F, -5.1, -10.0, 0, F2, { w: 1.4, d: 0.7, monitors: 2, screenKey: 'scr_cw1', lamp: true }); fileCabinet(F, -6.1, -13.9, Math.PI / 2, F2, { drawers: 3 }); guestChair(F, -5.1, -11.5, Math.PI, F2);
@@ -611,9 +613,9 @@ function stallX(f, x0, z0, depth, width, _unused, { id, accessible = false } = {
   mb('chrome').box(xf, y + pg + ph + 0.02, zc, 0.04, 0.035, width);
   const tx = x0 + 0.3;
   mb('porcelain').rbox(tx + 0.1, y + 0.2, zc, 0.34, 0.4, 0.24, { r: 0.08, uv: 0 }); mb('porcelain').rbox(tx + 0.22, y + 0.38, zc, 0.5, 0.06, 0.38, { r: 0.12, uv: 0 }); mb('white').rbox(tx + 0.23, y + 0.42, zc, 0.44, 0.025, 0.38, { r: 0.1, uv: 0 });
-  mb('chrome').tube(x0 + 0.08, y + 0.82, zc, 0.02, 0.3, 'x', 8); mb('chrome').cylinder(x0 + 0.08, y + 0.72, zc + 0.12, 0.025, 0.25, 8);
-  mb('chrome').rbox(tx + 0.3, y + 0.7, z0 + width - 0.05, 0.2, 0.12, 0.06, { r: 0.02, uv: 0 });
-  if (accessible) mb('chrome').tube(tx + 0.4, y + 0.85, z0 + width - 0.04, 0.018, 0.9, 'x', 8);
+  mb('chrome').tube(x0 + 0.08, y + 0.82, zc, 0.02, 0.3, 'x', 8); mb('chrome').cylinder(x0 + 0.03, y + 0.68, zc, 0.025, 0.28, 8);
+  mb('chrome').rbox(tx + 0.3, y + 0.7, z0 + width - 0.042, 0.2, 0.12, 0.06, { r: 0.02, uv: 0 });
+  if (accessible) { mb('chrome').tube(tx + 0.4, y + 0.85, z0 + width - 0.04, 0.018, 0.9, 'x', 8); for (const e of [-0.4, 0.4]) mb('chrome').box(tx + 0.4 + e, y + 0.85, z0 + width - 0.025, 0.03, 0.03, 0.05); }
   for (const zz of [z0, z0 + width]) f.col(x0, zz - 0.04, xf, zz + 0.04, y, y + 2);
   for (const [a, b] of [[z0, z0 + piW], [z0 + width - piW, z0 + width]]) f.col(xf - 0.04, a, xf + 0.04, b, y, y + 2);
   f.col(x0, zc - 0.2, tx + 0.45, zc + 0.2, y, y + 0.45);

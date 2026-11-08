@@ -20,8 +20,9 @@ export function officeChair(f, x, z, r, y = 0, { hi = false, seat = true, color 
   const bh = hi ? 0.72 : 0.54; const [bx, bz] = P(0, 0.26);
   mb('mesh').rbox(bx, y + 0.6 + bh / 2, bz, 0.46, bh, 0.05, { rotY: r, rotX: 0.12, r: 0.03, uv: 0.5 });
   const [fx, fz] = P(0, 0.285); mb('dark').rbox(fx, y + 0.6 + bh / 2, fz, 0.49, bh + 0.03, 0.025, { rotY: r, rotX: 0.12, r: 0.012, uv: 0 });
-  if (hi) { const [hx, hz] = P(0, 0.33); mb(color).rbox(hx, y + 0.6 + bh + 0.1, hz, 0.3, 0.13, 0.06, { rotY: r, r: 0.03, uv: 0.5 }); }
-  for (const s of [-1, 1]) { const [ax, az] = P(s * 0.28, 0.03); mb('dark').box(ax, y + 0.6, az, 0.03, 0.18, 0.03, { rotY: r }); const [px, pz] = P(s * 0.28, -0.01); mb('rubber').rbox(px, y + 0.7, pz, 0.07, 0.03, 0.25, { rotY: r, r: 0.012, uv: 0 }); }
+  { const [sx, sz] = P(0, 0.245); mb('dark').box(sx, y + 0.6, sz, 0.08, 0.2, 0.04, { rotY: r, uv: 0 }); } // back support spine
+  if (hi) { const [hx, hz] = P(0, 0.3); mb(color).rbox(hx, y + 0.6 + bh + 0.055, hz, 0.3, 0.13, 0.06, { rotY: r, r: 0.03, uv: 0.5 }); }
+  for (const s of [-1, 1]) { const [ax, az] = P(s * 0.255, 0.03); mb('dark').box(ax, y + 0.6, az, 0.03, 0.18, 0.03, { rotY: r }); const [px, pz] = P(s * 0.255, -0.01); mb('rubber').rbox(px, y + 0.7, pz, 0.07, 0.03, 0.25, { rotY: r, r: 0.012, uv: 0 }); }
   mb('chrome').cylinder(x, y + 0.27, z, 0.024, 0.36, 10); mb('dark').cylinder(x, y + 0.1, z, 0.045, 0.08, 10);
   for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2 + r; mb('dark').rbox(x + Math.cos(a) * 0.17, y + 0.075, z + Math.sin(a) * 0.17, 0.34, 0.04, 0.05, { rotY: -a, r: 0.015, uv: 0 }); if (D >= 2) mb('rubber').sphere(x + Math.cos(a) * 0.32, y + 0.03, z + Math.sin(a) * 0.32, 0.03, 8, 5); }
   if (seat) f.seat({ x, y: y + 0.5, z, yaw: r, label: label || 'Sit down' });
@@ -32,7 +33,7 @@ export function guestChair(f, x, z, r, y = 0, { seat = true, color = 'fabricWarm
   const { mb } = f; const P = rot2(x, z, r);
   mb(color).rbox(x, y + 0.47, z, 0.46, 0.07, 0.44, { rotY: r, r: 0.025, uv: 0.5, ao: 0.2 });
   const [bx, bz] = P(0, 0.21); mb(color).rbox(bx, y + 0.76, bz, 0.44, 0.4, 0.05, { rotY: r, rotX: 0.1, r: 0.025, uv: 0.5 });
-  for (const [dx, dz] of [[-0.19, -0.18], [0.19, -0.18], [-0.19, 0.19], [0.19, 0.19]]) { const [lx, lz] = P(dx, dz); mb(frame).box(lx, y + 0.22, lz, 0.024, 0.44, 0.024); }
+  for (const [dx, dz] of [[-0.19, -0.18], [0.19, -0.18], [-0.19, 0.2], [0.19, 0.2]]) { const [lx, lz] = P(dx, dz); const lh = dz > 0 ? 0.9 : 0.44; mb(frame).box(lx, y + lh / 2, lz, 0.024, lh, 0.024); }
   const [ax, az] = P(0, 0.2); mb(frame).box(ax, y + 0.56, az, 0.4, 0.02, 0.02, { rotY: r });
   if (seat) f.seat({ x, y: y + 0.47, z, yaw: r });
 }
@@ -42,7 +43,7 @@ export function stackChair(f, x, z, r, y = 0, { seat = true, color = 'chairShell
   const { mb } = f; const P = rot2(x, z, r);
   mb(color).rbox(x, y + 0.46, z, 0.45, 0.04, 0.43, { rotY: r, r: 0.02, uv: 0 });
   const [bx, bz] = P(0, 0.22); mb(color).rbox(bx, y + 0.72, bz, 0.43, 0.32, 0.03, { rotY: r, rotX: 0.14, r: 0.02, uv: 0 });
-  for (const [dx, dz] of [[-0.19, -0.17], [0.19, -0.17], [-0.19, 0.19], [0.19, 0.19]]) { const [lx, lz] = P(dx, dz); mb('chrome').box(lx, y + 0.22, lz, 0.02, 0.44, 0.02); }
+  for (const [dx, dz] of [[-0.19, -0.17], [0.19, -0.17], [-0.19, 0.215], [0.19, 0.215]]) { const [lx, lz] = P(dx, dz); const lh = dz > 0 ? 0.84 : 0.44; mb('chrome').box(lx, y + lh / 2, lz, 0.02, lh, 0.02); }
   if (seat) f.seat({ x, y: y + 0.46, z, yaw: r });
 }
 
@@ -55,7 +56,8 @@ export function beamSeating(f, x, z, r, y = 0, n = 4) {
     const dx = -L / 2 + pitch * (i + 0.5); const [sx, sz] = P(dx, 0); const [bx, bz] = P(dx, 0.24);
     mb('fabricBlue').rbox(sx, y + 0.44, sz, 0.52, 0.07, 0.46, { rotY: r, r: 0.03, uv: 0.5, ao: 0.2 });
     mb('fabricBlue').rbox(bx, y + 0.73, bz, 0.52, 0.44, 0.06, { rotY: r, rotX: 0.12, r: 0.03, uv: 0.5 });
-    if (i < n - 1) { const [ax, az] = P(dx + pitch / 2, 0.02); mb('metal').rbox(ax, y + 0.62, az, 0.05, 0.03, 0.4, { rotY: r, r: 0.01, uv: 0 }); }
+    { const [kx, kz] = P(dx, 0.05); mb('metal').box(kx, y + 0.37, kz, 0.1, 0.08, 0.3, { rotY: r, uv: 0 }); const [qx, qz] = P(dx, 0.22); mb('metal').box(qx, y + 0.49, qz, 0.08, 0.1, 0.05, { rotY: r, uv: 0 }); }
+    if (i < n - 1) { const [ax, az] = P(dx + pitch / 2, 0.02); mb('metal').rbox(ax, y + 0.62, az, 0.05, 0.03, 0.4, { rotY: r, r: 0.01, uv: 0 }); const [ux, uz] = P(dx + pitch / 2, 0.05); mb('metal').box(ux, y + 0.465, uz, 0.04, 0.3, 0.04, { rotY: r, uv: 0 }); }
     f.seat({ x: sx, y: y + 0.45, z: sz, yaw: r });
   }
   colRot(f, ...P(0, 0.05), L, 0.55, r, y, 0.9);
@@ -66,6 +68,7 @@ export function sofa(f, x, z, r, y = 0, { w = 2.1, color = 'fabricWarm', seats =
   const { mb } = f; const P = rot2(x, z, r);
   mb(color).rbox(x, y + 0.2, z, w, 0.24, 0.85, { rotY: r, r: 0.04, uv: 0.5, ao: 0.3 });
   for (let i = 0; i < seats; i++) { const dx = -w / 2 + 0.12 + (w - 0.24) * (i + 0.5) / seats; const [cx, cz] = P(dx, -0.04); mb(color).rbox(cx, y + 0.39, cz, (w - 0.3) / seats - 0.02, 0.14, 0.68, { rotY: r, r: 0.05, uv: 0.5 }); f.seat({ x: cx, y: y + 0.42, z: cz, yaw: r }); }
+  for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const [fx, fz] = P(dx * (w / 2 - 0.1), dz * 0.32); mb('woodDark').cylinder(fx, y + 0.04, fz, 0.025, 0.08, 8); }
   { const [bx, bz] = P(0, 0.33); mb(color).rbox(bx, y + 0.64, bz, w - 0.04, 0.52, 0.22, { rotY: r, rotX: 0.1, r: 0.07, uv: 0.5 }); }
   for (const s of [-1, 1]) { const [ax, az] = P(s * (w / 2 - 0.09), 0); mb(color).rbox(ax, y + 0.48, az, 0.18, 0.42, 0.85, { rotY: r, r: 0.06, uv: 0.5 }); }
   colRot(f, x, z, w, 0.85, r, y, 0.9);
@@ -95,9 +98,9 @@ export function desk(f, x, z, r, y = 0, { w = 1.6, d = 0.8, wood = 'wood', monit
     const [mx, mz] = P(off, -d / 2 + 0.2); const rr = r + tilt;
     mb('bezel').rbox(mx, y + 1.06, mz, 0.56, 0.34, 0.025, { rotY: rr, r: 0.006, uv: 0 });
     if (screenKey) { const c = Math.cos(rr), s2 = Math.sin(rr); mb(screenKey).panel(mx + s2 * 0.014, y + 1.06, mz + c * 0.014, 0.52, 0.3, 'z', 1, { rotY: rr }); }
-    const [sx, sz] = P(off, -d / 2 + 0.16); mb('dark').box(sx, y + 0.88, sz, 0.04, 0.22, 0.03, { rotY: rr }); mb('dark').rbox(sx, y + 0.768, sz, 0.22, 0.012, 0.16, { rotY: rr, r: 0.01, uv: 0 });
+    const [sx, sz] = P(off, -d / 2 + 0.185); mb('dark').box(sx, y + 0.88, sz, 0.04, 0.22, 0.03, { rotY: rr }); mb('dark').rbox(sx, y + 0.768, sz, 0.22, 0.012, 0.16, { rotY: rr, r: 0.01, uv: 0 });
   }
-  { const [kx, kz] = P(0, 0.08); mb('keyboard').box(kx, y + 0.772, kz, 0.44, 0.016, 0.14, { rotY: r, faces: 'Y', uv: 0 }); mb('dark').box(kx, y + 0.765, kz, 0.45, 0.012, 0.145, { rotY: r, faces: 'xXzZ' }); }
+  { const [kx, kz] = P(0, 0.08); mb('keyboard').box(kx, y + 0.772, kz, 0.44, 0.016, 0.14, { rotY: r, faces: 'Y', uv: 0 }); mb('dark').box(kx, y + 0.766, kz, 0.45, 0.028, 0.145, { rotY: r, faces: 'xXzZ' }); }
   if (D >= 1) {
     const [mx, mz] = P(0.34, 0.1); mb('plastic').sphere(mx, y + 0.772, mz, 0.032, 10, 6, { sy: 0.45 });
     const [px, pz] = P(-w / 2 + 0.3, -0.1); mb('plastic').rbox(px, y + 0.785, pz, 0.21, 0.05, 0.19, { rotY: r - 0.3, r: 0.012, uv: 0 }); mb('phone').box(px, y + 0.812, pz, 0.2, 0.004, 0.18, { rotY: r - 0.3, faces: 'Y', uv: 0 });
@@ -152,7 +155,7 @@ export function bookcase(f, x, z, r, y = 0, { w = 0.9, h = 2.0, d = 0.36, wood =
   { const [bx, bz] = P(0, d / 2 - 0.01); mb(wood).box(bx, y + h / 2, bz, w, h, 0.02, { rotY: r, uv: 1 }); }
   for (const s of [-1, 1]) { const [sx, sz] = P(s * (w / 2 - 0.01), 0); mb(wood).box(sx, y + h / 2, sz, 0.02, h, d, { rotY: r, uv: 1 }); }
   const shelves = Math.round(h / 0.38);
-  for (let i = 0; i <= shelves; i++) { mb(wood).box(x, y + 0.04 + i * (h - 0.06) / shelves, z, w - 0.02, 0.02, d - 0.02, { rotY: r, uv: 1 }); if (i < shelves && f.D >= 1) { const [bx2, bz2] = P(-w * 0.08, 0.02); mb('books').box(bx2, y + 0.19 + i * (h - 0.06) / shelves, bz2, w * 0.78, 0.26, d * 0.7, { rotY: r, faces: 'zZ', uv: 0 }); } }
+  for (let i = 0; i <= shelves; i++) { mb(wood).box(x, y + 0.04 + i * (h - 0.06) / shelves, z, w - 0.02, 0.02, d - 0.02, { rotY: r, uv: 1 }); if (i < shelves && f.D >= 1) { const [bx2, bz2] = P(-w * 0.08, 0.02); mb('books').box(bx2, y + 0.183 + i * (h - 0.06) / shelves, bz2, w * 0.78, 0.26, d * 0.7, { rotY: r, faces: 'zZ', uv: 0 }); } }
   colRot(f, x, z, w, d, r, y, h);
 }
 
@@ -204,9 +207,9 @@ export function plantPot(f, x, z, y = 0, s = 1) {
 
 /** Framed picture on a wall. axis/sign = which way the wall faces. */
 export function frame(f, x, y, z, axis, sign, w = 0.8, h = 0.6, mat = 'print1') {
-  const { mb } = f; const o = 0.012 * sign;
-  if (axis === 'z') { mb('frame').box(x, y, z + o, w + 0.06, h + 0.06, 0.02); mb(mat).box(x, y, z + o * 2, w, h, 0.004, { uv: 0 }); }
-  else { mb('frame').box(x + o, y, z, 0.02, h + 0.06, w + 0.06); mb(mat).box(x + o * 2, y, z, 0.004, h, w, { uv: 0 }); }
+  const { mb } = f; const o = 0.012 * sign; const back = 0.06 * sign; // frame depth reaches back into the wall surface
+  if (axis === 'z') { mb('frame').box(x, y, z + (o + 0.01 * sign - back) / 2, w + 0.06, h + 0.06, 0.02 + 0.06 - 0.002); mb(mat).box(x, y, z + o * 2, w, h, 0.004, { uv: 0 }); }
+  else { mb('frame').box(x + (o + 0.01 * sign - back) / 2, y, z, 0.02 + 0.06 - 0.002, h + 0.06, w + 0.06); mb(mat).box(x + o * 2, y, z, 0.004, h, w, { uv: 0 }); }
 }
 
 export function flagStand(f, x, z, y = 0, mat = 'flagUS', face = 0) {
@@ -221,22 +224,23 @@ export function flagStand(f, x, z, y = 0, mat = 'flagUS', face = 0) {
 export function trashCan(f, x, z, y = 0, mat = 'dark') { f.mb(mat).cylinder(x, y + 0.22, z, 0.16, 0.44, 14, { r2: 0.18 }); }
 
 export function waterCooler(f, x, z, r, y = 0) {
-  const { mb } = f; mb('white').rbox(x, y + 0.5, z, 0.32, 1.0, 0.32, { rotY: r, r: 0.02, uv: 0 }); mb('waterjug').cylinder(x, y + 1.22, z, 0.13, 0.42, 14);
+  const { mb } = f; mb('white').rbox(x, y + 0.5, z, 0.32, 1.0, 0.32, { rotY: r, r: 0.02, uv: 0 }); mb('waterjug').cylinder(x, y + 1.21, z, 0.13, 0.42, 14);
   f.col(x - 0.2, z - 0.2, x + 0.2, z + 0.2, y, y + 1.4);
 }
 
 export function copier(f, x, z, r, y = 0) {
   const { mb } = f; const P = rot2(x, z, r);
-  mb('white').rbox(x, y + 0.45, z, 0.6, 0.9, 0.62, { rotY: r, r: 0.02, uv: 0, ao: 0.2 }); mb('dark').rbox(x, y + 1.0, z, 0.6, 0.18, 0.5, { rotY: r, r: 0.03, uv: 0 });
-  const [px, pz] = P(0.18, -0.26); mb('led').box(px, y + 1.05, pz, 0.08, 0.04, 0.01, { rotY: r }); mb('paper').box(x, y + 1.1, z, 0.3, 0.008, 0.22, { rotY: r, uv: 0 });
+  mb('white').rbox(x, y + 0.45, z, 0.6, 0.9, 0.62, { rotY: r, r: 0.02, uv: 0, ao: 0.2 }); mb('dark').rbox(x, y + 0.99, z, 0.6, 0.18, 0.5, { rotY: r, r: 0.03, uv: 0 });
+  const [px, pz] = P(0.18, -0.26); mb('led').box(px, y + 1.05, pz, 0.08, 0.04, 0.01, { rotY: r }); mb('paper').box(x, y + 1.084, z, 0.3, 0.008, 0.22, { rotY: r, uv: 0 });
   colRot(f, x, z, 0.62, 0.64, r, y, 1.1);
 }
 
 /** Wall-mounted whiteboard / cork board / TV. axis/sign = wall facing. */
 export function wallBoard(f, x, y, z, axis, sign, w, h, mat = 'whiteboard', frameMat = 'frame') {
   const { mb } = f;
-  if (axis === 'z') { mb(frameMat).box(x, y, z + 0.015 * sign, w + 0.06, h + 0.06, 0.03); mb(mat).panel(x, y, z + 0.032 * sign, w, h, 'z', sign); }
-  else { mb(frameMat).box(x + 0.015 * sign, y, z, 0.03, h + 0.06, w + 0.06); mb(mat).panel(x + 0.032 * sign, y, z, w, h, 'x', sign); }
+  // frame spans from 6 cm behind the given point (into the wall) to 3 cm in front of it
+  if (axis === 'z') { mb(frameMat).box(x, y, z - 0.015 * sign, w + 0.06, h + 0.06, 0.09); mb(mat).panel(x, y, z + 0.032 * sign, w, h, 'z', sign); }
+  else { mb(frameMat).box(x - 0.015 * sign, y, z, 0.09, h + 0.06, w + 0.06); mb(mat).panel(x + 0.032 * sign, y, z, w, h, 'x', sign); }
 }
 
 // ---------------------------------------------------------------- restrooms
@@ -259,10 +263,10 @@ export function toiletStall(f, x0, z0, depth, width, facing, y = 0, { id, access
   mb('porcelain').rbox(xc, y + 0.2, tz + facing * 0.1, 0.24, 0.4, 0.34, { r: 0.08, uv: 0 });
   mb('porcelain').rbox(xc, y + 0.38, tz + facing * 0.22, 0.38, 0.06, 0.5, { r: 0.12, uv: 0 });
   mb('white').rbox(xc, y + 0.42, tz + facing * 0.23, 0.38, 0.025, 0.44, { r: 0.1, uv: 0 });
-  mb('chrome').tube(xc, y + 0.82, z0 + facing * 0.08, 0.02, 0.3, 'z', 8); mb('chrome').cylinder(xc + 0.12, y + 0.72, z0 + facing * 0.08, 0.025, 0.25, 8);
+  mb('chrome').tube(xc, y + 0.82, z0 + facing * 0.08, 0.02, 0.3, 'z', 8); mb('chrome').cylinder(xc, y + 0.68, z0 + facing * 0.03, 0.025, 0.28, 8);
   // tissue holder + grab bar (accessible stall)
-  mb('chrome').rbox(x0 + width - 0.05, y + 0.7, tz + facing * 0.3, 0.06, 0.12, 0.2, { r: 0.02, uv: 0 });
-  if (accessible) mb('chrome').tube(x0 + width - 0.04, y + 0.85, tz + facing * 0.35, 0.018, 0.9, 'z', 8);
+  mb('chrome').rbox(x0 + width - 0.042, y + 0.7, tz + facing * 0.3, 0.06, 0.12, 0.2, { r: 0.02, uv: 0 });
+  if (accessible) { mb('chrome').tube(x0 + width - 0.04, y + 0.85, tz + facing * 0.35, 0.018, 0.9, 'z', 8); for (const e of [-0.4, 0.4]) mb('chrome').box(x0 + width - 0.025, y + 0.85, tz + facing * 0.35 + e, 0.05, 0.03, 0.03); }
   // colliders: side panels (full height) and the pilasters; the door collider is dynamic
   for (const xx of [x0, x0 + width]) f.col(xx - 0.04, Math.min(z0, zf), xx + 0.04, Math.max(z0, zf), y, y + 2);
   for (const [a, b] of [[x0, x0 + piW], [x0 + width - piW, x0 + width]]) f.col(a, zf - 0.04, b, zf + 0.04, y, y + 2);
@@ -274,9 +278,10 @@ export function toiletStall(f, x0, z0, depth, width, facing, y = 0, { id, access
 
 export function urinal(f, x, z, sign, y = 0) {
   const { mb } = f;
-  mb('porcelain').rbox(x, y + 0.75, z + sign * 0.16, 0.36, 0.62, 0.3, { r: 0.1, uv: 0 });
-  mb('chrome').cylinder(x, y + 1.25, z + sign * 0.06, 0.025, 0.3, 8);
-  mb('stall').box(x + 0.42, y + 1.0, z + sign * 0.3, 0.02, 1.1, 0.5, { uv: 0.6 }); // privacy screen
+  mb('porcelain').rbox(x, y + 0.75, z + sign * 0.15, 0.36, 0.62, 0.34, { r: 0.1, uv: 0 });
+  mb('chrome').cylinder(x, y + 1.2, z + sign * 0.03, 0.025, 0.4, 8);
+  mb('stall').box(x + 0.42, y + 1.0, z + sign * 0.25, 0.02, 1.1, 0.56, { uv: 0.6 }); // privacy screen, fixed to the wall
+  for (const yy of [0.6, 1.4]) mb('chrome').box(x + 0.42, y + yy, z + sign * 0.0, 0.05, 0.06, 0.06);
   f.col(x - 0.2, Math.min(z, z + sign * 0.35), x + 0.2, Math.max(z, z + sign * 0.35), y, y + 1.2);
 }
 
@@ -323,11 +328,11 @@ export function fridge(f, x, z, sign, y = 0, { id = 'pd_fridge' } = {}) {
   mb('fridge').rbox(x, y + 0.92, z, 0.8, 1.84, 0.04, { r: 0.01, uv: 0 }); // back
   for (const s of [-1, 1]) mb('fridge').box(x + s * 0.39, y + 0.92, z + sign * 0.19, 0.03, 1.84, 0.38, { uv: 0 });
   mb('fridge').box(x, y + 1.83, z + sign * 0.19, 0.8, 0.03, 0.38, { uv: 0 }); mb('fridge').box(x, y + 0.05, z + sign * 0.19, 0.8, 0.1, 0.38, { uv: 0 });
-  mb('lightpanel').box(x, y + 1.79, z + sign * 0.15, 0.3, 0.02, 0.04, { faces: 'y', uv: 0 });
+  mb('lightpanel').box(x, y + 1.812, z + sign * 0.15, 0.3, 0.006, 0.04, { faces: 'y', uv: 0 });
   for (const yy of [0.5, 0.9, 1.3]) mb('glassFrost').box(x, y + yy, z + sign * 0.2, 0.74, 0.012, 0.34);
   mb('fridge').box(x, y + 1.1, z + sign * 0.19, 0.76, 0.02, 0.36, { uv: 0 }); // freezer divider
   const items = [[-0.22, 0.56, 'red', 0.06, 0.2], [-0.1, 0.56, 'blue', 0.06, 0.2], [0.05, 0.6, 'white', 0.18, 0.12], [0.22, 0.58, 'aed', 0.1, 0.16], [-0.18, 0.95, 'pie', 0.22, 0.1], [0.15, 0.97, 'paper', 0.24, 0.14], [-0.2, 1.36, 'mug', 0.08, 0.12], [0.12, 1.38, 'cone', 0.16, 0.16]];
-  for (const [dx, yy, mat, w, h] of items) mb(mat).rbox(x + dx, y + yy + h / 2 - 0.05, z + sign * 0.2, w, h, Math.min(0.2, w + 0.04), { r: Math.min(0.02, w / 4), uv: 0 });
+  for (const [dx, yy, mat, w, h] of items) { const shelf = yy < 0.75 ? 0.506 : yy < 1.15 ? 0.906 : 1.306; mb(mat).rbox(x + dx, y + shelf + h / 2, z + sign * 0.2, w, h, Math.min(0.2, w + 0.04), { r: Math.min(0.02, w / 4), uv: 0 }); }
   f.col(x - 0.42, Math.min(z, fz), x + 0.42, Math.max(z, fz), y, y + 1.9);
   f.interact({ kind: 'fridge', id, label: 'Open the fridge', min: [x - 0.45, y, Math.min(z, fz + sign * 0.1)], max: [x + 0.45, y + 1.9, Math.max(z, fz + sign * 0.1)], pri: 1 });
   return { id, kind: 'fridge', hinge: [x + 0.4, y + 0.06, fz + sign * 0.03], w: 0.8, h: 1.76, t: 0.06, base: Math.PI, openSign: sign > 0 ? 1 : -1, max: 1.85, mat: 'fridgeDoor', y, label: 'fridge' };
@@ -358,7 +363,7 @@ export function gunRack(f, x, z, r, y = 0, { n = 6 } = {}) {
 export function vestRack(f, x, z, r, y = 0, n = 6) {
   const { mb } = f; const P = rot2(x, z, r); const w = n * 0.32;
   mb('chrome').box(x, y + 1.7, z, w, 0.03, 0.03, { rotY: r }); for (const s of [-1, 1]) { const [px, pz] = P(s * w / 2, 0); mb('chrome').cylinder(px, y + 0.85, pz, 0.015, 1.7, 6); }
-  for (let i = 0; i < n; i++) { const [vx, vz] = P(-w / 2 + 0.16 + i * 0.32, 0); mb('matte').rbox(vx, y + 1.3, vz, 0.28, 0.62, 0.1, { rotY: r, r: 0.04, color: i % 3 === 2 ? [0.1, 0.12, 0.18] : [0.07, 0.07, 0.08] }); }
+  for (let i = 0; i < n; i++) { const [vx, vz] = P(-w / 2 + 0.16 + i * 0.32, 0); mb('matte').rbox(vx, y + 1.37, vz, 0.28, 0.62, 0.1, { rotY: r, r: 0.04, color: i % 3 === 2 ? [0.1, 0.12, 0.18] : [0.07, 0.07, 0.08] }); }
   colRot(f, x, z, w + 0.1, 0.3, r, y, 1.8);
 }
 
@@ -366,11 +371,12 @@ export function radioCharger(f, x, y, z, axis, sign, n = 8) {
   const { mb } = f;
   for (let i = 0; i < n; i++) {
     const o = (i - (n - 1) / 2) * 0.13;
-    const [px, pz] = axis === 'z' ? [x + o, z + sign * 0.08] : [x + sign * 0.08, z + o];
-    mb('satin').rbox(px, y, pz, 0.08, 0.12, 0.1, { r: 0.01, color: [0.1, 0.11, 0.12] });
-    mb('satin').rbox(px, y + 0.13, pz, 0.06, 0.16, 0.045, { r: 0.01, color: [0.06, 0.06, 0.07] });
-    mb(i % 4 === 1 ? 'beaconAmber' : 'beaconGreen').box(px, y - 0.03, axis === 'z' ? pz + sign * 0.051 : pz, 0.02, 0.01, 0.01);
+    const [px, pz] = axis === 'z' ? [x + o, z + sign * 0.06] : [x + sign * 0.06, z + o];
+    if (axis === 'z') mb('satin').rbox(px, y, pz, 0.08, 0.12, 0.1, { r: 0.01, color: [0.1, 0.11, 0.12] }); else mb('satin').rbox(px, y, pz, 0.1, 0.12, 0.08, { r: 0.01, color: [0.1, 0.11, 0.12] });
+    if (axis === 'z') mb('satin').rbox(px, y + 0.13, pz, 0.06, 0.16, 0.045, { r: 0.01, color: [0.06, 0.06, 0.07] }); else mb('satin').rbox(px, y + 0.13, pz, 0.045, 0.16, 0.06, { r: 0.01, color: [0.06, 0.06, 0.07] });
+    const led = mb(i % 4 === 1 ? 'beaconAmber' : 'beaconGreen'); if (axis === 'z') led.box(px, y - 0.03, pz + sign * 0.051, 0.02, 0.01, 0.01); else led.box(px + sign * 0.051, y - 0.03, pz, 0.01, 0.01, 0.02);
   }
+  { const L = n * 0.13 + 0.06; if (axis === 'z') mb('dark').box(x, y + 0.02, z - sign * 0.01, L, 0.2, 0.06, { uv: 0 }); else mb('dark').box(x - sign * 0.01, y + 0.02, z, 0.06, 0.2, L, { uv: 0 }); } // wall rail
 }
 
 /** Interview table bolted to the floor with chairs + a camera dome in the corner. */
@@ -387,7 +393,7 @@ export function podium(f, x, z, r, y = 0) {
   const { mb } = f; const P = rot2(x, z, r);
   mb('woodDark').rbox(x, y + 0.55, z, 0.6, 1.1, 0.5, { rotY: r, r: 0.03, uv: 1, ao: 0.2 });
   const [tx, tz] = P(0, 0.03); mb('woodDark').rbox(tx, y + 1.14, tz, 0.66, 0.05, 0.58, { rotY: r, rotX: -0.15, r: 0.02, uv: 1 });
-  const [sx, sz] = P(0, -0.26); mb('seal').panel(sx, y + 0.7, sz, 0.34, 0.34, 'z', -1, { rotY: r });
+  const [sx, sz] = P(0, -0.252); mb('seal').panel(sx, y + 0.7, sz, 0.34, 0.34, 'z', -1, { rotY: r });
   const [mx, mz] = P(0.18, 0.1); mb('chrome').cylinder(mx, y + 1.3, mz, 0.006, 0.26, 6); mb('dark').sphere(mx, y + 1.44, mz, 0.022, 8, 6);
   colRot(f, x, z, 0.62, 0.52, r, y, 1.2);
 }

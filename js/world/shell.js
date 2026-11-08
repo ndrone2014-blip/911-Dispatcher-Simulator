@@ -14,7 +14,7 @@ function segments() {
   const W2 = (a, b) => [a, b, F2 + 0.85, F2 + 2.75, 'win'];
   return [
     // Police Department (two stories)
-    { ax: 'z', c: P.z0, a: P.x0, b: P.x1, out: -1, y0: 0, y1: P.ROOF, open: [W1(2, 3.4), W1(5, 7.2, 0.45, 3.0), W1(8.2, 11, 0.45, 3.0), W2(-11, -9), W2(-8, -6), W2(-4.2, -1.4), W2(0.6, 3.2), W2(5, 7.6), W2(8.4, 11)] },
+    { ax: 'z', c: P.z0, a: P.x0, b: P.x1, out: -1, y0: 0, y1: P.ROOF, open: [W1(2, 3.4), W1(4.6, 6.6, 0.45, 3.0), W1(9.6, 11.4, 0.45, 3.0), W2(-11, -9), W2(-8, -6), W2(-4.2, -1.4), W2(0.6, 3.2), W2(5, 7.6), W2(8.4, 11)] },
     { ax: 'x', c: P.x1, a: P.z0, b: P.z1, out: 1, y0: 0, y1: P.ROOF, open: [W1(-39.4, -36, 0.3, 3.1), [ENTRANCE[0], ENTRANCE[1], 0, 2.45, 'door'], W1(-32, -28.6, 0.3, 3.1), W1(-26.4, -23.2), W1(-20.4, -17.2), W1(-13.6, -10.6), W2(-38.6, -36), W2(-32.6, -29.4), W2(-26.4, -23.2), W2(-20.4, -17.2), W2(-13.6, -10.6)] },
     { ax: 'x', c: P.x0, a: P.z0, b: -26, out: -1, y0: 0, y1: P.ROOF, open: [W2(-39, -36.6), W2(-31.6, -29.2)] },
     { ax: 'x', c: P.x0, a: -26, b: P.z1, out: -1, y0: 4.2, y1: P.ROOF, open: [W2(-14.2, -11.8), W2(-10.6, -8.6)] },
@@ -107,7 +107,10 @@ export function buildShell({ D = 1 } = {}) {
     const mx = 9, mz = -12, y0 = PD.ROOF, H = 14; const leg = [0.32, 0.33, 0.35];
     for (const [dx, dz] of [[-0.45, -0.3], [0.45, -0.3], [0, 0.45]]) ext.cylinder(mx + dx, y0 + H / 2, mz + dz, 0.04, H, 5, { color: leg, caps: false });
     for (let y = 1; y < H; y += 1.2) for (const [a, b] of [[[-0.45, -0.3], [0.45, -0.3]], [[0.45, -0.3], [0, 0.45]], [[0, 0.45], [-0.45, -0.3]]]) ext.box(mx + (a[0] + b[0]) / 2, y0 + y, mz + (a[1] + b[1]) / 2, Math.hypot(b[0] - a[0], b[1] - a[1]), 0.03, 0.03, { color: leg, uv: 0, rotY: -Math.atan2(b[1] - a[1], b[0] - a[0]) });
-    for (const [h, l] of [[H - 0.5, 3.2], [H - 3, 2.4], [H - 6, 1.8]]) { ext.cylinder(mx + 0.55, y0 + h + l / 2 - 0.4, mz, 0.03, l, 6, { color: [0.85, 0.86, 0.88] }); ext.cylinder(mx - 0.55, y0 + h + l / 2 - 0.6, mz + 0.2, 0.03, l * 0.8, 6, { color: [0.85, 0.86, 0.88] }); }
+    for (const [h, l] of [[H - 0.5, 3.2], [H - 3, 2.4], [H - 6, 1.8]]) { ext.cylinder(mx + 0.55, y0 + h + l / 2 - 0.4, mz, 0.03, l, 6, { color: [0.85, 0.86, 0.88] }); ext.cylinder(mx - 0.55, y0 + h + l / 2 - 0.6, mz + 0.2, 0.03, l * 0.8, 6, { color: [0.85, 0.86, 0.88] });
+      // stand-off arms clamping each antenna to the mast
+      ext.box(mx + 0.5, y0 + h - 0.2, mz - 0.13, 0.14, 0.04, 0.3, { color: leg, uv: 0 }); ext.box(mx - 0.5, y0 + h, mz - 0.04, 0.14, 0.04, 0.5, { color: leg, uv: 0 }); }
+    ext.box(mx, y0 + H, mz + 0.02, 1.0, 0.05, 0.85, { color: leg, uv: 0 }); // top plate carrying the whip antenna
     ext.cylinder(mx, y0 + H + 1.0, mz, 0.025, 2.0, 6, { color: [0.85, 0.86, 0.88] });
     glow.sphere(mx, y0 + H + 2.05, mz, 0.12, 6, 4, { color: [1.4, 0.06, 0.04] }); glow.sphere(mx, y0 + H * 0.55, mz + 0.45, 0.08, 6, 4, { color: [1.4, 0.06, 0.04] });
     for (const [x, z, a] of [[6, -36, 0.6], [-9, -36, 2.2]]) { ext.cylinder(x, PD.ROOF + 0.5, z, 0.06, 1.0, 6, { color: leg }); ext.sphere(x, PD.ROOF + 1.2, z, 0.55, 12, 6, { color: [0.86, 0.86, 0.85], sy: 0.35 }); void a; }
