@@ -7,7 +7,7 @@ import { pri, incStatus, unitStatus, callsign, etaText } from '../fmt.js';
 import { MapRenderer } from './mapView.js';
 import { TYPE_BY_ID } from '../../data/departments.js';
 import { EVENT_KINDS } from '../../sim/cityEvents.js';
-import { city } from '../../data/city.js';
+import { city, TOWNS, HAMLETS, insideCounty } from '../../data/city.js';
 
 export class MapScreen extends Screen {
   constructor(cad) {
@@ -20,13 +20,17 @@ export class MapScreen extends Screen {
   build() {
     this.root.innerHTML = `<div class="map-wrap" data-r="wrap"><canvas data-r="cv"></canvas>
       <div class="map-layers" data-r="layers"></div>
-      <div class="map-ctrl"><button class="btn" data-act="zin" title="Zoom in">＋</button><button class="btn" data-act="zout" title="Zoom out">－</button><button class="btn" data-act="fit" title="Whole county">⤢</button><button class="btn sm" data-act="carmi" title="Zoom to Carmi" style="width:auto;padding:0 6px">Carmi</button></div>
+      <div class="map-ctrl"><button class="btn" data-act="zin" title="Zoom in">＋</button><button class="btn" data-act="zout" title="Zoom out">－</button><button class="btn" data-act="fit" title="Whole county">⤢</button><button class="btn" data-act="region" title="Surrounding area (outside the jurisdiction)">🌐</button><button class="btn" data-act="theme" data-r="themebtn" title="Map style"></button>
+        <div class="map-goto-wrap"><select class="map-goto" data-r="goto" title="Go to a place" aria-label="Go to a place"><option value="">Go to…</option>${TOWNS.map((t) => `<option value="t:${t.id}">${esc(t.name)}</option>`).join('')}${HAMLETS.map(([n]) => `<option value="h:${esc(n)}">${esc(n)}</option>`).join('')}</select></div></div>
+      <div class="map-juris" data-r="juris" hidden>Outside White County – not your jurisdiction (mutual aid only)</div>
       <div class="map-info" data-r="info" hidden></div>
       <div class="map-legend hide-narrow"><span>▲</span><span>Incident (color = priority)</span><span>●</span><span>Unit (ring = status)</span><span>◆</span><span>Aircraft</span><span>▢</span><span>Facility</span></div></div>`;
     this.wrap = this.root.querySelector('[data-r="wrap"]'); this.cv = this.root.querySelector('[data-r="cv"]'); this.ctx = this.cv.getContext('2d');
     this.base = document.createElement('canvas'); this.bctx = this.base.getContext('2d');
     bindActions(this.root, {
-      zin: () => this.zoom(1.4), zout: () => this.zoom(1 / 1.4), fit: () => { this.view = null; this.baseDirty = true; },
+      zin: () => this.zoom(1.4), zout: () => this.zoom(1 / 1.4), fit: () => { const { w, h } = this.size(); this.view = this.renderer.fit(w, h); this.baseDirty = true; },
+      region: () => { const { w, h } = this.size(); this.view = this.renderer.fitRegion(w, h); this.baseDirty = true; },
+      theme: () => { this.game.settings.set('map.theme', this.theme() === 'day' ? 'night' : 'day'); this.baseDirty = true; this.renderThemeBtn(); },
       carmi: () => { const { w, h } = this.size(); this.view = this.renderer.focusTown('carmi', w, h); this.baseDirty = true; },
       layer: (t) => { this.layers[t.dataset.l] = !this.layers[t.dataset.l]; this.renderLayers(); },
       openinc: (t) => this.cad.selectIncident(t.dataset.id),
@@ -39,6 +43,13 @@ export class MapScreen extends Screen {
       closeinfo: () => { this.sel = null; this.renderInfo(); },
     });
     this.setupInput();
+    this.root.querySelector('[data-r="goto"]').addEventListener('change', (e) => {
+      const v = e.target.value; e.target.value = ''; if (!v) return; const { w, h } = this.size();
+      if (v.startsWith('t:')) this.view = this.renderer.focusTown(v.slice(2), w, h);
+      else { const hm = HAMLETS.find(([n]) => n === v.slice(2)); if (hm) this.view = { cx: hm[1], cy: hm[2], scale: 0.5 }; }
+      this.baseDirty = true;
+    });
+    this.renderThemeBtn();
     bus.on('cad:selectIncident', ({ id }) => { if (this.visible) { const inc = this.sim.incidents.byId(id); if (inc) { this.sel = { kind: 'incident', id }; this.renderInfo(); } } });
     for (const ev of ['unit:status', 'incident:updated', 'incident:created']) bus.on(ev, () => { if (this.visible) this.renderInfo(); });
     new ResizeObserver(() => { this.baseDirty = true; }).observe(this.wrap);
@@ -46,6 +57,10 @@ export class MapScreen extends Screen {
   }
 
   onShow() { if (!this.running) { this.running = true; this.loop(); } }
+  theme() { return this.game.settings?.get('map.theme') || 'day'; }
+  renderThemeBtn() { const b = this.root?.querySelector('[data-r="themebtn"]'); if (b) { b.textContent = this.theme() === 'day' ? '☾' : '☀'; b.title = this.theme() === 'day' ? 'Night (CAD) map style' : 'Day (aerial) map style'; } }
+  /** Pan/zoom draws a lighter frame; full detail returns as soon as the map is still. */
+  interact() { this.interactUntil = performance.now() + 160; this.baseDirty = true; }
 
   loop() {
     if (!this.visible || !this.cad.open) { this.running = false; return; }
@@ -64,10 +79,13 @@ export class MapScreen extends Screen {
   draw() {
     const { w, h, dpr } = this.size(); if (!w || !h) return;
     if (!this.view) { this.view = this.firstView ? this.renderer.fit(w, h) : this.renderer.focusTown('carmi', w, h); this.firstView = true; this.baseDirty = true; }
-    if (this.follow && this.sel?.kind === 'unit') { const u = this.sim.units.byId(this.sel.id); if (u) { this.view.cx = u.x; this.view.cy = u.y; this.baseDirty = true; } }
+    if (this.follow && this.sel?.kind === 'unit') { const u = this.sim.units.byId(this.sel.id); if (u) { this.view.cx = u.x; this.view.cy = u.y; this.interact(); } }
+    const fast = performance.now() < (this.interactUntil || 0);
+    if (!fast && this.wasFast) this.baseDirty = true;
     if (this.baseDirty) {
-      this.baseDirty = false; this.bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      this.renderer.drawBase(this.bctx, this.view, w, h, { labels: true });
+      this.baseDirty = false; this.wasFast = fast; this.bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.renderer.drawBase(this.bctx, this.view, w, h, { labels: true, theme: this.theme(), fast });
+      const juris = this.root.querySelector('[data-r="juris"]'); if (juris) juris.hidden = insideCounty(this.view.cx, this.view.cy);
     }
     const c = this.ctx; c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(this.base, 0, 0); c.setTransform(dpr, 0, 0, dpr, 0, 0);
     const avl = this.game.career.has('avl_overlay', this.sim.state.mode);
@@ -82,9 +100,9 @@ export class MapScreen extends Screen {
     const { w, h } = this.size();
     px ??= w / 2; py ??= h / 2;
     const wx = (px - w / 2) / this.view.scale + this.view.cx, wy = (py - h / 2) / this.view.scale + this.view.cy;
-    this.view.scale = clamp(this.view.scale * f, 0.02, 3);
+    this.view.scale = clamp(this.view.scale * f, this.renderer.minScale(w, h), 3);
     this.view.cx = wx - (px - w / 2) / this.view.scale; this.view.cy = wy - (py - h / 2) / this.view.scale;
-    this.baseDirty = true;
+    this.interact();
   }
 
   focusOn(x, y, scale = 0.45) { const { w, h } = this.size(); if (!this.view) this.view = this.renderer.fit(w || 600, h || 400); this.view.cx = x; this.view.cy = y; this.view.scale = Math.max(this.view.scale, scale); this.baseDirty = true; }
@@ -98,7 +116,7 @@ export class MapScreen extends Screen {
       if (!pointers.has(e.pointerId) || !this.view) return;
       pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
       if (pinch && pointers.size === 2) { const [a, b] = [...pointers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); this.zoom(d / pinch.d, (a.x + b.x) / 2, (a.y + b.y) / 2); pinch.d = d; moved = true; return; }
-      if (drag) { const dx = e.offsetX - drag.x, dy = e.offsetY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) moved = true; this.view.cx -= dx / this.view.scale; this.view.cy -= dy / this.view.scale; drag = { x: e.offsetX, y: e.offsetY }; this.baseDirty = true; if (moved) this.follow = false; }
+      if (drag) { const dx = e.offsetX - drag.x, dy = e.offsetY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) moved = true; this.view.cx -= dx / this.view.scale; this.view.cy -= dy / this.view.scale; drag = { x: e.offsetX, y: e.offsetY }; this.interact(); if (moved) this.follow = false; }
     });
     const up = (e) => {
       pointers.delete(e.pointerId);

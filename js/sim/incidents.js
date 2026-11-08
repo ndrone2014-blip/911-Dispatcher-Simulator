@@ -269,7 +269,9 @@ export class IncidentManager {
       if (sim.t - u.onSceneSince < (tr.critical ? 18 : 30)) continue;
       const kinds = ['hospital'];
       let hosp = nearestFacility(u.x, u.y, kinds);
-      if (tr.critical) hosp = city.facilities.find((f) => f.kind === 'hospital' && f.trauma === 1) || hosp;
+      // Rural practice: ground crews take critical patients to the nearest ER (stabilize and transfer);
+      // aircraft and critical-care trucks fly/drive straight to the Level I trauma center in Evansville.
+      if (tr.critical && (u.type === 'air_medical' || u.type === 'cct')) hosp = city.facilities.find((f) => f.kind === 'hospital' && f.trauma === 1) || hosp;
       const load = Math.min(patientsLeft, u.type === 'air_medical' || u.type === 'cct' ? 1 : (patientsLeft > 1 && sim.rng.chance(0.3) ? 2 : 1));
       u.patients = load; patientsLeft -= load;
       u.dest = { kind: 'hospital', id: hosp.id };

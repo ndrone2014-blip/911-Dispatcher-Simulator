@@ -108,6 +108,11 @@
 .map-wrap canvas:active { cursor: grabbing; }
 .map-ctrl { position: absolute; right: 8px; top: 8px; display: flex; flex-direction: column; gap: 4px; }
 .map-ctrl .btn { width: 32px; height: 32px; padding: 0; }
+.map-ctrl .map-goto { font-size: 0; width: 32px; height: 32px; padding: 0; text-indent: 0; color: transparent; background-image: none; border-radius: 8px; background: var(--panel2, #121a28); color: var(--text, #e6edf7); border: 1px solid var(--line2, #2a3650); font-size: 11px; appearance: none; text-align: center; cursor: pointer; }
+.map-goto option { font-size: 14px; color: #e6edf7; background: #121a28; }
+.map-goto-wrap { position: relative; width: 32px; height: 32px; }
+.map-goto-wrap::before { content: '📍'; position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; font-size: 15px; }
+.map-juris { position: absolute; left: 50%; top: 46px; transform: translateX(-50%); padding: 4px 10px; border-radius: 999px; background: rgba(120,30,30,.88); color: #fff; font-size: .74em; font-weight: 700; white-space: nowrap; pointer-events: none; max-width: calc(100% - 80px); overflow: hidden; text-overflow: ellipsis; }
 .map-layers { position: absolute; left: 8px; top: 8px; display: flex; gap: 4px; flex-wrap: wrap; max-width: calc(100% - 60px); }
 .map-info { position: absolute; left: 8px; bottom: 8px; width: min(310px, calc(100% - 16px)); max-height: 60%; overflow: auto; padding: 10px; border-radius: 10px; background: rgba(12,18,28,.96); border: 1px solid var(--line2); font-size: .86em; }
 .map-legend { position: absolute; right: 8px; bottom: 8px; padding: 6px 8px; border-radius: 8px; background: rgba(12,18,28,.85); border: 1px solid var(--line); font-size: .72em; color: var(--text2); display: grid; grid-template-columns: auto auto; gap: 2px 8px; }

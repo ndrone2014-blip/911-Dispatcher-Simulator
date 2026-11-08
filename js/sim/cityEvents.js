@@ -45,7 +45,7 @@ export class CityEvents {
       case 'road_closure': {
         // sometimes a rural highway, sometimes a town street
         let edges;
-        if (r.chance(0.4)) { const rural = city.edges.filter((ed) => !ed.town && ['state', 'county', 'us'].includes(ed.kind)); const ed = r.pick(rural); edges = [ed]; const A = city.nodes[ed.a], Bn = city.nodes[ed.b]; e.x = (A.x + Bn.x) / 2; e.y = (A.y + Bn.y) / 2; e.district = 'Rural White County'; }
+        if (r.chance(0.4)) { const rural = city.edges.filter((ed) => !ed.town && !ed.outside && ['state', 'county', 'us', 'township'].includes(ed.kind)); const ed = r.pick(rural); edges = [ed]; const A = city.nodes[ed.a], Bn = city.nodes[ed.b]; e.x = (A.x + Bn.x) / 2; e.y = (A.y + Bn.y) / 2; e.district = 'Rural White County'; }
         else edges = sim.router.edgesNear(x, y, 70).filter((ed) => ed.town === town.id).slice(0, 2);
         if (!edges.length) edges = sim.router.edgesNear(x, y, 200).slice(0, 1);
         e.edges = edges.map((ed) => ed.id); e.radius = 120;

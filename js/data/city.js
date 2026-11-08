@@ -40,6 +40,8 @@ export const TOWNS = [
   { id: 'herald', name: 'Herald', x: 5600, y: 9500, block: 90, blockY: 90, mainNS: 1, mainEW: 1, weight: 0.015, ns: ['West St', 'Main St', 'East St'], ew: ['North St', 'Center St', 'South St'] },
   { id: 'emma', name: 'Emma', x: 8800, y: 8700, block: 90, blockY: 90, mainNS: 1, mainEW: 1, weight: 0.02, ns: ['West St', 'Main St', 'East St'], ew: ['North St', 'Center St', 'South St'] },
   { id: 'maunie', name: 'Maunie', x: 10900, y: 8500, block: 90, blockY: 90, mainNS: 1, mainEW: 1, weight: 0.02, ns: ['West St', 'Main St', 'River St'], ew: ['North St', 'Center St', 'South St'] },
+  // Brownsville: unincorporated, 38.0414 N 88.2447 W (about 5 miles WSW of Carmi). Street names are game placeholders.
+  { id: 'brownsville', name: 'Brownsville', x: 3570, y: 7930, block: 90, blockY: 90, mainNS: 1, mainEW: 1, weight: 0.015, ns: ['West St', 'Main St', 'East St'], ew: ['North St', 'Church St', 'South St'] },
 ];
 export const TOWN_BY_ID = Object.fromEntries(TOWNS.map((t) => [t.id, t]));
 for (const t of TOWNS) {
@@ -81,15 +83,98 @@ const ROAD_DEFS = [
   { name: 'County Road 1200 E', kind: 'county', pts: [[3500, 6000], [3700, 7800], [4000, 9450]] },
   { name: 'Wabash River Rd', kind: 'county', pts: [[10900, 8410], [11100, 7000], [11000, 5600], [10200, 4750]] },
   { name: 'Airport Rd', kind: 'county', pts: [[6200, 7300], [5900, 7350]] },
+  { name: 'Brownsville Rd', kind: 'county', pts: [[3660, 7930], [4200, 7930], [4700, 7930]] },
+  { name: 'Brownsville Rd', kind: 'county', pts: [[3480, 7930], [2950, 7930]] },
 ];
-const SPEED = { interstate: 2.7, us: 2.25, state: 2.15, county: 1.7, street: 1.0 };
+const SPEED = { interstate: 2.7, us: 2.25, state: 2.15, county: 1.7, township: 1.45, street: 1.0 };
+
+// ---------------- Projection & surrounding region ----------------
+// Game coordinates are a plain projection of real latitude/longitude at SCALE (x = east from
+// the west county line, y = south from the north county line). These helpers place real
+// places on the map; they're also handy when adding more locations.
+export const GEO = { lon0: -88.375, lat0: 38.270, xPerDeg: 27400, yPerDeg: 34690 };
+export function geoToGame(lat, lon) { return [Math.round((lon - GEO.lon0) * GEO.xPerDeg), Math.round((GEO.lat0 - lat) * GEO.yPerDeg)]; }
+export function gameToGeo(x, y) { return { lat: GEO.lat0 - y / GEO.yPerDeg, lon: GEO.lon0 + x / GEO.xPerDeg }; }
+
+/** Is a point inside White County (the department's jurisdiction)? */
+export function insideCounty(x, y) {
+  let inside = false; const P = COUNTY_LINE;
+  for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
+    const [xi, yi] = P[i], [xj, yj] = P[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+// The map can be zoomed out past the county line to show the surrounding area. Everything
+// below is outside the jurisdiction: drawn on the map (and routable for hospital transfers),
+// but calls, incidents and city events are only ever generated inside White County.
+export const REGION_BOUNDS = { x0: -9500, y0: -7500, x1: 24500, y1: 21500 };
+export const OUTER_TOWNS = [
+  { name: 'McLeansboro', county: 'Hamilton Co.', size: 3, at: [38.0934, -88.5356] },
+  { name: 'Fairfield', county: 'Wayne Co.', size: 3, at: [38.3789, -88.3598] },
+  { name: 'Albion', county: 'Edwards Co.', size: 2, at: [38.3770, -88.0562] },
+  { name: 'Mount Carmel', county: 'Wabash Co.', size: 3, at: [38.4109, -87.7614] },
+  { name: 'Eldorado', county: 'Saline Co.', size: 3, at: [37.8137, -88.4381] },
+  { name: 'Ridgway', county: 'Gallatin Co.', size: 1, at: [37.7992, -88.2606] },
+  { name: 'Shawneetown', county: 'Gallatin Co.', size: 1, at: [37.7131, -88.1867] },
+  { name: 'Omaha', county: 'Gallatin Co.', size: 1, at: [37.8903, -88.3034] },
+  { name: 'New Haven', county: 'Gallatin Co.', size: 1, at: [37.9067, -88.1286] },
+  { name: 'New Harmony', county: 'Posey Co., IN', size: 1, at: [38.1298, -87.9353] },
+  { name: 'Mount Vernon', county: 'Posey Co., IN', size: 2, at: [37.9323, -87.8950] },
+  { name: 'Evansville', county: 'Vanderburgh Co., IN', size: 5, at: [37.9716, -87.5711] },
+  { name: 'Wayne City', county: 'Wayne Co.', size: 1, at: [38.3456, -88.5878] },
+  { name: 'Keensburg', county: 'Wabash Co.', size: 1, at: [38.3517, -87.8673] },
+].map((t) => { const [x, y] = geoToGame(...t.at); return { ...t, x, y }; });
+export const NEIGHBOR_COUNTIES = [
+  ['HAMILTON COUNTY', -5200, 3600], ['WAYNE COUNTY', 1500, -4800], ['EDWARDS COUNTY', 8200, -5200], ['WABASH COUNTY', 14200, -6600],
+  ['SALINE COUNTY', -5200, 14500], ['GALLATIN COUNTY', 3200, 14800], ['GIBSON COUNTY, IN', 18500, -2400], ['POSEY COUNTY, IN', 15800, 6500],
+  ['VANDERBURGH CO., IN', 22300, 4400], ['KENTUCKY', 9200, 20500],
+];
+// Approximate neighbouring county lines (drawn only).
+export const NEIGHBOR_LINES = [
+  [[0, 0], [-9500, 0]], [[0, 10500], [-9500, 10500]], [[0, 10500], [0, 21500]], [[0, 0], [0, -7500]],
+  [[6160, 0], [6160, -7500]], [[11320, 0], [10850, -2600], [10900, -7500]],
+  [[12900, 1900], [24500, 1900]], [[19900, 1900], [19900, 11300]],
+];
+// Display-only rivers outside the county (the Wabash north of Grayville and south of the county, and the Ohio).
+export const OUTER_RIVERS = [
+  { name: 'Wabash River', width: 110, points: [[11320, 0], [11320, -500], [12100, -1900], [13600, -2900], [15400, -3700], [16900, -4800], [17500, -6200], [17800, -7500]] },
+  { name: 'Wabash River', width: 120, points: [[11300, 10500], [11200, 11000], [10900, 12600], [10400, 14200], [9800, 15600], [9450, 16300]] },
+  { name: 'Ohio River', width: 260, points: [[24500, 11300], [22400, 10900], [20100, 11900], [17600, 12700], [15200, 12300], [13150, 12100], [11400, 13900], [10200, 15400], [9450, 16300], [8100, 17400], [6900, 18500], [5600, 19500], [4300, 20600], [3200, 21500]] },
+];
+// Indiana / Kentucky (east of the Wabash, south of the Ohio) — filled darker on the map.
+export const STATE_AREAS = [
+  { name: 'Indiana', pts: [[11320, -500], [12100, -1900], [13600, -2900], [15400, -3700], [16900, -4800], [17500, -6200], [17800, -7500], [24500, -7500], [24500, 11300], [22400, 10900], [20100, 11900], [17600, 12700], [15200, 12300], [13150, 12100], [11400, 13900], [10200, 15400], [9450, 16300], [9800, 15600], [10400, 14200], [10900, 12600], [11200, 11000], [11300, 10500], [11500, 9400], [11650, 8000], [11400, 6400], [11550, 4800], [11350, 3200], [11500, 1600], [11320, 0]] },
+  { name: 'Kentucky', pts: [[24500, 11300], [24500, 21500], [3200, 21500], [4300, 20600], [5600, 19500], [6900, 18500], [8100, 17400], [9450, 16300], [10200, 15400], [11400, 13900], [13150, 12100], [15200, 12300], [17600, 12700], [20100, 11900], [22400, 10900]] },
+];
+// Highways leaving the county toward the nearby towns and hospitals (routable, outside the jurisdiction).
+const OUTER_ROAD_DEFS = [
+  { name: 'US-45', kind: 'us', pts: [[1700, -400], [1200, -1800], [700, -3000], [420, -3700], [300, -7500]] },
+  { name: 'US-45', kind: 'us', pts: [[2700, 10900], [1600, 12600], [300, 14200], [-1700, 15800], [-3800, 17800], [-6000, 20000]] },
+  { name: 'IL-1', kind: 'state', pts: [[10950, -400], [11050, -1200], [11900, -3300], [13500, -4400], [16600, -4900], [17200, -7500]] },
+  { name: 'IL-1', kind: 'state', pts: [[2000, 10900], [2050, 13150], [2600, 14800], [3100, 16300], [4300, 17800], [5150, 19300]] },
+  { name: 'IL-141', kind: 'state', pts: [[3700, 10900], [4900, 11900], [6750, 12600], [8300, 14000]] },
+  { name: 'IL-14', kind: 'state', pts: [[-400, 5900], [-2400, 6000], [-4400, 6140], [-9500, 6300]] },
+  { name: 'IL-15', kind: 'state', pts: [[420, -3700], [3400, -3720], [6200, -3720], [8740, -3710], [10400, -3800], [11900, -3300]] },
+  { name: 'IL-242', kind: 'state', pts: [[-4400, 6140], [-4200, 9000], [-3600, 12000], [-1700, 15800]] },
+  { name: 'I-64', kind: 'interstate', pts: [[-400, 2380], [-3500, 2600], [-6800, 2700], [-9500, 2900]] },
+  { name: 'I-64', kind: 'interstate', pts: [[12400, 1550], [14500, 1800], [17000, 2300], [19300, 2900], [21300, 3100], [24500, 3000]] },
+  { name: 'I-69', kind: 'interstate', pts: [[21300, 3100], [22000, 5800], [22300, 8300], [22600, 10200]] },
+  { name: 'IN-69', kind: 'state', pts: [[12060, 4860], [13000, 7000], [13150, 11700]] },
+  { name: 'IN-66', kind: 'state', pts: [[13150, 11700], [16500, 11300], [19500, 10800], [22400, 10300]] },
+];
+// Real smaller communities (no street grid in the game, shown as named places).
+export const HAMLETS = [
+  ['Stokes', 3120, 8380], ['Roland', 3500, 10250], ['Epworth', 7900, 6950], ['Calvin', 9900, 2930],
+];
 export const ROAD_KINDS = SPEED;
 
 // ---------------- Build graph ----------------
 function townAt(x, y, pad = 0) { return TOWNS.find((t) => x >= t.x0 - pad && x <= t.x1 + pad && y >= t.y0 - pad && y <= t.y1 + pad) || null; }
 export { townAt };
 
-function buildCity() {
+function buildCity(defs) {
   const r = new RNG(618_1814);
   const nodes = []; const adj = []; const edges = []; const nodeMap = new Map();
   const node = (x, y) => {
@@ -110,10 +195,10 @@ function buildCity() {
     t.ew.forEach((name, j) => { for (let i = 0; i < t.xs.length - 1; i++) addEdge(node(t.xs[i], t.ys[j]), node(t.xs[i + 1], t.ys[j]), { name, kind: 'street', speed: j === t.mainEW ? 1.15 : 1.0, axis: 'ew', town: t.id, idx: j }); });
   }
   // named roads with cumulative distances (for rural addressing)
-  const roads = ROAD_DEFS.map((d, ri) => {
+  const roads = defs.map((d, ri) => {
     let acc = 0; const rd = { ...d, id: ri, cum: [0] };
     for (let i = 1; i < d.pts.length; i++) { acc += dist(d.pts[i - 1][0], d.pts[i - 1][1], d.pts[i][0], d.pts[i][1]); rd.cum.push(acc); }
-    for (let i = 0; i < d.pts.length - 1; i++) addEdge(node(...d.pts[i]), node(...d.pts[i + 1]), { name: d.name, kind: d.kind, speed: SPEED[d.kind], road: ri, seg: i });
+    for (let i = 0; i < d.pts.length - 1; i++) addEdge(node(...d.pts[i]), node(...d.pts[i + 1]), { name: d.name, kind: d.kind, speed: SPEED[d.kind], road: ri, seg: i, outside: !!d.outside, grid: !!d.grid });
     return rd;
   });
   // Carmi's Main St carries IL-14/IL-1 and Oak St carries IL-1 (display aliases)
@@ -152,7 +237,7 @@ function buildCity() {
   // rural farmsteads & oil wells along county/state roads
   const farms = []; const wells = [];
   for (const rd of roads) {
-    if (rd.kind === 'interstate') continue;
+    if (rd.kind === 'interstate' || rd.outside) continue;
     const total = rd.cum[rd.cum.length - 1];
     for (let d = r.float(150, 500); d < total - 100; d += r.float(380, 820)) {
       const p = pointAlong(rd, d); const side = r.chance(0.5) ? 1 : -1;
@@ -173,6 +258,108 @@ function buildCity() {
   return { nodes, adj, edges, roads, blocks, farms, wells, woods };
 }
 
+// ---------------- Section-line county roads ----------------
+// Illinois' rural roads follow the one-mile survey grid. This lays a road on every section
+// line inside the county, leaving gaps the way the real network has them (river bottoms,
+// fields, the interstate), only bridging the Little Wabash and Skillet Fork in a few places,
+// and never crossing the Wabash. Names follow the county grid ("County Road 1200 E").
+// It's a faithful *pattern* of White County's road network, not a survey of every real road.
+export const MILE = 1609 / SCALE;
+function segHits(ax, ay, bx, by, cx, cy, dx, dy) {
+  const rx = bx - ax, ry = by - ay, sx = dx - cx, sy = dy - cy; const den = rx * sy - ry * sx;
+  if (Math.abs(den) < 1e-9) return null;
+  const t = ((cx - ax) * sy - (cy - ay) * sx) / den, u = ((cx - ax) * ry - (cy - ay) * rx) / den;
+  return t >= -1e-6 && t <= 1 + 1e-6 && u >= -1e-6 && u <= 1 + 1e-6 ? { t, u, x: ax + rx * t, y: ay + ry * t } : null;
+}
+function gridRoadDefs(named) {
+  const r = new RNG(1816_0618);
+  const out = [];
+  const namedSegs = [];
+  for (const d of named) for (let i = 0; i < d.pts.length - 1; i++) namedSegs.push([...d.pts[i], ...d.pts[i + 1], d.kind]);
+  const nearTown = (x, y, pad) => TOWNS.some((t) => x >= t.x0 - pad && x <= t.x1 + pad && y >= t.y0 - pad && y <= t.y1 + pad);
+  const ok = (ax, ay, bx, by) => {
+    const mx = (ax + bx) / 2, my = (ay + by) / 2;
+    if (!insideCounty(ax + (mx - ax) * 0.02, ay + (my - ay) * 0.02) || !insideCounty(bx + (mx - bx) * 0.02, by + (my - by) * 0.02)) return false;
+    if (nearTown(ax, ay, 25) || nearTown(bx, by, 25) || nearTown(mx, my, 25)) return false;
+    // rivers: never along a river, never across the Wabash, only a few bridges elsewhere
+    for (const rv of RIVERS) for (let i = 0; i < rv.points.length - 1; i++) {
+      const [px, py] = rv.points[i], [qx, qy] = rv.points[i + 1];
+      if (segHits(ax, ay, bx, by, px, py, qx, qy)) { if (rv.name === 'Wabash River' || r.chance(0.72)) return false; }
+    }
+    if (nearRiver(mx, my, 30)) return false;
+    const bottoms = nearRiver(mx, my, 420);
+    if (r.chance(bottoms ? 0.5 : 0.13)) return false;
+    // don't double up on a named road running the same way, and only some roads cross I-64
+    const L = Math.hypot(bx - ax, by - ay);
+    for (const [px, py, qx, qy, kind] of namedSegs) {
+      if (kind === 'interstate') { if (segHits(ax, ay, bx, by, px, py, qx, qy) && r.chance(0.45)) return false; continue; }
+      const sL = Math.hypot(qx - px, qy - py) || 1; const cos = Math.abs(((bx - ax) * (qx - px) + (by - ay) * (qy - py)) / (L * sL));
+      if (cos > 0.88 && segDist(mx, my, px, py, qx, qy).d < 170) return false;
+    }
+    return true;
+  };
+  const nx = Math.floor(11700 / MILE), ny = Math.floor(10500 / MILE);
+  const run = (name, pts) => { if (pts.length > 1) out.push({ name, kind: 'township', grid: true, pts: pts.map(([x, y]) => [Math.round(x), Math.round(y)]) }); };
+  for (let i = 1; i <= nx; i++) { // north–south roads ("E" numbers)
+    const x = i * MILE; const name = `County Road ${i * 100 + 500} E`; let cur = [];
+    for (let j = 0; j < ny + 1; j++) {
+      const y0 = j * MILE, y1 = Math.min(10500, (j + 1) * MILE); if (y1 - y0 < 50) continue;
+      if (ok(x, y0, x, y1)) { if (!cur.length) cur.push([x, y0]); cur.push([x, y1]); } else { run(name, cur); cur = []; }
+    }
+    run(name, cur);
+  }
+  for (let j = 1; j <= ny; j++) { // east–west roads ("N" numbers)
+    const y = j * MILE; const name = `County Road ${Math.round((10500 - y) / MILE) * 100 + 300} N`; let cur = [];
+    for (let i = 0; i < nx + 2; i++) {
+      const x0 = i * MILE, x1 = (i + 1) * MILE;
+      if (ok(x0, y, x1, y)) { if (!cur.length) cur.push([x0, y]); cur.push([x1, y]); } else { run(name, cur); cur = []; }
+    }
+    run(name, cur);
+  }
+  return out;
+}
+
+/** Split road polylines wherever two of them cross, so the routing graph connects them. Interstates are grade-separated. */
+function nodeRoads(defs) {
+  const C = 600; const cells = new Map(); const segs = [];
+  defs.forEach((d, di) => { if (d.kind === 'interstate') return; for (let i = 0; i < d.pts.length - 1; i++) {
+    const [ax, ay] = d.pts[i], [bx, by] = d.pts[i + 1]; const sg = { di, i, ax, ay, bx, by, id: segs.length }; segs.push(sg);
+    for (let cx = Math.floor(Math.min(ax, bx) / C); cx <= Math.floor(Math.max(ax, bx) / C); cx++) for (let cy = Math.floor(Math.min(ay, by) / C); cy <= Math.floor(Math.max(ay, by) / C); cy++) {
+      const k = `${cx},${cy}`; if (!cells.has(k)) cells.set(k, []); cells.get(k).push(sg);
+    } } });
+  const ins = defs.map((d) => d.pts.map(() => []));
+  const seen = new Set(); const E = 0.002;
+  for (const list of cells.values()) for (let a = 0; a < list.length; a++) for (let b = a + 1; b < list.length; b++) {
+    const s1 = list[a], s2 = list[b]; if (s1.di === s2.di) continue;
+    const key = s1.id < s2.id ? `${s1.id}|${s2.id}` : `${s2.id}|${s1.id}`; if (seen.has(key)) continue; seen.add(key);
+    const h = segHits(s1.ax, s1.ay, s1.bx, s1.by, s2.ax, s2.ay, s2.bx, s2.by); if (!h) continue;
+    const end1 = h.t < E ? [s1.ax, s1.ay] : h.t > 1 - E ? [s1.bx, s1.by] : null;
+    const end2 = h.u < E ? [s2.ax, s2.ay] : h.u > 1 - E ? [s2.bx, s2.by] : null;
+    const p = end1 || end2 || [Math.round(h.x), Math.round(h.y)];
+    if (!end1) ins[s1.di][s1.i].push([h.t, p]);
+    if (!end2) ins[s2.di][s2.i].push([h.u, p]);
+  }
+  return defs.map((d, di) => {
+    if (d.kind === 'interstate') return d;
+    const pts = [];
+    for (let i = 0; i < d.pts.length; i++) { pts.push(d.pts[i]); if (i < d.pts.length - 1) for (const [, p] of ins[di][i].sort((x, y) => x[0] - y[0])) pts.push(p); }
+    return { ...d, pts: pts.filter((p, i) => i === 0 || p[0] !== pts[i - 1][0] || p[1] !== pts[i - 1][1]) };
+  });
+}
+
+function buildNetwork() {
+  const named = [...ROAD_DEFS, ...OUTER_ROAD_DEFS.map((d) => ({ ...d, outside: true }))];
+  let defs = nodeRoads([...named, ...gridRoadDefs(ROAD_DEFS)]);
+  let c = buildCity(defs);
+  // drop section-road runs that ended up cut off from the network (islands between rivers)
+  const start = c.nodes.reduce((b, n) => (Math.hypot(n.x - 6000, n.y - 6200) < Math.hypot(b.x - 6000, b.y - 6200) ? n : b), c.nodes[0]).id;
+  const seen = new Uint8Array(c.nodes.length); const stack = [start]; seen[start] = 1;
+  while (stack.length) { const u = stack.pop(); for (const { to } of c.adj[u]) if (!seen[to]) { seen[to] = 1; stack.push(to); } }
+  const bad = new Set(c.edges.filter((e) => e.grid && !seen[e.a]).map((e) => e.road));
+  if (bad.size) { defs = defs.filter((d, i) => !bad.has(i)); c = buildCity(defs); }
+  return c;
+}
+
 function pointAlong(rd, d) {
   let i = 1; while (i < rd.cum.length - 1 && rd.cum[i] < d) i++;
   const [ax, ay] = rd.pts[i - 1], [bx, by] = rd.pts[i]; const L = rd.cum[i] - rd.cum[i - 1] || 1; const k = clamp((d - rd.cum[i - 1]) / L, 0, 1);
@@ -191,7 +378,7 @@ export function nearRiver(x, y, pad = 0) {
   return null;
 }
 
-export const city = buildCity();
+export const city = buildNetwork();
 export const ROADS = city.roads;
 
 // ---------------- Spatial index over edges ----------------
@@ -231,7 +418,7 @@ const FACILITY_DEFS = [
   ['precinct', 'Crossville Police Department', ...T('crossville', 2, 2, -35, 30), 'Crossville PD'],
   ['precinct', 'Enfield Police Department', ...T('enfield', 2, 2, 35, -30), 'Enfield PD'],
   ['sheriff', "White County Sheriff's Office", ...T('carmi', 6, 4, 45, -35), 'Sheriff'],
-  ['federal', 'Federal Field Office (Evansville) – staging', 12320, 1480, 'Federal'],
+  ['federal', 'Federal Field Office – I-64 staging', 12320, 1480, 'Federal'],
   ['eoc', 'White County 911 & EMA (your center)', ...T('carmi', 4, 3, 40, 40), '911 / EMA'],
   ['fire', 'Carmi Fire Department – Station 1', ...T('carmi', 4, 4, -40, 35), 'Carmi FD 1'],
   ['fire', 'Carmi Fire Department – Station 2', ...T('carmi', 8, 6, 40, 30), 'Carmi FD 2'],
@@ -249,9 +436,9 @@ const FACILITY_DEFS = [
   ['ems', 'White County Ambulance – Grayville', ...T('grayville', 1, 2, 35, 30), 'WCAS Grayville'],
   ['ems', 'White County Ambulance – Crossville', ...T('crossville', 1, 2, 35, -30), 'WCAS Crossville'],
   ['hospital', 'Carmi Township Hospital', ...T('carmi', 2, 6, 55, 40), 'Carmi Twp Hospital', { trauma: 3 }],
-  ['hospital', 'Deaconess Midtown (Evansville, IN)', 12380, 1640, 'Deaconess', { trauma: 1 }],
-  ['hospital', 'Ferrell Hospital (Eldorado)', 2050, 10860, 'Ferrell Hosp.', { trauma: 3 }],
-  ['hospital', 'Fairfield Memorial Hospital', 1650, -360, 'Fairfield Mem.', { trauma: 3 }],
+  ['hospital', 'Deaconess Midtown (Evansville, IN)', 22520, 10050, 'Deaconess', { trauma: 1, outside: true }],
+  ['hospital', 'Ferrell Hospital (Eldorado)', -1620, 15700, 'Ferrell Hosp.', { trauma: 3, outside: true }],
+  ['hospital', 'Fairfield Memorial Hospital', 520, -3640, 'Fairfield Mem.', { trauma: 3, outside: true }],
   ['hospital_helipad', 'Carmi Township Hospital Helipad', ...T('carmi', 2, 6, 25, 75), 'Helipad'],
   ['airport', 'Carmi Municipal Airport', 5880, 7360, 'Carmi Airport'],
   ['marina', 'Grayville Wabash River Boat Ramp', ...T('grayville', 4, 2, 60, 0), 'Boat Ramp'],
@@ -306,6 +493,11 @@ const POI_DEFS = [
   ['Skillet Fork Bottoms', 3300, 4500, 'forest', 'forest'],
   ['Wabash River Bottoms (Phillipstown)', 11050, 3600, 'forest', 'forest'],
   ['Calvin', 9900, 2930, 'residential', 'village'],
+  ['Brownsville Church', ...T('brownsville', 1, 0, 45, 40), 'residential', 'church'],
+  ['Brownsville Cemetery', ...T('brownsville', 0, 1, -60, 30), 'park', 'park'],
+  ['Stokes', 3120, 8380, 'residential', 'village'],
+  ['Roland', 3500, 10250, 'residential', 'village'],
+  ['Epworth', 7900, 6950, 'residential', 'village'],
 ];
 
 export const FACILITIES = FACILITY_DEFS.map(([kind, name, x, y, short, extra], i) => ({ id: `fac_${i}`, kind, name, short, x, y, ...(extra || {}), address: null }));
@@ -322,7 +514,9 @@ export function nearestTown(x, y) {
 function compass(dx, dy) { const a = Math.atan2(dx, -dy) * 180 / Math.PI; return ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'][Math.round(((a + 360) % 360) / 45) % 8]; }
 export function miles(gameMeters) { return (gameMeters * SCALE) / 1609; }
 function milesText(m) { return m < 0.35 ? 'just outside' : `${m.toFixed(1)} miles`; }
-function relTown(x, y) { const { town, d } = nearestTown(x, y); const m = miles(d); return m < 0.35 ? `near ${town.name}` : `${milesText(m)} ${compass(x - town.x, y - town.y)} of ${town.name}`; }
+function relTown(x, y) {
+  if (!insideCounty(x, y)) { let best = null, bd = Infinity; for (const t of OUTER_TOWNS) { const d = dist(x, y, t.x, t.y); if (d < bd) { bd = d; best = t; } } const m = miles(bd); return `${m < 0.35 ? 'near' : `${milesText(m)} ${compass(x - best.x, y - best.y)} of`} ${best.name} (outside White County)`; }
+  const { town, d } = nearestTown(x, y); const m = miles(d); return m < 0.35 ? `near ${town.name}` : `${milesText(m)} ${compass(x - town.x, y - town.y)} of ${town.name}`; }
 
 /** Address for any point. kind: street | road | highway | water */
 export function addressFor(x, y) {
@@ -361,7 +555,7 @@ export function addressFor(x, y) {
     const mm = Math.round(117 + ((near.qx - 4500) / 6000) * 13);
     return { kind: 'highway', street: 'I-64', number: null, cross: `mile marker ${mm}`, district, full: `I-64 near mile marker ${mm} (${rel})`, short: `I-64 MM ${mm}`, rel, mm };
   }
-  const label = e.kind === 'county' ? rd.name : rd.name.replace('IL-', 'IL Route ').replace('US-', 'US Hwy ');
+  const label = e.kind === 'county' || e.kind === 'township' ? rd.name : rd.name.replace('IL-', 'IL Route ').replace('US-', 'US Hwy ');
   return { kind: 'road', street: rd.name, number, cross: rel, district, full: `${number} ${label}`, short: `${number} ${label}`, rel, highway: e.kind !== 'county' };
 }
 
@@ -394,7 +588,7 @@ export function randomLocation(r, zones = ['residential'], opts = {}) {
     if (choices.length) { const p = r.pick(choices); return finalizeLocation(p.x + r.float(-15, 15), p.y + r.float(-15, 15), r, { poi: p }); }
   }
   if (zones.includes('highway')) {
-    const hw = city.edges.filter((e) => ['interstate', 'us', 'state'].includes(e.kind) && !e.town && e.len > 150);
+    const hw = city.edges.filter((e) => ['interstate', 'us', 'state'].includes(e.kind) && !e.town && !e.outside && e.len > 150 && insideCounty((city.nodes[e.a].x + city.nodes[e.b].x) / 2, (city.nodes[e.a].y + city.nodes[e.b].y) / 2));
     const e = r.weighted(hw, (x) => x.len * (x.kind === 'interstate' ? 1.4 : 1)); const A = city.nodes[e.a], Bn = city.nodes[e.b]; const k = r.float(0.1, 0.9);
     const dir = e.kind === 'interstate' ? r.pick(['eastbound', 'westbound']) : Math.abs(Bn.x - A.x) > Math.abs(Bn.y - A.y) ? r.pick(['eastbound', 'westbound']) : r.pick(['northbound', 'southbound']);
     return finalizeLocation(A.x + (Bn.x - A.x) * k, A.y + (Bn.y - A.y) * k, r, { dir, highway: true });
@@ -436,7 +630,7 @@ function finalizeLocation(x, y, r, extra = {}) {
 }
 
 // ---------------- Geocoding (typed address → point) ----------------
-export const ALL_STREETS = [...new Set([...TOWNS.flatMap((t) => [...t.ns, ...t.ew]), ...ROAD_DEFS.map((d) => d.name)])];
+export const ALL_STREETS = [...new Set([...TOWNS.flatMap((t) => [...t.ns, ...t.ew]), ...ROAD_DEFS.map((d) => d.name), ...city.roads.filter((d) => d.grid).map((d) => d.name)])];
 export const STREET_WORDS = [...new Set(ALL_STREETS.flatMap((s) => s.toLowerCase().split(/[\s/-]+/)))];
 // legacy exports used by the NLU
 export const NS_STREETS = C.ns; export const EW_STREETS = C.ew;
@@ -461,7 +655,7 @@ export function geocodeAddress(number, street, text = '') {
     return { x, y, ...addressFor(x, y), street, town: t.id, district: t.name };
   }
   // county road / highway: number is ~1000 per mile from the road's start
-  const rds = city.roads.filter((r) => r.name === street);
+  const rds = city.roads.filter((r) => r.name === street && !r.outside);
   if (!rds.length) return null;
   const targetMi = number ? Math.max(0, (number - 1000) / 1000) : null;
   let best = null;

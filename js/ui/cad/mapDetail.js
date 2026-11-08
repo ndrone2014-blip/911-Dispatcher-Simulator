@@ -11,6 +11,44 @@ import { city, TOWNS, RIVERS, ROADS, townAt, nearRiver } from '../../data/city.j
 let cache = null;
 export function mapDetail() { return (cache ||= build()); }
 
+// ---------------- Map styles ----------------
+// "night" is the dark CAD look used on the console monitors; "day" is a realistic
+// aerial-style palette. Every layer reads colors from the active palette.
+export const THEMES = {
+  night: {
+    bg: '#0a0f0d', outside: '#0d1311', otherState: '#0b100f', county: '#141d16', veil: 'rgba(4,7,10,.42)', hatch: 'rgba(160,175,140,.05)',
+    crops: { corn: ['#1d2a17', '#22301a', 'rgba(140,170,90,.06)'], soy: ['#1a2a1c', '#1d2f1f', 'rgba(120,180,110,.06)'], wheat: ['#28281a', '#2c2b1b', 'rgba(210,190,120,.06)'], stubble: ['#262418', '#2a2719', 'rgba(200,170,110,.07)'], pasture: ['#17271a', '#1a2b1c', null] },
+    outFields: ['#111a14', '#131c15', '#151d14', '#121a15'],
+    wood: '#163720', woodHi: 'rgba(120,170,100,.12)', woodShadow: 'rgba(0,0,0,.35)', streetTree: '#1b4426',
+    water: '#1b4a72', waterHi: 'rgba(120,180,230,.18)', bank: 'rgba(30,70,60,.55)', pond: '#163d5c', pondEdge: 'rgba(70,110,80,.6)',
+    rail: '#6b6f78', railBed: 'rgba(10,10,12,.8)', lease: 'rgba(150,130,90,.55)', drive: 'rgba(150,140,110,.6)', yard: '#1e2a1c',
+    houseA: '#6c7686', houseB: '#7d7466', barn: '#7a2f25', shed: '#6d737b', bin: '#a9b0b8', lot: '#23272e', lotInd: '#2a2d2f', driveway: '#3a3f46',
+    block: { residential: '#1a2333', commercial: '#1e2740', downtown: '#222c48', industrial: '#22292b', park: '#133a22', institutional: '#1d2342' },
+    roofs: ['#3e4a5f', '#46516a', '#4d5568', '#3b4456', '#525a6c'], roofInd: '#4a5052', roofCom: '#4a556e',
+    road: { street: '#34405a', township: '#5d5745', county: '#686452', state: '#a8924c', us: '#bf9b45', interstate: '#cf8d34' },
+    casing: '#07090c', sidewalk: '#283142', center: 'rgba(242,201,76,.85)', edgeLine: 'rgba(235,238,242,.55)', lane: 'rgba(255,245,220,.6)', median: '#16201a',
+    label: 'rgba(200,212,230,.85)', labelHalo: 'rgba(6,9,14,.9)', roadLabel: 'rgba(205,195,155,.8)', river: 'rgba(110,170,225,.85)', town: '#f2f5fa', townSmall: '#c9d3e2',
+    countyLine: 'rgba(255,214,102,.75)', countyGlow: 'rgba(255,214,102,.14)', neighborLine: 'rgba(170,180,160,.28)', neighborLabel: 'rgba(170,182,160,.32)',
+  },
+  day: {
+    bg: '#c7c9b6', outside: '#b9bea4', otherState: '#b3b8a0', county: '#a9b98a', veil: 'rgba(235,235,225,.38)', hatch: 'rgba(90,90,70,.07)',
+    crops: { corn: ['#6f8c45', '#789648', 'rgba(40,60,20,.10)'], soy: ['#86a055', '#8ea85c', 'rgba(40,70,20,.09)'], wheat: ['#c2b26e', '#cbb978', 'rgba(110,90,40,.10)'], stubble: ['#b3a378', '#bba982', 'rgba(110,90,50,.12)'], pasture: ['#8fae66', '#97b46d', null] },
+    outFields: ['#a4b083', '#adb78c', '#b7b48a', '#9fae80'],
+    wood: '#4d6b3c', woodHi: 'rgba(170,200,120,.25)', woodShadow: 'rgba(30,40,20,.35)', streetTree: '#557a42',
+    water: '#5c8fb8', waterHi: 'rgba(220,240,255,.28)', bank: 'rgba(80,110,70,.45)', pond: '#5f91b6', pondEdge: 'rgba(60,90,60,.5)',
+    rail: '#5d5a55', railBed: 'rgba(90,80,70,.75)', lease: 'rgba(170,150,110,.85)', drive: 'rgba(170,160,135,.9)', yard: '#9db47d',
+    houseA: '#8f949b', houseB: '#8a7766', barn: '#9a3b2c', shed: '#a5abb2', bin: '#cfd4d8', lot: '#7d8086', lotInd: '#86888a', driveway: '#9a9c9f',
+    block: { residential: '#b8c29e', commercial: '#b9b9ae', downtown: '#b4b2aa', industrial: '#b0afa6', park: '#8fb36a', institutional: '#bcbcae' },
+    roofs: ['#7c7f86', '#8a7a6a', '#6f747c', '#94877a', '#5f646c'], roofInd: '#9ea3a6', roofCom: '#a3a6aa',
+    road: { street: '#64676d', township: '#b1a68c', county: '#5e6066', state: '#55585e', us: '#525459', interstate: '#4f5156' },
+    casing: '#3b3d40', sidewalk: '#d6d6cf', center: 'rgba(240,196,40,.95)', edgeLine: 'rgba(250,250,250,.85)', lane: 'rgba(255,255,255,.85)', median: '#7f9a5f',
+    label: 'rgba(30,34,40,.92)', labelHalo: 'rgba(250,250,245,.88)', roadLabel: 'rgba(60,55,40,.9)', river: 'rgba(25,70,120,.9)', town: '#14181f', townSmall: '#262c36',
+    countyLine: 'rgba(200,40,40,.85)', countyGlow: 'rgba(200,40,40,.12)', neighborLine: 'rgba(70,70,60,.4)', neighborLabel: 'rgba(60,60,50,.45)',
+  },
+};
+export let P = THEMES.night;
+export function setMapTheme(name) { P = THEMES[name] || THEMES.night; return P; }
+
 function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 
 function pointAlong(rd, d) {
@@ -128,7 +166,7 @@ function rowPattern(ctx, col, dir, gap) {
   p = ctx.createPattern(c, 'repeat'); patterns.set(key, p); return p;
 }
 
-const CROP_COL = {
+const CROP_COL_LEGACY = {
   corn: ['#1d2a17', '#22301a', 'rgba(140,170,90,.06)'], soy: ['#1a2a1c', '#1d2f1f', 'rgba(120,180,110,.06)'], wheat: ['#28281a', '#2c2b1b', 'rgba(210,190,120,.06)'],
   stubble: ['#262418', '#2a2719', 'rgba(200,170,110,.07)'], pasture: ['#17271a', '#1a2b1c', null],
 };
@@ -140,27 +178,27 @@ export function drawGround(ctx, X, Y, s, w, h) {
   for (const f of D.fields) {
     const px = X(f.x), py = Y(f.y), pw = f.w * s, ph = f.h * s;
     if (px > w || py > h || px + pw < 0 || py + ph < 0) continue;
-    const c = CROP_COL[f.crop]; ctx.fillStyle = f.tone > 0.5 ? c[1] : c[0]; ctx.fillRect(px, py, pw, ph);
+    const c = P.crops[f.crop]; ctx.fillStyle = f.tone > 0.5 ? c[1] : c[0]; ctx.fillRect(px, py, pw, ph);
     if (c[2] && rows) { ctx.fillStyle = rowPattern(ctx, c[2], f.dir, gap); ctx.fillRect(px, py, pw, ph); }
   }
   if (s > 0.04) {
     ctx.beginPath();
     for (const p of D.ponds) { if (!vis(p.x, p.y, 200 * s + 10)) continue; const px = X(p.x), py = Y(p.y); ctx.moveTo(px + Math.max(1.5, p.rx * s) * Math.cos(p.rot), py + Math.max(1.5, p.rx * s) * Math.sin(p.rot)); ctx.ellipse(px, py, Math.max(1.5, p.rx * s), Math.max(1, p.ry * s), p.rot, 0, 6.283); }
     for (const p of D.oxbows) { if (!vis(p.x, p.y, 200 * s + 10)) continue; const px = X(p.x), py = Y(p.y); ctx.moveTo(px + Math.max(1.5, p.rx * s) * Math.cos(p.rot), py + Math.max(1.5, p.rx * s) * Math.sin(p.rot)); ctx.ellipse(px, py, Math.max(1.5, p.rx * s), Math.max(1, p.ry * s), p.rot, 0, 6.283); }
-    ctx.fillStyle = '#163d5c'; ctx.fill();
-    if (s > 0.15) { ctx.strokeStyle = 'rgba(70,110,80,.6)'; ctx.lineWidth = 1; ctx.stroke(); }
+    ctx.fillStyle = P.pond; ctx.fill();
+    if (s > 0.15) { ctx.strokeStyle = P.pondEdge; ctx.lineWidth = 1; ctx.stroke(); }
   }
   if (s > 0.035) {
     const trees = []; const far = s < 0.12;
     if (far) { // zoomed out: one soft blob per woodlot, no hedgerows
       ctx.beginPath(); for (const lot of D.woodlots) { if (lot.hedge || !vis(lot.cx, lot.cy, 20)) continue; const cx = X(lot.cx), cy = Y(lot.cy), r2 = Math.max(1.2, lot.r * s); ctx.moveTo(cx + r2, cy); ctx.arc(cx, cy, r2, 0, 6.283); }
-      ctx.fillStyle = '#163720'; ctx.fill(); return;
+      ctx.fillStyle = P.wood; ctx.fill(); return;
     }
     for (const lot of D.woodlots) { const t0 = lot.trees[0]; if (t0 && vis(t0[0], t0[1], 300 * s + 20)) for (const t of lot.trees) trees.push(t); }
     const circles = (dx, dy, k, col) => { ctx.beginPath(); for (const [x, y, rr] of trees) { const r2 = Math.max(1, rr * s * k), cx = X(x) + rr * s * dx, cy = Y(y) + rr * s * dy; ctx.moveTo(cx + r2, cy); ctx.arc(cx, cy, r2, 0, 6.283); } ctx.fillStyle = col; ctx.fill(); };
-    if (s > 0.22) circles(0.3, 0.35, 1, 'rgba(0,0,0,.35)');
-    circles(0, 0, 1, '#163720');
-    if (s > 0.3) circles(-0.25, -0.25, 0.5, 'rgba(120,170,100,.12)');
+    if (s > 0.22) circles(0.3, 0.35, 1, P.woodShadow);
+    circles(0, 0, 1, P.wood);
+    if (s > 0.3) circles(-0.25, -0.25, 0.5, P.woodHi);
   }
 }
 
@@ -169,8 +207,8 @@ export function drawRail(ctx, X, Y, s) {
   const D = mapDetail();
   ctx.lineCap = 'butt'; ctx.lineJoin = 'round';
   ctx.beginPath(); D.rail.forEach(([x, y], i) => (i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))));
-  ctx.strokeStyle = 'rgba(10,10,12,.8)'; ctx.lineWidth = Math.max(2.4, 7 * s); ctx.stroke();
-  ctx.strokeStyle = '#6b6f78'; ctx.lineWidth = Math.max(1, 2.2 * s); ctx.setLineDash([Math.max(2, 9 * s), Math.max(2, 6 * s)]); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = P.railBed; ctx.lineWidth = Math.max(2.4, 7 * s); ctx.stroke();
+  ctx.strokeStyle = P.rail; ctx.lineWidth = Math.max(1, 2.2 * s); ctx.setLineDash([Math.max(2, 9 * s), Math.max(2, 6 * s)]); ctx.stroke(); ctx.setLineDash([]);
   if (s > 0.25) { ctx.strokeStyle = 'rgba(140,145,155,.7)'; ctx.lineWidth = Math.max(4, 9 * s); ctx.setLineDash([1.2, Math.max(3, 6 * s)]); ctx.stroke(); ctx.setLineDash([]); }
 }
 
@@ -178,19 +216,19 @@ export function drawRail(ctx, X, Y, s) {
 export function drawSettlement(ctx, X, Y, s, w, h) {
   const D = mapDetail(); const vis = (x, y, pad) => { const px = X(x), py = Y(y); return px > -pad && py > -pad && px < w + pad && py < h + pad; };
   if (s > 0.09) {
-    ctx.strokeStyle = 'rgba(150,130,90,.55)'; ctx.lineWidth = Math.max(1, 5 * s); ctx.beginPath();
+    ctx.strokeStyle = P.lease; ctx.lineWidth = Math.max(1, 5 * s); ctx.beginPath();
     for (const [ax, ay, bx, by] of D.lease) { if (!vis(ax, ay, 500 * s)) continue; ctx.moveTo(X(ax), Y(ay)); ctx.lineTo(X(bx), Y(by)); }
     ctx.stroke();
     for (const f of D.farmsteads) {
       if (!vis(f.x, f.y, 140 * s + 10)) continue;
-      ctx.strokeStyle = 'rgba(150,140,110,.6)'; ctx.lineWidth = Math.max(1, 4 * s); ctx.beginPath(); ctx.moveTo(X(f.road[0]), Y(f.road[1])); ctx.lineTo(X(f.x), Y(f.y)); ctx.stroke();
+      ctx.strokeStyle = P.drive; ctx.lineWidth = Math.max(1, 4 * s); ctx.beginPath(); ctx.moveTo(X(f.road[0]), Y(f.road[1])); ctx.lineTo(X(f.x), Y(f.y)); ctx.stroke();
       ctx.save(); ctx.translate(X(f.x), Y(f.y)); ctx.rotate(f.ang + Math.PI / 2); ctx.scale(s, s);
       const sh = (x, y, ww, hh, col) => { ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(x + 1.5, y + 2, ww, hh); ctx.fillStyle = col; ctx.fillRect(x, y, ww, hh); };
-      ctx.fillStyle = '#1e2a1c'; ctx.fillRect(-34, -40, 78, 64); // yard
-      sh(-10, -2, 16, 12, f.houseTone > 0.5 ? '#6c7686' : '#7d7466'); ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(-10, -2, 16, 5); // house + ridge light
-      if (f.barn) { sh(-30, -36, 18, 26, '#7a2f25'); ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fillRect(-21.5, -36, 1, 26); }
-      if (f.shed) sh(10, 2, 24, 14, '#6d737b');
-      for (const [bx, by, br] of f.bins) { ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.arc(bx + 1.5, by + 2, br, 0, 6.283); ctx.fill(); ctx.fillStyle = '#a9b0b8'; ctx.beginPath(); ctx.arc(bx, by, br, 0, 6.283); ctx.fill(); if (s > 0.4) { ctx.fillStyle = '#d6dbe0'; ctx.beginPath(); ctx.arc(bx, by, br * 0.25, 0, 6.283); ctx.fill(); } }
+      ctx.fillStyle = P.yard; ctx.fillRect(-34, -40, 78, 64); // yard
+      sh(-10, -2, 16, 12, f.houseTone > 0.5 ? P.houseA : P.houseB); ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(-10, -2, 16, 5); // house + ridge light
+      if (f.barn) { sh(-30, -36, 18, 26, P.barn); ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fillRect(-21.5, -36, 1, 26); }
+      if (f.shed) sh(10, 2, 24, 14, P.shed);
+      for (const [bx, by, br] of f.bins) { ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.arc(bx + 1.5, by + 2, br, 0, 6.283); ctx.fill(); ctx.fillStyle = P.bin; ctx.beginPath(); ctx.arc(bx, by, br, 0, 6.283); ctx.fill(); if (s > 0.4) { ctx.fillStyle = '#d6dbe0'; ctx.beginPath(); ctx.arc(bx, by, br * 0.25, 0, 6.283); ctx.fill(); } }
       ctx.restore();
     }
   }
@@ -201,12 +239,12 @@ export function drawSettlement(ctx, X, Y, s, w, h) {
     for (const l of pick('lots')) {
       if (!vis(l.x, l.y, 200)) continue;
       const px = X(l.x), py = Y(l.y), pw = l.w * s, ph = l.h * s;
-      ctx.fillStyle = l.industrial ? '#2a2d2f' : '#23272e'; ctx.fillRect(px, py, pw, ph);
+      ctx.fillStyle = l.industrial ? P.lotInd : P.lot; ctx.fillRect(px, py, pw, ph);
       if (s > 0.5) { ctx.strokeStyle = 'rgba(230,230,230,.28)'; ctx.lineWidth = 1; ctx.beginPath(); for (let x = px + 6 * s; x < px + pw - 2; x += 6 * s) { ctx.moveTo(x, py + 1); ctx.lineTo(x, py + Math.min(ph * 0.4, 12 * s)); ctx.moveTo(x, py + ph - 1); ctx.lineTo(x, py + ph - Math.min(ph * 0.4, 12 * s)); } ctx.stroke(); }
     }
   }
   if (s > 0.45) {
-    ctx.fillStyle = '#3a3f46';
+    ctx.fillStyle = P.driveway;
     for (const [x, y, dw, dh] of pick('driveways')) { if (!vis(x, y, 40)) continue; ctx.fillRect(X(x), Y(y), Math.max(1, dw * s), Math.max(1, dh * s)); }
   }
   if (s > 0.6) {
@@ -214,7 +252,7 @@ export function drawSettlement(ctx, X, Y, s, w, h) {
   }
   if (s > 0.32) {
     const vt = pick('trees').filter(([x, y]) => vis(x, y, 20));
-    for (const [dx, dy, col] of [[1, 1.4, 'rgba(0,0,0,.35)'], [0, 0, '#1b4426']]) { ctx.beginPath(); for (const [x, y, rr] of vt) { const r2 = Math.max(1, rr * s), cx = X(x) + dx, cy = Y(y) + dy; ctx.moveTo(cx + r2, cy); ctx.arc(cx, cy, r2, 0, 6.283); } ctx.fillStyle = col; ctx.fill(); }
+    for (const [dx, dy, col] of [[1, 1.4, P.woodShadow], [0, 0, P.streetTree]]) { ctx.beginPath(); for (const [x, y, rr] of vt) { const r2 = Math.max(1, rr * s), cx = X(x) + dx, cy = Y(y) + dy; ctx.moveTo(cx + r2, cy); ctx.arc(cx, cy, r2, 0, 6.283); } ctx.fillStyle = col; ctx.fill(); }
   }
 }
 
@@ -238,7 +276,7 @@ export function drawBridges(ctx, X, Y, s, w, h) {
 export function drawOverlays(ctx, X, Y, s, w, h, SCALE_M) {
   const D = mapDetail();
   if (s < 0.13) {
-    ctx.save(); ctx.font = `700 ${Math.max(9, Math.min(13, 9 + s * 40))}px system-ui, sans-serif`; ctx.fillStyle = 'rgba(190,200,175,.22)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.save(); ctx.font = `700 ${Math.max(9, Math.min(13, 9 + s * 40))}px system-ui, sans-serif`; ctx.fillStyle = P === THEMES.day ? 'rgba(60,70,40,.35)' : 'rgba(190,200,175,.22)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     if (ctx.letterSpacing !== undefined) ctx.letterSpacing = '3px';
     for (const [name, x, y] of D.townships) ctx.fillText(name, X(x), Y(y));
     ctx.restore();
@@ -305,8 +343,8 @@ function drawSite(ctx, f, s, t) {
   if (k === 'police_hq' || k === 'precinct' || k === 'sheriff') {
     const big = k !== 'precinct'; const fleet = k === 'sheriff' ? 'sheriff' : 'police';
     const W = big ? 64 : 44, Hh = big ? 46 : 34;
-    ctx.fillStyle = '#1f2a1e'; ctx.fillRect(-W / 2 - 4, -Hh / 2 - 4, W + 8, Hh + 8);           // lawn / landscaping
-    ctx.fillStyle = '#25292f'; ctx.fillRect(-W / 2, -Hh / 2 + Hh * 0.46, W, Hh * 0.54);         // parking lot
+    ctx.fillStyle = P.yard; ctx.fillRect(-W / 2 - 4, -Hh / 2 - 4, W + 8, Hh + 8);           // lawn / landscaping
+    ctx.fillStyle = P.lot; ctx.fillRect(-W / 2, -Hh / 2 + Hh * 0.46, W, Hh * 0.54);         // parking lot
     ctx.fillStyle = '#3a3f46'; ctx.fillRect(-W / 2, Hh / 2 - 4, 6, 4);                            // drive entrance
     const bw = big ? 36 : 24, bh = big ? 18 : 14; const bx = -W / 2 + 4, by = -Hh / 2 + 3;
     shadowRect(ctx, bx, by, bw, bh, k === 'sheriff' ? '#6d6455' : '#5a6475');                  // main building
@@ -326,20 +364,20 @@ function drawSite(ctx, f, s, t) {
   }
   if (k === 'fire' || k === 'fire_hq') {
     const W = 46, Hh = 36;
-    ctx.fillStyle = '#1f2a1e'; ctx.fillRect(-W / 2 - 3, -Hh / 2 - 3, W + 6, Hh + 6);
+    ctx.fillStyle = P.yard; ctx.fillRect(-W / 2 - 3, -Hh / 2 - 3, W + 6, Hh + 6);
     ctx.fillStyle = '#5b5f66'; ctx.fillRect(-W / 2 + 2, -Hh / 2 + 18, 26, 18);                  // concrete apron
     shadowRect(ctx, -W / 2 + 2, -Hh / 2 + 2, 26, 16, '#7b3a2c');                                // apparatus bays (brick)
     shadowRect(ctx, -W / 2 + 28, -Hh / 2 + 4, 14, 12, '#6b6f78');                               // quarters
     ctx.fillStyle = '#c4161c'; for (let i = 0; i < 3; i++) ctx.fillRect(-W / 2 + 3.5 + i * 8.4, -Hh / 2 + 17, 6.8, 1);
     hvac(ctx, -W / 2 + 31, -Hh / 2 + 6);
     if (k === 'fire') { truck(ctx, -W / 2 + 7, -Hh / 2 + 26, 0, 'fire'); truck(ctx, -W / 2 + 15.4, -Hh / 2 + 27, 0, 'fire'); }
-    ctx.fillStyle = '#25292f'; ctx.fillRect(-W / 2 + 30, -Hh / 2 + 20, 14, 14); stalls(ctx, -W / 2 + 30.5, -Hh / 2 + 21, 4, 1);
+    ctx.fillStyle = P.lot; ctx.fillRect(-W / 2 + 30, -Hh / 2 + 20, 14, 14); stalls(ctx, -W / 2 + 30.5, -Hh / 2 + 21, 4, 1);
     car(ctx, -W / 2 + 32, -Hh / 2 + 24.5, 0, 'civ'); car(ctx, -W / 2 + 38.5, -Hh / 2 + 24.5, 0, 'civ');
     flag(ctx, -W / 2 + 30, -Hh / 2 + 18);
     return;
   }
   if (k === 'ems') {
-    ctx.fillStyle = '#1f2a1e'; ctx.fillRect(-20, -15, 40, 30);
+    ctx.fillStyle = P.yard; ctx.fillRect(-20, -15, 40, 30);
     ctx.fillStyle = '#5b5f66'; ctx.fillRect(-18, 1, 22, 13);
     shadowRect(ctx, -18, -13, 22, 13, '#6a7280'); shadowRect(ctx, 4, -11, 13, 10, '#59606c');
     ctx.fillStyle = '#e8edf2'; for (let i = 0; i < 2; i++) ctx.fillRect(-16.5 + i * 10, 0, 8.5, 0.9);
@@ -348,8 +386,8 @@ function drawSite(ctx, f, s, t) {
     return;
   }
   if (k === 'hospital') {
-    ctx.fillStyle = '#1f2a1e'; ctx.fillRect(-46, -36, 92, 72);
-    ctx.fillStyle = '#25292f'; ctx.fillRect(-44, 8, 52, 26); stalls(ctx, -42, 10, 15, 1); stalls(ctx, -42, 32, 15, -1);
+    ctx.fillStyle = P.yard; ctx.fillRect(-46, -36, 92, 72);
+    ctx.fillStyle = P.lot; ctx.fillRect(-44, 8, 52, 26); stalls(ctx, -42, 10, 15, 1); stalls(ctx, -42, 32, 15, -1);
     for (let i = 0; i < 10; i++) car(ctx, -40.4 + i * 3.2 * 1.5, 13.5, 0, 'civ'); for (let i = 0; i < 8; i++) car(ctx, -40.4 + i * 3.2 * 1.8, 28.5, Math.PI, 'civ');
     shadowRect(ctx, -40, -32, 54, 34, '#7d8796'); shadowRect(ctx, 14, -28, 24, 22, '#6f7987');
     ctx.fillStyle = '#c9ced6'; ctx.fillRect(14, -6, 14, 4); truck(ctx, 22, 2, Math.PI / 2, 'ems');            // ER canopy + ambulance
@@ -364,8 +402,8 @@ function drawSite(ctx, f, s, t) {
     return;
   }
   if (k === 'eoc') {
-    ctx.fillStyle = '#1f2a1e'; ctx.fillRect(-26, -20, 52, 40);
-    ctx.fillStyle = '#25292f'; ctx.fillRect(-24, 4, 48, 14); stalls(ctx, -22, 5, 12, 1);
+    ctx.fillStyle = P.yard; ctx.fillRect(-26, -20, 52, 40);
+    ctx.fillStyle = P.lot; ctx.fillRect(-24, 4, 48, 14); stalls(ctx, -22, 5, 12, 1);
     for (let i = 0; i < 9; i++) car(ctx, -20.4 + i * 3.2 * 1.3, 9.5, 0, i === 2 ? 'police' : 'civ', false);
     shadowRect(ctx, -22, -17, 34, 18, '#5d6b7d'); hvac(ctx, -18, -14); hvac(ctx, -12, -14);
     ctx.fillStyle = '#7b8088'; ctx.fillRect(14, -14, 7, 5);                                        // backup generator
@@ -373,8 +411,8 @@ function drawSite(ctx, f, s, t) {
     return;
   }
   // generic facility (public works, SAR, utility, animal control, …)
-  ctx.fillStyle = '#1f2a1e'; ctx.fillRect(-20, -15, 40, 30);
-  ctx.fillStyle = '#2a2d2f'; ctx.fillRect(-18, 1, 36, 12);
+  ctx.fillStyle = P.yard; ctx.fillRect(-20, -15, 40, 30);
+  ctx.fillStyle = P.lotInd; ctx.fillRect(-18, 1, 36, 12);
   shadowRect(ctx, -18, -13, 26, 13, '#5f6772'); hvac(ctx, -14, -10);
   for (let i = 0; i < 3; i++) car(ctx, -14 + i * 4.5, 7, 0, 'civ');
 }

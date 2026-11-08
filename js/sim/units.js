@@ -37,7 +37,7 @@ export class UnitManager {
     for (const type of UNIT_TYPES) {
       if (cfg.departments && cfg.departments[type.dept] === false) continue;
       if (cfg.unitTypes && cfg.unitTypes[type.id] === false) continue;
-      const stations = city.facilities.filter((f) => type.station.includes(f.kind));
+      const stations = city.facilities.filter((f) => type.station.includes(f.kind) && !f.outside); // White County units are based in the county
       if (!stations.length) continue;
       let numbers = type.numbers.slice();
       const count = Math.max(1, Math.round(numbers.length * mult));
