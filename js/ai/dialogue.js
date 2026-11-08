@@ -144,7 +144,7 @@ export function styled(text, persona, r, { panic = 0, first = false, allowPost =
   let out = text.trim();
   if (!out) return out;
   const pre = r.chance(0.55) ? r.pick(p.pre) : '';
-  if (pre) out = `${pre} ${out.charAt(0).toLowerCase() + out.slice(1)}`;
+  if (pre) out = `${pre} ${/^(I\b|I'|[A-Z]{2}|[A-Z][a-z]+ [A-Z])/.test(out) ? out : out.charAt(0).toLowerCase() + out.slice(1)}`;
   if (persona === 'panicked' && panic > 0.6 && r.chance(0.3)) out = out.replace(/^(\w)/, (m) => `${m}-${m}`);
   if (allowPost && r.chance(persona === 'panicked' ? Math.min(0.8, 0.3 + panic) : 0.3)) { const post = r.pick(p.post); if (post) out += ` ${post}`; }
   if (persona === 'quiet') out = out.replace(/!+/g, '.');

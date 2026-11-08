@@ -92,7 +92,7 @@ export const UNIT_TYPES = [
     numbers: [1], speed: 1.0, caps: { federal: 1, tactical: 0.7, narcotics: 0.5, gang: 0.5 } },
   // ---- Fire ----
   { id: 'engine', dept: 'fire', name: 'Fire Engine', prefix: 'Engine', glyph: 'E', station: ['fire'], channel: 'fire',
-    numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], perStation: true, speed: 0.95, caps: { suppression: 1, bls: 0.5, rescue: 0.3, hazmat: 0.15 } },
+    numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], perStation: true, speed: 0.95, caps: { suppression: 1, bls: 0.3, rescue: 0.3, hazmat: 0.15 } },
   { id: 'ladder', dept: 'fire', name: 'Ladder Truck', prefix: 'Ladder', glyph: 'L', station: ['fire'], channel: 'fire',
     numbers: [1, 2, 5, 8], stationNumbers: true, speed: 0.85, caps: { ladder: 1, rescue: 0.5, suppression: 0.4 } },
   { id: 'heavy_rescue', dept: 'fire', name: 'Heavy Rescue', prefix: 'Rescue', glyph: 'R', station: ['fire'], channel: 'fire',

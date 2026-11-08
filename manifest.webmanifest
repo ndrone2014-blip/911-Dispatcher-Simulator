@@ -1,0 +1,11 @@
+{
+  "name": "911 Dispatch Simulator",
+  "short_name": "911 Dispatch",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#070b12",
+  "theme_color": "#070b12",
+  "description": "First-person 3D 911 dispatch simulator. No API keys, runs in the browser.",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

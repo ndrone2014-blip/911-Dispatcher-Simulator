@@ -167,7 +167,7 @@ export function respond(call, text, r) {
       let txt = ans.text;
       if (already && slot !== 'location' && c.asked[slot] >= 1) {
         const irritated = ['upset', 'panicked', 'worried'].includes(sc.caller.persona) || c.asked[slot] >= 2;
-        txt = irritated ? fill(SLOT_LINES.repeat_irritated, { answer: txt.charAt(0).toLowerCase() + txt.slice(1) }, r) : txt;
+        txt = irritated ? fill(SLOT_LINES.repeat_irritated, { answer: /^(I\b|I'|[A-Z][a-z]+ [A-Z])/.test(txt) ? txt : txt.charAt(0).toLowerCase() + txt.slice(1) }, r) : txt;
         c.panic = clamp(c.panic + 0.03, 0, 1);
       } else if (already && slot === 'location' && c.asked.location >= 2 && !c.revealed.location_partial) {
         txt = fill(['Yes — {address}.', 'It\'s {address}, like I said.', 'Still {address}.'], ctx, r);

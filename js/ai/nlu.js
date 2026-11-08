@@ -304,3 +304,22 @@ export function matchStreet(text) {
 
 export const INTENT_NAMES = Object.keys(INTENTS);
 export { STREET_WORDS };
+
+// Generic classifier so other dialogue systems (staff NPCs, radio) can reuse the engine.
+const customCache = new WeakMap();
+export function classifyWith(defs, text, threshold = 0.36) {
+  let compiled = customCache.get(defs);
+  if (!compiled) {
+    compiled = Object.entries(defs).map(([name, d]) => ({ name, ex: (d.ex || []).map(features), re: d.re || [] }));
+    customCache.set(defs, compiled);
+  }
+  const norm = normalize(text); if (!norm) return { intent: 'unknown', score: 0 };
+  const f = features(norm);
+  let best = { intent: 'unknown', score: 0 };
+  for (const it of compiled) {
+    let s = 0; for (const e of it.ex) s = Math.max(s, cosine(f, e));
+    for (const re of it.re) if (re.test(norm)) { s += 0.32; break; }
+    if (s > best.score) best = { intent: it.name, score: s };
+  }
+  return best.score >= threshold ? best : { intent: 'unknown', score: best.score };
+}

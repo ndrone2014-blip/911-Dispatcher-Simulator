@@ -211,6 +211,11 @@ export class UnitManager {
   }
 
   sendHome(u, announce = false) {
+    if (u.mutualAid) {
+      u.incident = null; u.patients = 0; u.dest = { kind: 'station', id: u.station };
+      this.routeTo(u, u.homeX, u.homeY); this.setStatus(u, 'returning', 'Released – returning to home county');
+      return;
+    }
     const st = this.station(u) || nearestFacility(u.x, u.y);
     u.incident = null; u.patients = 0; u.dest = { kind: 'station', id: st.id };
     if (dist(u.x, u.y, st.x, st.y) < 15) { this.setStatus(u, 'available', 'In quarters'); return; }
