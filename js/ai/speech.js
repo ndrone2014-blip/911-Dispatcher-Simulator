@@ -79,9 +79,34 @@ export class Speech {
         this.ranked = this.voices.map((v) => ({ v, q: voiceQuality(v) })).sort((a, b) => b.q - a.q);
       };
       load(); this.synth.onvoiceschanged = load;
+      // some mobile browsers fill the voice list late and never fire onvoiceschanged
+      for (const ms of [500, 1500, 4000]) setTimeout(() => { if (!this.voices.length) load(); }, ms);
+      this.bindUnlock();
       // Chrome stops long utterances after ~15 s unless nudged; keep it alive while speaking.
-      this.keepAlive = setInterval(() => { try { if (this.synth.speaking && !this.synth.paused && /chrome/i.test(navigator.userAgent) && !/edg/i.test(navigator.userAgent)) { this.synth.pause(); this.synth.resume(); } } catch { /* ignore */ } }, 10000);
+      // (desktop Chrome only: on Android pause() cancels the utterance outright)
+      const desktopChrome = /chrome/i.test(navigator.userAgent) && !/edg|android|mobile/i.test(navigator.userAgent);
+      this.keepAlive = setInterval(() => { try { if (desktopChrome && this.synth.speaking && !this.synth.paused) { this.synth.pause(); this.synth.resume(); } } catch { /* ignore */ } }, 10000);
     }
+  }
+
+  /**
+   * iOS/Safari only allow speech once speak() has been called inside a tap; after that it works from
+   * timers too. Speak an empty utterance on the first gestures so later caller/radio voices aren't blocked.
+   */
+  bindUnlock() {
+    if (!this.synth || typeof document === 'undefined') return;
+    const unlock = () => {
+      if (this.unlocked) return;
+      try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; u.rate = 2; this.synth.speak(u); this.unlocked = true; } catch { /* ignore */ }
+      if (this.synth.paused) try { this.synth.resume(); } catch { /* ignore */ }
+    };
+    for (const ev of ['touchend', 'click', 'keydown']) document.addEventListener(ev, unlock, { capture: true, passive: true });
+    // returning to the tab: Safari can leave the queue paused, and a half-spoken line never ends
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      try { if (this.synth.paused) this.synth.resume(); } catch { /* ignore */ }
+      if (this.speaking && !this.synth.speaking && !this.synth.pending) { const it = this.speaking; this.speaking = null; it.cancelled = true; this.pump(); }
+    });
   }
 
   get ttsSupported() { return !!this.synth; }

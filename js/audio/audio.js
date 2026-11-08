@@ -6,17 +6,70 @@ export class AudioSystem {
   constructor(settings) {
     this.settings = settings; this.ctx = null; this.gains = {}; this.ambience = {}; this.ringTimer = null; this.ringLevel = 1;
     bus.on('settings:changed', ({ path }) => { if (path.startsWith('audio')) this.applyVolumes(); });
+    if (typeof window !== 'undefined') this.bindUnlock();
   }
+
+  /**
+   * Mobile browsers only let audio start (or restart) inside a real tap/click/keypress, and they
+   * suspend it again whenever the phone locks, the tab is hidden or a call comes in. So every
+   * gesture re-checks the context, not just the first one. touchend/click/keydown are the events
+   * iOS Safari accepts as "user activation" (pointerdown/touchstart are not).
+   */
+  bindUnlock() {
+    const kick = () => this.init();
+    for (const ev of ['touchend', 'click', 'keydown', 'mousedown']) document.addEventListener(ev, kick, { capture: true, passive: true });
+    document.addEventListener('visibilitychange', () => {
+      if (!this.ctx) return;
+      if (document.hidden) { if (this.ctx.state === 'running') this.ctx.suspend().catch(() => {}); }
+      else this.resume();
+    });
+    window.addEventListener('pageshow', () => this.resume());
+    window.addEventListener('focus', () => this.resume());
+  }
+
+  resume() { if (this.ctx && this.ctx.state !== 'running' && this.ctx.state !== 'closed' && !document.hidden) this.ctx.resume().catch(() => {}); }
 
   /** Must be called from a user gesture (browsers block autoplay). */
   init() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    if (this.ctx) {
+      if (this.ctx.state !== 'running' && this.ctx.state !== 'closed') { this.ctx.resume().catch(() => {}); this.playSilentTick(); } // 'suspended' or iOS 'interrupted'
+      if (this.silentEl && this.silentEl.paused) this.silentEl.play().catch(() => {});
+      return;
+    }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-    this.ctx = new AC();
+    // iPhone: play through the "media" channel so the ring/silent switch doesn't mute game audio
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch { /* older iOS */ }
+    try { this.ctx = new AC({ latencyHint: 'interactive' }); } catch { this.ctx = new AC(); }
+    this.startSilentElement();
+    if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
+    this.playSilentTick();
+    this.ctx.onstatechange = () => { if (this.ctx.state !== 'running' && !document.hidden) setTimeout(() => this.resume(), 300); };
     this.master = this.ctx.createGain(); this.master.connect(this.ctx.destination);
     for (const cat of ['game', 'caller', 'radio', 'ambience', 'notifications']) { const g = this.ctx.createGain(); g.connect(this.master); this.gains[cat] = g; }
     this.noiseBuf = this.makeNoise(2, 'white'); this.brownBuf = this.makeNoise(4, 'brown'); this.pinkBuf = this.makeNoise(4, 'pink');
     this.applyVolumes();
+  }
+
+  /** A one-sample silent buffer played inside the gesture: required by older iOS to really unlock Web Audio. */
+  playSilentTick() {
+    try { const b = this.ctx.createBuffer(1, 1, this.ctx.sampleRate); const src = this.ctx.createBufferSource(); src.buffer = b; src.connect(this.ctx.destination); src.start(0); } catch { /* ignore */ }
+  }
+
+  /**
+   * Older iPhones (no navigator.audioSession): a looping, silent <audio> element switches the page
+   * into media playback, which stops the ring/silent switch from muting Web Audio.
+   */
+  startSilentElement() {
+    if (navigator.audioSession || !/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) || !('ontouchend' in document)) return;
+    try {
+      const sr = 8000, n = sr / 2; const buf = new ArrayBuffer(44 + n * 2); const v = new DataView(buf);
+      const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+      w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+      const el = document.createElement('audio'); el.src = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+      el.loop = true; el.setAttribute('playsinline', ''); el.setAttribute('x-webkit-airplay', 'deny'); el.preload = 'auto';
+      el.play().catch(() => {}); this.silentEl = el;
+    } catch { /* ignore */ }
   }
 
   applyVolumes() {
