@@ -48,8 +48,8 @@ export class NPCManager {
 
   sitAtHome(npc) {
     if (npc.consoleIndex != null) { const c = this.consoles[npc.consoleIndex]; npc.x = c.x; npc.z = c.z + 0.78; npc.yaw = 0; npc.sitting = true; npc.state = 'sit'; return; }
-    if (npc.home === 'sup_desk') { npc.x = 0; npc.z = 14.75; npc.yaw = Math.PI; npc.sitting = true; npc.state = 'sit'; return; }
-    if (npc.home === 'dir_desk') { npc.x = 9.3; npc.z = 14.85; npc.yaw = Math.PI; npc.sitting = true; npc.state = 'sit'; return; }
+    if (npc.home === 'sup_desk') { npc.x = 0; npc.z = 14.75; npc.yaw = 0; npc.sitting = true; npc.state = 'sit'; return; }
+    if (npc.home === 'dir_desk') { npc.x = 9.3; npc.z = 14.85; npc.yaw = 0; npc.sitting = true; npc.state = 'sit'; return; }
     npc.state = 'idle'; npc.sitting = false;
   }
 

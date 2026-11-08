@@ -172,7 +172,7 @@ export function buildSheriffWing(k) {
   mb('blackgloss').box(-26.3, 1.02, 4.6, 0.6, 0.36, 0.03, { uv: 0 }); mb('radiopanel').panel(-26.3, 1.02, 4.58, 0.56, 0.32, 'z', -1); mb('satin').box(-26.3, 0.86, 4.62, 0.05, 0.2, 0.05, { color: [0.07, 0.07, 0.08] });
   mb('phone').box(-25.3, 0.78, 4.6, 0.2, 0.004, 0.18, { faces: 'Y', uv: 0 }); mb('paper').box(-25.7, 0.77, 4.85, 0.22, 0.008, 0.3, { uv: 0 });
   mb('seal').panel(-26, 2.0, 2.11, 0.9, 0.9, 'z', 1);
-  for (const [x, mat] of [[-28.6, 'flagUS'], [-27.6, 'flagIL']]) { mb('chrome').cylinder(x, 1.25, 2.5, 0.018, 2.5, 8); mb('gold').sphere(x, 2.55, 2.5, 0.05, 10, 8); mb('gold').cylinder(x, 0.03, 2.5, 0.2, 0.06, 16); mb(mat).panel(x + 0.32, 2.05, 2.52, 0.6, 0.8, 'z', 1); col(x - 0.2, 2.3, x + 0.2, 2.7); }
+  for (const [x, mat, fw, ar] of [[-28.8, 'flagUS', 0.86, 1.9], [-27.5, 'flagIL', 0.78, 1.667]]) { mb('chrome').cylinder(x, 1.25, 2.5, 0.018, 2.5, 8); mb('gold').sphere(x, 2.55, 2.5, 0.05, 10, 8); mb('gold').cylinder(x, 0.03, 2.5, 0.2, 0.06, 16); mb(mat).panel(x + 0.02 + fw / 2, 2.46 - fw / ar / 2, 2.52, fw, fw / ar, 'z', 1); col(x - 0.2, 2.3, x + 0.2, 2.7); } // true flag proportions
   mb('wood').box(-29.75, 1.1, 5.5, 0.4, 2.2, 2.0, { uv: 1 }); for (let i = 0; i < 4; i++) mb('books').box(-29.54, 0.5 + i * 0.5, 5.5, 0.02, 0.3, 1.8, { faces: 'X', uv: 0 });
   col(-30, 4.45, -29.5, 6.55);
   for (const z of [3.2, 4.0]) { mb('frame').box(-22.09, 1.7, z, 0.02, 0.4, 0.55); mb('paper').box(-22.11, 1.7, z, 0.004, 0.32, 0.45, { uv: 0 }); }

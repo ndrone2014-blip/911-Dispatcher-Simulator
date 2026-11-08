@@ -11,6 +11,7 @@
 // not draw calls. Colliders, interactables and screens are identical at every level.
 import { MeshBuilder } from '../engine/geometry.js';
 import { buildSheriffWing } from './sheriffWing.js';
+import { buildExterior } from './exterior.js';
 
 export const H = 3.6; // ceiling height
 export const CONSOLE_XS = [-8.4, -2.8, 2.8, 8.4];
@@ -139,9 +140,14 @@ export function buildCenter(opts = {}) {
   };
   const door = (x0, x1, z, side) => { // leaf swung fully open against the wall
     if (D < 1) return;
-    const w = x1 - x0 - 0.08; const zz = z + side * 0.13;
-    mb('doorWood').rbox(x0 - w / 2 - 0.02, 1.12, zz, w, 2.22, 0.045, { r: 0.008, uv: 1 });
-    mb('chrome').box(x0 - w + 0.1, 1.02, zz + side * 0.045, 0.14, 0.022, 0.03);
+    const w = x1 - x0 - 0.08; const zz = z + side * 0.13; const cx = x0 - w / 2 - 0.02;
+    mb('doorWood').rbox(cx, 1.12, zz, w, 2.22, 0.045, { r: 0.008, uv: 1 });
+    // narrow vision lite, stainless kick plate and a lever handle on both faces
+    for (const f of [-1, 1]) {
+      mb('glassDark').box(cx + w * 0.18, 1.45, zz + f * 0.024, 0.16, 0.7, 0.004, { uv: 0 }); mb('frame').box(cx + w * 0.18, 1.45, zz + f * 0.025, 0.2, 0.74, 0.002, { uv: 0 });
+      mb('metal').box(cx, 0.15, zz + f * 0.024, w - 0.06, 0.25, 0.003, { uv: 0.5 });
+      mb('chrome').box(x0 - w + 0.12, 1.02, zz + f * 0.045, 0.14, 0.022, 0.03); mb('chrome').cylinder(x0 - w + 0.06, 1.02, zz + f * 0.032, 0.022, 0.02, 10);
+    }
     mb('metal').box((x0 + x1) / 2, 0.006, z, x1 - x0, 0.012, 0.24, { uv: 0.5 }); // threshold strip
   };
 
@@ -210,10 +216,15 @@ export function buildCenter(opts = {}) {
     door(x0, x1, z, side);
   }
   exitSign(-7.6, 8, -1); exitSign(5.0, 8, -1);
-  // exterior views (sky/skyline) behind the windows
-  screen('ext_east', 'exterior', 13.6, 2.2, -0.2, 20, 9, 'x', -1, 0, { shared: 'scr_ext', unlit: true });
-  screen('ext_east2', 'exterior', 13.0, 2.2, 13.3, 7, 6, 'x', -1, 0, { shared: 'scr_ext', unlit: true });
-  screen('ext_south', 'exterior', -7.5, 2.0, 19.0, 9, 6, 'z', -1, 0, { shared: 'scr_ext', unlit: true });
+  // The view outside: a real 3D town around the building (exterior.js) under a far sky dome
+  // (east + south backdrops). Rain streaks run on transparent sheets just outside the glass.
+  screen('sky_east', 'exterior', 210, 52, 0, 600, 180, 'x', -1, 0, { shared: 'scr_sky', unlit: true, sky: true });
+  screen('sky_south', 'exterior', 0, 52, 210, 600, 180, 'z', -1, 0, { shared: 'scr_sky', unlit: true, sky: true });
+  screen('sky_north', 'exterior', 60, 52, -210, 600, 180, 'z', 1, 0, { shared: 'scr_sky', unlit: true, sky: true });
+  for (const [a, b] of winZ) screen(`rain_e${a}`, 'rainfx', 12.3, 1.85, (a + b) / 2, b - a, 1.9, 'x', -1, 0, { shared: 'scr_rain', unlit: true, transparent: true });
+  screen('rain_dir', 'rainfx', 12.3, 1.85, 13.3, 3.8, 1.9, 'x', -1, 0, { shared: 'scr_rain', unlit: true, transparent: true });
+  screen('rain_brk', 'rainfx', -7.5, 1.75, 18.3, 5, 1.7, 'z', -1, 0, { shared: 'scr_rain', unlit: true, transparent: true });
+  { const X = buildExterior({ D }); B['ext@out'] = X.ext; B['extGlow@out'] = X.glow; B['extSigns@out'] = X.signs; B['extFlagUS@out'] = X.flagUS; B['extFlagIL@out'] = X.flagIL; }
 
   // ---------------- Lights & ceiling services ----------------
   for (const x of [-7, 0, 7]) for (const z of [-5, -0.4, 4.4]) light(x, z, 'floor', H - 0.05, 1.6, 0.6);
@@ -449,8 +460,10 @@ export function buildCenter(opts = {}) {
     for (const s of [-1, 1]) mb('wood').box(s * 0.95, 0.37, 13.9, 0.06, 0.72, 0.86, { uv: 1 });
   }
   col(-1.05, 13.4, 1.05, 14.4);
-  for (const s of [-1, 1]) { mb('blackgloss').box(s * 0.36, 1.06, 14.15, 0.56, 0.34, 0.03, { rotY: Math.PI + s * -0.2, uv: 0 }); mb('dark').box(s * 0.36, 0.86, 14.2, 0.04, 0.2, 0.04); screen(`supmon${s}`, 'coworker', s * 0.36 - 0.0, 1.06, 14.13, 0.52, 0.3, 'z', -1, s * -0.2, { shared: 'scr_cw1' }); }
-  chair(0, 14.75, Math.PI);
+  // The supervisor sits on the far (+z) side of the desk facing the door, so the monitors face +z toward the chair.
+  for (const s of [-1, 1]) { mb('blackgloss').box(s * 0.36, 1.06, 13.85, 0.56, 0.34, 0.03, { rotY: s * 0.2, uv: 0 }); mb('dark').box(s * 0.36, 0.86, 13.8, 0.04, 0.2, 0.04); mb('dark').box(s * 0.36, 0.775, 13.8, 0.2, 0.012, 0.16); screen(`supmon${s}`, 'coworker', s * 0.36, 1.06, 13.87, 0.52, 0.3, 'z', 1, s * 0.2, { shared: 'scr_cw1' }); }
+  mb('keyboard').box(0, 0.773, 14.12, 0.46, 0.018, 0.15, { faces: 'Y', uv: 0 }); mb('dark').box(0, 0.765, 14.12, 0.47, 0.014, 0.155, { faces: 'xXzZ' });
+  chair(0, 14.75, 0);
   mb('metal').box(2.6, 0.65, 15.6, 0.5, 1.3, 0.6, { uv: 0.6, ao: 0.2 }); col(2.3, 15.25, 2.9, 15.95);
   plant(-2.6, 15.6, 0.9);
   interactables.push({ id: 'supervisor_desk', kind: 'supervisor_desk', label: 'Use the supervisor console', min: [-1.1, 0, 13.3], max: [1.1, 1.4, 14.5], pri: 1 });
@@ -474,11 +487,12 @@ export function buildCenter(opts = {}) {
   mb('wood').box(9.3, 0.74, 14.0, 2.0, 0.05, 0.95, { uv: 1 }); mb('wood').box(9.3, 0.37, 13.55, 2.0, 0.7, 0.05, { uv: 1 });
   for (const s of [-1, 1]) mb('wood').box(9.3 + s * 0.95, 0.37, 14.0, 0.06, 0.72, 0.9, { uv: 1 });
   col(8.25, 13.45, 10.35, 14.5);
-  mb('blackgloss').box(9.3, 1.06, 14.25, 0.6, 0.36, 0.03, { rotY: Math.PI, uv: 0 }); screen('dirmon', 'coworker', 9.3, 1.06, 14.23, 0.56, 0.32, 'z', -1, 0, { shared: 'scr_cw2' });
-  chair(9.3, 14.85, Math.PI, true); tableChair(8.8, 12.6, 0); tableChair(9.8, 12.6, 0);
+  mb('blackgloss').box(9.3, 1.06, 13.8, 0.6, 0.36, 0.03, { uv: 0 }); mb('dark').box(9.3, 0.86, 13.76, 0.04, 0.2, 0.04); screen('dirmon', 'coworker', 9.3, 1.06, 13.82, 0.56, 0.32, 'z', 1, 0, { shared: 'scr_cw2' });
+  // director faces the door (−z); visitor chairs on the door side face the desk (+z)
+  chair(9.3, 14.85, 0, true); tableChair(8.8, 12.6, Math.PI); tableChair(9.8, 12.6, Math.PI);
   mb('wood').box(11.75, 1.1, 14.8, 0.4, 2.2, 1.8, { uv: 1, ao: 0.2 }); col(11.5, 13.85, 12, 15.75);
   for (let i = 0; i < 4; i++) mb('books').box(11.55, 0.5 + i * 0.5, 14.8, 0.02, 0.3, 1.6, { faces: 'x', uv: 0 });
-  if (D >= 1) { for (let i = 0; i < 5; i++) mb('wood').box(11.6, 0.33 + i * 0.5, 14.8, 0.32, 0.03, 1.7, { uv: 1 }); mb('flag').box(7.15, 1.2, 15.6, 0.01, 0.8, 0.5); mb('chrome').cylinder(6.95, 1.1, 15.6, 0.012, 2.2, 6); }
+  if (D >= 1) { for (let i = 0; i < 5; i++) mb('wood').box(11.6, 0.33 + i * 0.5, 14.8, 0.32, 0.03, 1.7, { uv: 1 }); mb('gold').cylinder(7.0, 0.03, 15.55, 0.18, 0.06, 16); mb('chrome').cylinder(7.0, 1.15, 15.55, 0.016, 2.3, 8); mb('gold').sphere(7.0, 2.32, 15.55, 0.045, 10, 8); mb('flagUS').panel(7.02 + 0.43, 2.22 - 0.86 / 1.9 / 2, 15.53, 0.86, 0.86 / 1.9, 'z', -1, { uvRect: [1, 0, 0, 1] }); }
   plant(7.0, 15.6, 1.0);
   interactables.push({ id: 'director_desk', kind: 'director_desk', label: 'Look at the director\'s desk', min: [8.2, 0, 13.4], max: [10.4, 1.4, 14.6], pri: 0 });
   screen('dirsign', 'sign', 7.7, 2.55, 10.48, 1.6, 0.24, 'z', -1, 0, { text: 'COMMUNICATIONS DIRECTOR' });
@@ -495,6 +509,7 @@ export function buildCenter(opts = {}) {
     for (const x of [-9.5, 6.4, 10.3]) { mb('frame').box(x, 1.65, 10.49, 0.9, 0.65, 0.025); mb(x > 0 ? 'print2' : 'print1').box(x, 1.65, 10.475, 0.8, 0.55, 0.01, { uv: 0 }); }
   }
 
+  buildArchitecture({ mb, col, screen, D });
   if (D >= 1) buildLawEnforcement({ mb, col, D });
   mb = mbZone('wing'); // wing geometry goes in its own batches so it can be culled
   buildSheriffWing({ mb, col, wallSeg, floor, ceiling, light, door, screen, interactables, tableChair, chair, plant, D, H });
@@ -506,6 +521,40 @@ export function buildCenter(opts = {}) {
 }
 
 
+// ---------------- Architectural finish (modern ops-center look) ----------------
+function buildArchitecture({ mb, col, screen, D }) {
+  // pilasters between the east windows
+  for (const z of [-7.3, -2.4, 2.4, 7.3]) { mb('wall').box(11.86, H / 2, z, 0.26, H, z === -7.3 || z === 7.3 ? 0.9 : 0.62, { uv: 2 }); col(11.7, z - 0.3, 12, z + 0.3); }
+  // wainscot + chair rail around the main floor and down the corridor
+  const wains = (x0, z0, x1, z1, h = 1.0, nx = 0, nz = 0) => {
+    const len = Math.hypot(x1 - x0, z1 - z0); const ang = Math.atan2(-(z1 - z0), x1 - x0); const cx = (x0 + x1) / 2 + nx * 0.09, cz = (z0 + z1) / 2 + nz * 0.09;
+    mb(D >= 1 ? 'woodDark' : 'wood').box(cx, h / 2, cz, len, h, 0.02, { rotY: ang, uv: 1 });
+    mb('frame').box(cx + nx * 0.012, h + 0.02, cz + nz * 0.012, len, 0.05, 0.035, { rotY: ang });
+    if (D >= 1) for (let d = 1.2; d < len - 0.3; d += 1.2) { const k = d / len; mb('frame').box(x0 + (x1 - x0) * k + nx * 0.1, h / 2, z0 + (z1 - z0) * k + nz * 0.1, 0.02, h - 0.12, 0.02, { rotY: ang }); } // panel reveals
+  };
+  wains(-12, -8, -12, 8, 1.0, 1, 0);
+  for (const [a, b] of [[-12, -8.4], [-6.8, 4.2], [5.8, 12]]) wains(a, 8, b, 8, 1.0, 0, -1);
+  for (const [a, b] of [[-8, -7.6], [-6.6, -3.0], [-1.8, 1.8], [3.0, 6.6]]) wains(12, a, 12, b, 0.88, -1, 0);
+  // corridor wall-protection rails
+  if (D >= 1) {
+    for (const [a, b] of [[-12, -8.4], [-6.8, -2.9], [-0.1, 4.2], [5.8, 10.5]]) mb('woodDark').rbox((a + b) / 2, 0.92, 8.1, b - a, 0.14, 0.05, { r: 0.015, uv: 1 });
+    for (const [a, b] of [[-12, -6], [-4.4, -2.8], [2.4, 3.4], [4.6, 7.0], [8.4, 10.4]]) mb('woodDark').rbox((a + b) / 2, 0.92, 10.5, b - a, 0.14, 0.05, { r: 0.015, uv: 1 });
+  }
+  // floating ceiling coffer with an LED cove line over the console floor
+  const y = 3.45, x0 = -9.6, x1 = 9.6, z0 = -6.05, z1 = 5.75;
+  mb('wall').box(0, y, z0, x1 - x0 + 0.3, 0.3, 0.3, { uv: 2 }); mb('wall').box(0, y, z1, x1 - x0 + 0.3, 0.3, 0.3, { uv: 2 });
+  mb('wall').box(x0, y, (z0 + z1) / 2, 0.3, 0.3, z1 - z0 - 0.3, { uv: 2 }); mb('wall').box(x1, y, (z0 + z1) / 2, 0.3, 0.3, z1 - z0 - 0.3, { uv: 2 });
+  if (D >= 1) {
+    mb('coveCool').box(0, y - 0.151, z0 + 0.12, x1 - x0 - 0.1, 0.01, 0.03, { faces: 'y', uv: 0 }); mb('coveCool').box(0, y - 0.151, z1 - 0.12, x1 - x0 - 0.1, 0.01, 0.03, { faces: 'y', uv: 0 });
+    mb('coveCool').box(x0 + 0.12, y - 0.151, (z0 + z1) / 2, 0.03, 0.01, z1 - z0 - 0.5, { faces: 'y', uv: 0 }); mb('coveCool').box(x1 - 0.12, y - 0.151, (z0 + z1) / 2, 0.03, 0.01, z1 - z0 - 0.5, { faces: 'y', uv: 0 });
+    // soft under-desk accent light on every console
+    for (const z of ROW_ZS) for (const x of CONSOLE_XS) mb('coveCool').box(x, 0.705, z + 0.38, 1.9, 0.008, 0.02, { faces: 'y', uv: 0 });
+  }
+  // motto over the corridor doors
+  screen('motto', 'sign', -1.3, 3.12, 7.9, 4.6, 0.3, 'z', -1, 0, { text: 'EVERY CALL · EVERY TIME · EVERY LIFE' });
+  if (D >= 1) { mb('frame').box(-1.3, 3.12, 7.93, 4.7, 0.36, 0.02); }
+}
+
 // ---------------- Police / sheriff details ----------------
 function buildLawEnforcement({ mb, col, D }) {
   // US and Illinois flags on floor stands flanking the video wall
@@ -513,8 +562,11 @@ function buildLawEnforcement({ mb, col, D }) {
     const z = -7.5;
     mb('gold').cylinder(x, 0.03, z, 0.2, 0.06, 18); mb('chrome').cylinder(x, 1.25, z, 0.018, 2.5, 8); mb('gold').sphere(x, 2.55, z, 0.05, 10, 8);
     // draped flag: four slightly angled panels read as folds
-    const folds = [[-0.32, 0.18], [-0.1, -0.2], [0.12, 0.2], [0.33, -0.15]];
-    folds.forEach(([dx, a], i) => mb(mat).panel(x + (x < 0 ? -0.36 : 0.36) + dx * 0.55, 2.05, z + 0.02 + (i % 2) * 0.03, 0.27, 0.8, 'z', 1, { rotY: a, uvRect: [i / 4, 0, (i + 1) / 4, 1] }));
+    // Four gently angled strips read as folds. Total size matches the flag's real proportions
+    // (US 10:19, Illinois 3:5) and each strip takes exactly its share of the texture, so nothing is squished.
+    const fw = 1.16, fh = fw / (mat === 'flagUS' ? 1.9 : 1.667); const sw = fw / 4;
+    const folds = [0.14, -0.14, 0.14, -0.1];
+    folds.forEach((a, i) => { const off = (i + 0.5) * sw * Math.cos(0.14) + 0.03; mb(mat).panel(x + (x < 0 ? -off : off), 2.5 - fh / 2, z + 0.02 + (i % 2) * 0.035, sw, fh, 'z', 1, { rotY: x < 0 ? -a : a, uvRect: x < 0 ? [(i + 1) / 4, 0, i / 4, 1] : [i / 4, 0, (i + 1) / 4, 1] }); }); // left flag: canton next to its pole
     col(x - 0.22, z - 0.22, x + 0.22, z + 0.22);
   }
   // Sheriff's star seal + award plaques on the main-floor south wall (facing the consoles)

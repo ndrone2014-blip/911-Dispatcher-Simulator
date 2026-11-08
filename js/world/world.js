@@ -5,6 +5,7 @@ import { MeshBuilder } from '../engine/geometry.js';
 import { makeTextures, makeCanvas, makeEnvironment, makeBlob, makeFace } from '../engine/textures.js';
 import { forwardOf, rayAABB, trs, mat4 } from '../engine/math.js';
 import { buildCenter, consoleList, PLAYER_CONSOLE, BUILDING_BOUNDS } from './building.js';
+import { makeSignAtlas } from './exterior.js';
 import { ScreenPainter } from './screens.js';
 import { NPCManager } from './npcs.js';
 import { Player } from './player.js';
@@ -86,6 +87,7 @@ export class World {
     const tex = (c, o) => { const t = this.renderer.createTexture(c, o); this.ownedTex.push(t); return t; };
     this.tex = Object.fromEntries(Object.entries(T).map(([k, c]) => [k, tex(c)]));
     this.tex.blob = tex(makeBlob(64), { repeat: false }); this.tex.face = tex(makeFace(), { repeat: false });
+    this.tex.extSigns = tex(makeSignAtlas(), { repeat: false });
     this.tex.vend = tex(this.vendCanvas()); this.tex.rack = tex(this.rackCanvas()); this.tex.books = tex(this.booksCanvas());
     this.texSize = size;
     this.mats = this.makeMaterials();
@@ -117,7 +119,7 @@ export class World {
     return {
       carpet: m({ map: t.carpet, specular: 0.015, shininess: 8 }), carpetDark: m({ map: t.carpet, color: [0.82, 0.8, 0.78], specular: 0.015, shininess: 8 }),
       ceiling: m({ map: t.ceiling, specular: 0, noCast: true }), wall: m({ map: t.wall, specular: 0.05, shininess: 14 }), accent: m({ map: t.accent, specular: 0.03 }),
-      wood: m({ map: t.wood, specular: 0.3, shininess: 40, reflect: 0.05 }), laminate: m({ map: t.laminate, specular: 0.28, shininess: 46, reflect: 0.05 }),
+      wood: m({ map: t.wood, specular: 0.3, shininess: 40, reflect: 0.05 }), woodDark: m({ map: t.wood, color: [0.58, 0.5, 0.45], specular: 0.28, shininess: 36, reflect: 0.04 }), laminate: m({ map: t.laminate, specular: 0.28, shininess: 46, reflect: 0.05 }),
       fabric: m({ map: t.fabric, specular: 0.02 }), mesh: m({ map: t.mesh, specular: 0.08, shininess: 18 }),
       fabricBlue: m({ map: t.fabric, color: [0.55, 0.75, 1.3], specular: 0.02 }), fabricWarm: m({ map: t.fabric, color: [1.6, 1.15, 0.8], specular: 0.02 }),
       metal: m({ map: t.metal, specular: 0.6, shininess: 50, reflect: 0.2 }), chrome: m({ color: [0.75, 0.77, 0.8], specular: 1.0, shininess: 110, reflect: 0.55 }),
@@ -156,6 +158,12 @@ export class World {
       turkey: m({ color: [0.62, 0.32, 0.11], specular: 0.6, shininess: 60 }), pie: m({ color: [0.86, 0.62, 0.32], specular: 0.15 }), pieFill: m({ color: [0.72, 0.33, 0.07], specular: 0.3 }),
       tablecloth: m({ color: [0.5, 0.2, 0.07], specular: 0.05 }), plate: m({ color: [0.95, 0.94, 0.9], specular: 0.5, shininess: 60, reflect: 0.08 }),
       blob: { color: [0, 0, 0], map: t.blob, unlit: true, opacity: 0.42, transparent: true, noCast: true },
+      // outdoors: unlit (lighting baked in the vertices), tinted per frame for time of day + weather, with outdoor haze
+      ext: { color: [1, 1, 1], unlit: true, noCast: true, receive: false, fogMode: 2 },
+      extGlow: { color: [0.2, 0.25, 0.3], unlit: true, noCast: true, receive: false, fogMode: 2 },
+      extSigns: { color: [1, 1, 1], map: t.extSigns, unlit: true, noCast: true, receive: false, fogMode: 2 },
+      extFlagUS: { color: [1, 1, 1], map: t.flagUS, unlit: true, noCast: true, receive: false, fogMode: 2, doubleSided: true },
+      extFlagIL: { color: [1, 1, 1], map: t.flagIL, unlit: true, noCast: true, receive: false, fogMode: 2, doubleSided: true },
     };
   }
 
@@ -183,7 +191,7 @@ export class World {
       const canvas = this.painter.canvasFor(s);
       this.painter.paint(s, canvas, g);
       const texture = this.renderer.createTexture(canvas, { repeat: false, mipmap: s.kind === 'sign' || s.kind === 'board' });
-      const mat = s.unlit ? { color: [1, 1, 1], map: texture, unlit: true, noCast: true } : { color: [0.01, 0.01, 0.012], emissiveMap: texture, emissive: [1, 1, 1], specular: 0.12, shininess: 90, reflect: 0.06 };
+      const mat = s.unlit ? { color: [1, 1, 1], map: texture, unlit: true, noCast: true, fogMode: s.sky ? 1 : 0, transparent: !!s.transparent, receive: false } : { color: [0.01, 0.01, 0.012], emissiveMap: texture, emissive: [1, 1, 1], specular: 0.12, shininess: 90, reflect: 0.06 };
       this.screens[s.key] = { def: s, canvas, texture, mat, last: -99 };
     }
     for (const [key, b] of Object.entries(center.batches)) {
@@ -232,21 +240,36 @@ export class World {
       p.color = [lightI * base * c[0], lightI * base * c[1], lightI * base * c[2]];
     }
     this.mats.lightpanel.emissive = [1.5 - night * 0.2, 1.45 - night * 0.2, 1.35 - night * 0.2];
+    // outdoor scene: daylight tint (warm at dawn/dusk, blue-dark at night, grey when overcast) + street/window lights
+    const dusk = Math.max(0, 1 - Math.abs(hr - 18.4) / 1.5) + Math.max(0, 1 - Math.abs(hr - 6.6) / 1.3);
+    const bright = 0.07 + 0.74 * day * (1 - overcast * 0.45);
+    let tintO = [bright, bright * (0.99 + day * 0.01), bright * (1.02 + night * 0.25)];
+    if (dusk > 0) tintO = [tintO[0] * (1 + dusk * 0.25), tintO[1] * (1 + dusk * 0.02), tintO[2] * (1 - dusk * 0.18)];
+    const grey = overcast * 0.5; const avg = (tintO[0] + tintO[1] + tintO[2]) / 3; tintO = tintO.map((c) => c + (avg - c) * grey);
+    const fl = this.flash * 0.9; this.mats.ext.color = tintO.map((c) => c + fl); this.mats.extSigns.color = tintO.map((c) => Math.max(c, night * 0.35) + fl);
+    this.mats.extFlagUS.color = this.mats.ext.color; this.mats.extFlagIL.color = this.mats.ext.color;
+    const lights = Math.min(1, night * 1.4 + overcast * 0.3);
+    this.mats.extGlow.color = [0.2 + (1.15 - 0.2) * lights, 0.26 + (1.15 - 0.26) * lights, 0.42 + (1.15 - 0.42) * lights].map((c, i) => c * (lights > 0.3 ? 1 : 0.8 + day * 0.2));
+    const hz = [0.66 + day * 0.14, 0.72 + day * 0.14, 0.84 + day * 0.12].map((c) => c * bright);
+    const fogW = wx === 'fog' ? [6, 75] : wx === 'snow' ? [14, 150] : ['rain', 'thunderstorm', 'severe'].includes(wx) ? [22, 240] : [70, 520];
+    this.outFog = { color: hz.map((c, i) => (wx === 'fog' ? c * 1.1 + 0.05 * bright : c)), near: fogW[0], far: fogW[1] };
     this.mats.troffer.emissive = [1.5 - night * 0.15, 1.47 - night * 0.15, 1.4 - night * 0.15];
     return {
       sky: [0.24 + day * 0.08, 0.25 + day * 0.09, 0.29 + day * 0.1], ground: [0.13, 0.12, 0.11], dirDir: sunDir.map((v) => v / l),
       dirColor: warm.map((c) => c * sunAmt * 0.5 + this.flash * 0.8), fogColor: [0.02, 0.025, 0.035], fogNear: 60, fogFar: 140,
       exposure: 1.03 + night * 0.05, flash: this.flash * 0.6,
+      outFogColor: this.outFog.color, outFogNear: this.outFog.near, outFogFar: this.outFog.far,
     };
   }
 
   updateScreens(dt) {
     const g = this.game; const now = this.time; const refresh = g.settings.data.graphics.monitorRefresh || 1;
-    const hz = { monitor: refresh, coworker: 1.5, videowall: 0.5, tv: this.preset.tvHz, board: 0.33, clock: 1, exterior: this.preset.extHz, shiftboard: 0.05, sign: 0 };
+    const hz = { monitor: refresh, coworker: 1.5, videowall: 0.5, tv: this.preset.tvHz, board: 0.33, clock: 1, exterior: this.preset.extHz, rainfx: this.preset.extHz * 1.5, shiftboard: 0.05, sign: 0 };
     let budget = this.perf.ema > 1 / 30 ? 1 : 3; // limit texture uploads per frame (fewer when the device is struggling)
     for (const s of Object.values(this.screens)) {
       const rate = hz[s.def.kind] ?? 0; if (!rate) continue;
-      if (s.def.kind === 'exterior') { const wx = g.sim?.weather.current(); if (!['rain', 'thunderstorm', 'severe', 'snow'].includes(wx) && this.flash <= 0 && now - s.last < 2) continue; }
+      if (s.def.kind === 'exterior' && this.flash <= 0 && now - s.last < 2) continue; // sky changes slowly
+      if (s.def.kind === 'rainfx') { const wx = g.sim?.weather.current(); const wet = ['rain', 'thunderstorm', 'severe', 'snow'].includes(wx); if (!wet && s.dry) continue; s.dry = !wet; }
       if (now - s.last < 1 / rate) continue;
       if (budget-- <= 0) break;
       s.last = now;
@@ -334,7 +357,8 @@ export class World {
     const items = []; const all = [];
     // Zone culling: the Sheriff's wing is only visible from the corridor or from inside it
     const p = this.player.pos; const wingVisible = p[2] > 7.3 || p[0] < -11.4;
-    for (const s of this.static) { all.push(s); if (s.zone !== 'wing' || wingVisible) items.push(s); }
+    const outVisible = !(p[0] < -12.2 && p[2] < 8); // deep inside the Sheriff's wing no window looks outside
+    for (const s of this.static) { if (s.zone !== 'out') all.push(s); if ((s.zone !== 'wing' || wingVisible) && (s.zone !== 'out' || outVisible)) items.push(s); }
     const before = items.length;
     this.npcs.draw(items, this.unit, (color, spec = 0.12) => ({ color, specular: spec, shininess: 20 }));
     for (let i = before; i < items.length; i++) all.push(items[i]);
@@ -344,7 +368,7 @@ export class World {
       b.mesh = this.unit.disc; b.mat = this.mats.blob;
       trs(b.model, n.x, 0.009, n.z, 0, 0, n.sitting ? 0.42 : 0.32, 1, n.sitting ? 0.42 : 0.32); items.push(b);
     });
-    const cam = { pos: this.player.pos, yaw: this.player.yaw, pitch: this.player.pitch, fov: this.game.settings.data.graphics.fov || 72, near: 0.04, far: 150 };
+    const cam = { pos: this.player.pos, yaw: this.player.yaw, pitch: this.player.pitch, fov: this.game.settings.data.graphics.fov || 72, near: 0.04, far: 320 };
     this.renderer.render({ items, shadowItems: all, env: this.env(), points: this.points }, cam);
   }
 }

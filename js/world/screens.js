@@ -23,7 +23,8 @@ export class ScreenPainter {
       case 'tv': return makeCanvas(r, Math.round(r * 0.5625));
       case 'board': return makeCanvas(r, Math.round(r * 0.58));
       case 'clock': return makeCanvas(128, 128);
-      case 'exterior': return makeCanvas(1024, 460);
+      case 'exterior': return makeCanvas(1024, 320);
+      case 'rainfx': return makeCanvas(256, 128);
       case 'shiftboard': return makeCanvas(512, 256);
       case 'sign': return textTexture(s.text || '', { w: s.small ? 256 : 1024, h: s.small ? 64 : 64, bg: s.small ? '#10151d' : '#0b1626', fg: s.small ? '#64d2ff' : '#dfe8f5', font: s.small ? 'bold 26px system-ui' : 'bold 38px system-ui' });
       case 'banner': return this.bannerCanvas(s.text || '', s.w / s.h);
@@ -70,7 +71,8 @@ export class ScreenPainter {
       case 'tv': return this.paintTV(g, w, h, game);
       case 'board': return this.paintBoard(s.boardIndex, g, w, h, sim);
       case 'clock': return this.paintClock(g, w, h, sim);
-      case 'exterior': return this.paintExterior(g, w, h, game);
+      case 'exterior': return s.sky ? this.paintSky(g, w, h, game) : this.paintExterior(g, w, h, game);
+      case 'rainfx': return this.paintRain(g, w, h, game);
       case 'shiftboard': return this.paintShiftBoard(g, w, h, game);
       default: return null;
     }
@@ -421,6 +423,61 @@ export class ScreenPainter {
     }
     if (wx === 'snow') { g.fillStyle = 'rgba(255,255,255,.85)'; for (let i = 0; i < 200; i++) { const x = (i * 97 + Math.sin(t + i) * 20 + t * 15) % w; const y = (i * 53 + t * 40) % h; g.fillRect(x, y, 2.5, 2.5); } g.fillStyle = 'rgba(245,248,255,.6)'; g.fillRect(0, ground, w, 6); }
     if (game.world?.flash > 0) { g.fillStyle = `rgba(230,235,255,${game.world.flash * 0.8})`; g.fillRect(0, 0, w, h); }
+  }
+
+  /** Sky backdrop for the 3D outdoor scene: gradient, sun/moon, stars, clouds, horizon haze, lightning. */
+  paintSky(g, w, h, game) {
+    const sim = game.sim; const m = sim ? sim.clock() : 720; const hr = m / 60;
+    const wx = sim ? sim.weather.current() : 'clear'; const t = performance.now() / 1000;
+    const day = Math.max(0, Math.min(1, Math.sin(((hr - 6) / 12) * Math.PI) * 1.4));
+    const dusk = Math.max(0, 1 - Math.abs(hr - 18.5) / 1.6) + Math.max(0, 1 - Math.abs(hr - 6.5) / 1.4);
+    const overcast = { clear: 0, rain: 0.7, thunderstorm: 0.88, snow: 0.6, fog: 0.85, severe: 0.94 }[wx] ?? 0;
+    const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
+    let top = mix([6, 9, 24], [48, 112, 200], day), mid = mix([14, 20, 40], [118, 168, 224], day), bot = mix([28, 34, 56], [200, 220, 238], day);
+    if (dusk > 0) { top = mix(top, [70, 60, 120], dusk * 0.6); mid = mix(mid, [205, 125, 120], dusk * 0.55); bot = mix(bot, [255, 168, 100], dusk * 0.75); }
+    const grey = (v) => v.map((x) => x * (0.3 + day * 0.7));
+    top = mix(top, grey([84, 90, 100]), overcast); mid = mix(mid, grey([110, 115, 124]), overcast); bot = mix(bot, grey([140, 145, 152]), overcast);
+    const horizon = h * 0.83; // the plane spans y −38…142 m, so the eye-level horizon sits ~83% down
+    const grad = g.createLinearGradient(0, 0, 0, horizon); grad.addColorStop(0, `rgb(${top})`); grad.addColorStop(0.55, `rgb(${mid})`); grad.addColorStop(1, `rgb(${bot})`);
+    g.fillStyle = grad; g.fillRect(0, 0, w, horizon); g.fillStyle = `rgb(${bot})`; g.fillRect(0, horizon, w, h - horizon);
+    if (overcast < 0.65) {
+      if (day > 0.05) {
+        const sx = w * (0.15 + 0.7 * ((hr - 6) / 12)), sy = horizon - day * horizon * 0.62;
+        const halo = g.createRadialGradient(sx, sy, 0, sx, sy, 150); halo.addColorStop(0, `rgba(255,236,190,${0.6 * (1 - overcast)})`); halo.addColorStop(1, 'rgba(255,236,190,0)');
+        g.fillStyle = halo; g.fillRect(sx - 150, sy - 150, 300, 300);
+        g.fillStyle = `rgba(255,248,226,${0.95 * (1 - overcast)})`; g.beginPath(); g.arc(sx, sy, 16, 0, 6.283); g.fill();
+      } else {
+        for (let i = 0; i < 140; i++) { g.globalAlpha = (0.35 + 0.65 * Math.abs(Math.sin(t * 0.6 + i))) * (1 - overcast); g.fillStyle = '#fff'; const z = i % 9 === 0 ? 2 : 1.2; g.fillRect((i * 173.3) % w, (i * 97.7) % (horizon * 0.8), z, z); }
+        g.globalAlpha = 1;
+        const mx = w * 0.7, my = horizon * 0.25; const mg = g.createRadialGradient(mx, my, 0, mx, my, 70); mg.addColorStop(0, 'rgba(220,230,255,.35)'); mg.addColorStop(1, 'rgba(220,230,255,0)'); g.fillStyle = mg; g.fillRect(mx - 70, my - 70, 140, 140);
+        g.fillStyle = 'rgba(236,240,255,.95)'; g.beginPath(); g.arc(mx, my, 11, 0, 6.283); g.fill();
+      }
+    }
+    const cl = overcast > 0.5 ? grey([120, 124, 132]) : [255, 255, 255];
+    for (let i = 0; i < 14; i++) {
+      const cx = ((i * 157 + t * (2 + (i % 3))) % (w + 320)) - 160; const cy = horizon * (0.12 + (i % 6) * 0.11);
+      g.fillStyle = `rgba(${cl},${(0.12 + overcast * 0.5) * (0.6 + (i % 3) * 0.2) * (0.5 + day * 0.5)})`;
+      for (const [dx, dy, rx, ry] of [[0, 0, 80, 14], [-50, 5, 50, 10], [55, 4, 60, 11], [10, -7, 45, 11]]) { g.beginPath(); g.ellipse(cx + dx * (1 + (i % 2) * 0.4), cy + dy, rx * (1 + (i % 3) * 0.3), ry, 0, 0, 6.283); g.fill(); }
+    }
+    const hzg = g.createLinearGradient(0, horizon - 60, 0, horizon); hzg.addColorStop(0, 'rgba(255,255,255,0)'); hzg.addColorStop(1, `rgba(${bot},0.85)`); g.fillStyle = hzg; g.fillRect(0, horizon - 60, w, 60);
+    if (game.world?.flash > 0) { g.fillStyle = `rgba(230,235,255,${game.world.flash * 0.85})`; g.fillRect(0, 0, w, h); }
+  }
+
+  /** Rain/snow on the window glass (transparent overlay just outside the windows). */
+  paintRain(g, w, h, game) {
+    const wx = game.sim ? game.sim.weather.current() : 'clear'; const t = performance.now() / 1000;
+    g.clearRect(0, 0, w, h);
+    if (['rain', 'thunderstorm', 'severe'].includes(wx)) {
+      const heavy = wx !== 'rain';
+      g.strokeStyle = `rgba(210,222,240,${heavy ? 0.42 : 0.3})`; g.lineWidth = 1; g.beginPath();
+      const n = heavy ? 120 : 70;
+      for (let i = 0; i < n; i++) { const x = (i * 37.7 + t * 40) % w; const y = (i * 23.3 + t * (heavy ? 260 : 190)) % (h + 20) - 20; g.moveTo(x, y); g.lineTo(x - 2, y + (heavy ? 14 : 10)); }
+      g.stroke();
+      g.fillStyle = 'rgba(220,230,245,.35)'; // droplets beading on the glass
+      for (let i = 0; i < 40; i++) { const x = (i * 61.3) % w, y = (i * 29.1 + t * (i % 5) * 3) % h; g.beginPath(); g.arc(x, y, 0.8 + (i % 3) * 0.6, 0, 6.283); g.fill(); }
+    } else if (wx === 'snow') {
+      g.fillStyle = 'rgba(255,255,255,.85)'; for (let i = 0; i < 70; i++) { const x = (i * 37 + Math.sin(t + i) * 8 + t * 6) % w; const y = (i * 23 + t * 22) % h; g.fillRect(x, y, 1.8, 1.8); }
+    }
   }
 
   paintShiftBoard(g, w, h, game) {

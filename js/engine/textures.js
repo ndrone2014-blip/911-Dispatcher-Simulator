@@ -69,7 +69,7 @@ export function makeTextures(size = 256) {
   }, { offset: 2 });
 
   // Eggshell paint: soft roller mottling + orange peel.
-  T.wall = paint(S, (x, y, n, r) => { const v = 202 + (n - 0.5) * 14 + (r() - 0.5) * 6; return [clamp(v), clamp(v + 3), clamp(v + 6)]; }, { offset: 3 });
+  T.wall = paint(S, (x, y, n, r) => { const peel = (r() - 0.5) * 5 + (((x * 7 + y * 13) % 5) - 2) * 0.6; const v = 204 + (n - 0.5) * 9 + peel; return [clamp(v + 2), clamp(v + 2), clamp(v + 1)]; }, { offset: 3 });
 
   // Navy fabric-wrapped acoustic panels (1 m wide) with reveals.
   T.accent = paint(S, (x, y, n, r) => {
@@ -79,12 +79,13 @@ export function makeTextures(size = 256) {
     return [clamp(v * 0.45), clamp(v * 0.72), clamp(v * 1.25)];
   }, { offset: 4 });
 
-  // Walnut veneer with warped grain.
+  // Walnut veneer: fine straight grain with gentle cathedral figure, pores and subtle plank changes.
   T.wood = paint(S, (x, y, n, r) => {
-    const g = Math.sin((y / k) * 0.22 + n * 9 + Math.sin((x / k) * 0.012) * 3) * 0.5 + 0.5;
-    const pores = r() < 0.06 ? -14 : 0; const plank = (Math.floor(y / (S / 4)) * 37) % 11 - 5;
-    const v = 92 + g * 34 + (n - 0.5) * 30 + pores + plank;
-    return [clamp(v * 1.18), clamp(v * 0.82), clamp(v * 0.55)];
+    const fig = Math.sin((y / k) * 0.045 + Math.sin((x / k) * 0.02) * 1.6 + n * 2.2) * 0.5 + 0.5;          // broad figure
+    const lines = Math.sin((y / k) * 0.85 + n * 3.2 + Math.sin((x / k) * 0.006) * 2) * 0.5 + 0.5;       // fine grain
+    const pores = r() < 0.05 ? -10 : 0; const plank = ((Math.floor(y / (S / 4)) * 37) % 9) - 4;
+    const v = 96 + fig * 18 + lines * 12 + (n - 0.5) * 16 + pores + plank;
+    return [clamp(v * 1.16), clamp(v * 0.8), clamp(v * 0.55)];
   }, { offset: 5 });
 
   // Light grey high-pressure laminate work surface.
@@ -187,17 +188,24 @@ export function makeTextures(size = 256) {
   }, { offset: 12 });
 
   // ---- law-enforcement set ----
-  // US flag
-  { const c = cv(256, 160); const g = c.getContext('2d');
-    for (let i = 0; i < 13; i++) { g.fillStyle = i % 2 ? '#f4f2ee' : '#b22234'; g.fillRect(0, i * 160 / 13, 256, 160 / 13 + 1); }
-    g.fillStyle = '#3c3b6e'; g.fillRect(0, 0, 104, 86);
-    g.fillStyle = '#f4f2ee'; for (let r = 0; r < 9; r++) for (let q = 0; q < (r % 2 ? 5 : 6); q++) { const x = 9 + q * 17 + (r % 2 ? 8.5 : 0), y = 6 + r * 8.6; g.beginPath(); g.arc(x, y, 2.4, 0, 6.283); g.fill(); }
+  // US flag at its official 10:19 proportions: 13 stripes, canton 7 stripes tall and 0.76 × the hoist wide, 50 stars.
+  { const W = 380, Hh = 200; const c = cv(W, Hh); const g = c.getContext('2d'); const st = Hh / 13;
+    for (let i = 0; i < 13; i++) { g.fillStyle = i % 2 ? '#f4f2ee' : '#b22234'; g.fillRect(0, Math.floor(i * st), W, Math.ceil(st) + 1); }
+    const cw = Hh * 0.76, ch = st * 7; g.fillStyle = '#3c3b6e'; g.fillRect(0, 0, cw, ch);
+    g.fillStyle = '#f4f2ee';
+    const starAt = (x, y, R) => { g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + (i * Math.PI) / 5; const rr = i % 2 ? R * 0.4 : R; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.closePath(); g.fill(); };
+    for (let r = 0; r < 9; r++) for (let q = 0; q < (r % 2 ? 5 : 6); q++) starAt(cw / 12 * (1 + q * 2 + (r % 2)), ch / 10 * (1 + r), st * 0.31);
     T.flagUS = c; }
-  // Illinois state flag (white field, simplified eagle seal, banner)
-  { const c = cv(256, 160); const g = c.getContext('2d'); g.fillStyle = '#f4f2ee'; g.fillRect(0, 0, 256, 160);
-    g.fillStyle = '#7a5a2a'; g.beginPath(); g.ellipse(128, 70, 34, 26, 0, 0, 6.283); g.fill();
-    g.fillStyle = '#4d6b2a'; g.fillRect(96, 88, 64, 12); g.fillStyle = '#3c3b6e'; g.fillRect(108, 54, 40, 22); g.fillStyle = '#b22234'; for (let i = 0; i < 4; i++) g.fillRect(110 + i * 10, 64, 5, 12);
-    g.fillStyle = '#c9a227'; g.fillRect(84, 100, 88, 8); g.fillStyle = '#3c3b6e'; g.font = '900 22px system-ui'; g.textAlign = 'center'; g.fillText('ILLINOIS', 128, 134);
+  // Illinois state flag (3:5): white field, eagle on a rock with the shield and banner, ILLINOIS beneath.
+  { const W = 334, Hh = 200; const c = cv(W, Hh); const g = c.getContext('2d'); g.fillStyle = '#f4f2ee'; g.fillRect(0, 0, W, Hh);
+    const cx = W / 2;
+    g.fillStyle = '#4d6b2a'; g.beginPath(); g.ellipse(cx, 132, 70, 12, 0, 0, 6.283); g.fill();                  // ground
+    g.fillStyle = '#8a6a3a'; g.fillRect(cx - 26, 104, 52, 24);                                                      // rock
+    g.fillStyle = '#6b4a24'; g.beginPath(); g.moveTo(cx - 52, 66); g.quadraticCurveTo(cx - 28, 40, cx, 58); g.quadraticCurveTo(cx + 28, 40, cx + 52, 66); g.quadraticCurveTo(cx + 20, 72, cx, 96); g.quadraticCurveTo(cx - 20, 72, cx - 52, 66); g.fill(); // eagle wings
+    g.fillStyle = '#f4f2ee'; g.beginPath(); g.arc(cx + 4, 50, 7, 0, 6.283); g.fill(); g.fillStyle = '#d9a52a'; g.fillRect(cx + 9, 49, 6, 3); // head + beak
+    g.fillStyle = '#3c3b6e'; g.fillRect(cx - 12, 66, 24, 8); g.fillStyle = '#f4f2ee'; g.fillRect(cx - 12, 74, 24, 18); g.fillStyle = '#b22234'; for (let i = 0; i < 4; i++) g.fillRect(cx - 10 + i * 6, 74, 3, 18); // shield
+    g.strokeStyle = '#b22234'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx - 60, 40); g.quadraticCurveTo(cx, 22, cx + 60, 40); g.stroke();       // banner
+    g.fillStyle = '#3c3b6e'; g.font = '800 30px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('ILLINOIS', cx, 166);
     T.flagIL = c; }
   // Sheriff star seal
   { const n = 256; const c = cv(n); const g = c.getContext('2d'); g.fillStyle = '#1f3552'; g.fillRect(0, 0, n, n);
@@ -206,8 +214,8 @@ export function makeTextures(size = 256) {
     star(96, 52, '#d9b23a'); star(84, 46, '#f0cf5a');
     for (let i = 0; i < 7; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / 7; g.fillStyle = '#d9b23a'; g.beginPath(); g.arc(128 + Math.cos(a) * 96, 128 + Math.sin(a) * 96, 7, 0, 6.283); g.fill(); }
     g.fillStyle = '#1f3552'; g.beginPath(); g.arc(128, 128, 34, 0, 6.283); g.fill();
-    g.fillStyle = '#f0cf5a'; g.font = '900 14px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('WHITE', 128, 120); g.fillText('COUNTY', 128, 136);
-    g.save(); g.translate(128, 128); g.font = '800 15px system-ui'; const txt = 'SHERIFF · EMERGENCY COMMUNICATIONS ·'; for (let i = 0; i < txt.length; i++) { g.save(); g.rotate(-Math.PI * 0.95 + (i / txt.length) * Math.PI * 1.9); g.fillText(txt[i], 0, -114 + 0); g.restore(); } g.restore();
+    g.fillStyle = '#f0cf5a'; g.font = '900 22px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('911', 128, 129);
+    g.save(); g.translate(128, 128); g.font = '800 15px system-ui'; const txt = 'EMERGENCY · COMMUNICATIONS · DISPATCH ·'; for (let i = 0; i < txt.length; i++) { g.save(); g.rotate(-Math.PI * 0.95 + (i / txt.length) * Math.PI * 1.9); g.fillText(txt[i], 0, -114 + 0); g.restore(); } g.restore();
     T.seal = c; }
   // Steel lockers: 4 louvered doors with name plates
   { const c = cv(256); const g = c.getContext('2d'); g.fillStyle = '#4e5866'; g.fillRect(0, 0, 256, 256);

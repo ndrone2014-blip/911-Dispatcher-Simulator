@@ -36,6 +36,7 @@ uniform float uSpec; uniform float uShine; uniform float uOpacity; uniform int u
 uniform vec3 uSky; uniform vec3 uGround; uniform vec3 uDirDir; uniform vec3 uDirColor;
 uniform int uNumPoints; uniform vec3 uPointPos[MAXL]; uniform vec3 uPointColor[MAXL]; uniform float uPointRange[MAXL];
 uniform vec3 uCamPos; uniform vec3 uFogColor; uniform vec2 uFog; uniform float uExposure; uniform float uFlash;
+uniform int uFogMode; uniform vec3 uOutFogColor; uniform vec2 uOutFog;
 #ifdef SHADOWS
 uniform sampler2DShadow uShadow; uniform mat4 uLightVP; uniform float uShadowTexel; uniform int uRecv;
 #endif
@@ -112,8 +113,9 @@ void main() {
   }
   if (uHasEm == 1) col += uEmissive * toLinear(texture(uEmMap, vUV).rgb);
   else col += uEmissive;
-  float fg = clamp((length(uCamPos - vWorld) - uFog.x) / max(0.001, uFog.y - uFog.x), 0.0, 1.0);
-  col = mix(col, uFogColor, fg);
+  // fog: 0 = indoor fog, 1 = none (sky), 2 = outdoor atmosphere (distance haze / weather fog)
+  if (uFogMode == 0) { float fg = clamp((length(uCamPos - vWorld) - uFog.x) / max(0.001, uFog.y - uFog.x), 0.0, 1.0); col = mix(col, uFogColor, fg); }
+  else if (uFogMode == 2) { float fg = clamp((length(uCamPos - vWorld) - uOutFog.x) / max(0.001, uOutFog.y - uOutFog.x), 0.0, 1.0); col = mix(col, uOutFogColor, fg * fg * (3.0 - 2.0 * fg)); }
   col *= uExposure;
   col = clamp((col * (2.51 * col + 0.03)) / (col * (2.43 * col + 0.59) + 0.14), 0.0, 1.0);
   fragColor = vec4(sqrt(col), alpha);
@@ -234,7 +236,7 @@ export class Renderer {
     if (this.programs[key]) return this.programs[key];
     const defs = [q.shadows ? `#define SHADOWS\n#define SHADOW_TAPS ${q.shadowTaps}` : '', q.envmap ? '#define ENVMAP' : ''].join('\n');
     const names = ['uModel', 'uViewProj', 'uColor', 'uMap', 'uHasMap', 'uEmissive', 'uEmMap', 'uHasEm', 'uSpec', 'uShine', 'uOpacity', 'uUnlit', 'uRefl', 'uSky', 'uGround', 'uDirDir', 'uDirColor',
-      'uNumPoints', 'uPointPos', 'uPointColor', 'uPointRange', 'uCamPos', 'uFogColor', 'uFog', 'uExposure', 'uFlash', 'uShadow', 'uLightVP', 'uShadowTexel', 'uRecv', 'uEnv', 'uEnvStrength'];
+      'uNumPoints', 'uPointPos', 'uPointColor', 'uPointRange', 'uCamPos', 'uFogColor', 'uFog', 'uExposure', 'uFlash', 'uFogMode', 'uOutFogColor', 'uOutFog', 'uShadow', 'uLightVP', 'uShadowTexel', 'uRecv', 'uEnv', 'uEnvStrength'];
     const prog = this.link(VS, fs(defs), names);
     const gl = this.gl; gl.useProgram(prog.p);
     gl.uniform1i(prog.loc.uMap, 0); gl.uniform1i(prog.loc.uEmMap, 1);
@@ -454,6 +456,7 @@ export class Renderer {
     gl.uniform3fv(L.uCamPos, cam.pos); gl.uniform3fv(L.uSky, env.sky); gl.uniform3fv(L.uGround, env.ground);
     gl.uniform3fv(L.uDirDir, env.dirDir); gl.uniform3fv(L.uDirColor, env.dirColor); gl.uniform3fv(L.uFogColor, env.fogColor);
     gl.uniform2f(L.uFog, env.fogNear, env.fogFar); gl.uniform1f(L.uExposure, env.exposure ?? 1); gl.uniform1f(L.uFlash, env.flash || 0);
+    gl.uniform3fv(L.uOutFogColor, env.outFogColor || env.fogColor); gl.uniform2f(L.uOutFog, env.outFogNear ?? 120, env.outFogFar ?? 600);
     if (L.uShadow && this.shadow) {
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.shadow.tex);
       gl.uniformMatrix4fv(L.uLightVP, false, this.lightVP); gl.uniform1f(L.uShadowTexel, 1 / this.shadow.size);
@@ -516,7 +519,7 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, (m.emissiveMap || this.white).tex); gl.uniform1i(L.uHasEm, m.emissiveMap ? 1 : 0);
     gl.uniform3fv(L.uEmissive, m.emissive || ZERO);
     gl.uniform1f(L.uSpec, m.specular ?? 0.15); gl.uniform1f(L.uShine, m.shininess ?? 24); gl.uniform1f(L.uOpacity, m.opacity ?? 1); gl.uniform1i(L.uUnlit, m.unlit ? 1 : 0);
-    gl.uniform1f(L.uRefl, m.reflect || 0);
+    gl.uniform1f(L.uRefl, m.reflect || 0); gl.uniform1i(L.uFogMode, m.fogMode || 0);
     if (L.uRecv) gl.uniform1i(L.uRecv, this.hasShadow && m.receive !== false ? 1 : 0);
     if (m.doubleSided) gl.disable(gl.CULL_FACE); else gl.enable(gl.CULL_FACE);
     gl.bindVertexArray(it.mesh.vao); gl.drawElements(gl.TRIANGLES, it.mesh.count, it.mesh.type, 0);
