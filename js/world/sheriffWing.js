@@ -35,7 +35,8 @@ export function buildSheriffWing(k) {
 
   // outer walls
   wallSeg(-42, -2, -42, 18, 'concrete'); wallSeg(-42, 18, -12, 18); wallSeg(-42, -2, -30, -2, 'concrete');
-  wallSeg(-30, -8, -12, -8);
+  // north wall with the door from the armory into the training range (x -13.9..-12.7)
+  wallSeg(-30, -8, -13.9, -8); wallSeg(-12.7, -8, -12, -8); wallSeg(-13.9, -8, -12.7, -8, 'wall', 2.3, H, false);
   // hallway north side: doors to briefing (x -15.5..-14) and sheriff's office (x -27.4..-26.2)
   wallSeg(-22, 8, -15.5, 8); wallSeg(-14, 8, -12, 8); wallSeg(-15.5, 8, -14, 8, 'wall', 2.3, H, false);
   wallSeg(-30, 8, -27.4, 8); wallSeg(-26.2, 8, -22, 8); wallSeg(-27.4, 8, -26.2, 8, 'wall', 2.3, H, false);
@@ -162,7 +163,42 @@ export function buildSheriffWing(k) {
   col(-21.9, -6.65, -20.9, -5.75);
   mb('satin').cylinder(-13.0, 0.42, -0.9, 0.24, 0.84, 18, { color: [0.85, 0.65, 0.08] }); mb('matte').disc(-13.0, 0.845, -0.9, 0.2, 14, { color: [0.6, 0.5, 0.3] });
   col(-13.3, -1.2, -12.7, -0.6);
-  interactables.push({ id: 'armory', kind: 'armory', label: 'Inspect the armory', min: [-21, 0, -8], max: [-14.2, 2.5, -6.8], pri: 1 });
+  interactables.push({ id: 'armory', kind: 'armory', label: 'Armory – check out equipment', min: [-21, 0, -8], max: [-14.2, 2.5, -6.8], pri: 1 });
+  interactables.push({ id: 'armory_bench', kind: 'armory', label: 'Armory – check out equipment', min: [-22, 0.6, -5.4], max: [-21.4, 2.1, -3.0], pri: 1 });
+
+  // ---------------- indoor training range (north of the armory) ----------------
+  //   six lanes, firing line at z ≈ -10.6, targets out to z -24, rubber-block backstop at z -25.6
+  floor(-22, -26, -12, -8, 'concrete', 2.5); ceiling(-22, -26, -12, -8);
+  wallSeg(-22, -26, -22, -8, 'concrete'); wallSeg(-12, -26, -12, -8, 'concrete'); wallSeg(-22, -26, -12, -26, 'concrete');
+  for (const [x0, x1, z] of [[-13.9, -12.7, -8]]) { mb('frame').box(x0, 1.15, z, 0.08, 2.3, 0.22); mb('frame').box(x1, 1.15, z, 0.08, 2.3, 0.22); mb('frame').box((x0 + x1) / 2, 2.32, z, x1 - x0 + 0.08, 0.06, 0.22); }
+  mb('metal').box(-13.3, 1.12, -8.16, 1.12, 2.22, 0.05); // heavy range door, held open
+  for (const z of [-11.5, -17, -22.5]) light(-17, z, 'armory', H - 0.05, 1.4, 0.5);
+  const lanes = 6; const lw = 10 / lanes;
+  for (let i = 0; i <= lanes; i++) { // shooting booths
+    const x = -22 + i * lw;
+    if (i > 0 && i < lanes) { mb('satin').rbox(x, 0.95, -10.55, 0.06, 1.9, 1.5, { r: 0.01, color: [0.5, 0.52, 0.55] }); col(x - 0.05, -11.3, x + 0.05, -9.8); }
+    if (i < lanes) {
+      const cx = x + lw / 2;
+      mb('satin').rbox(cx, 1.0, -11.2, lw - 0.12, 0.05, 0.42, { r: 0.01, color: [0.36, 0.38, 0.4] });        // bench / shelf
+      mb('satin').box(cx, 0.5, -11.38, lw - 0.2, 1.0, 0.04, { color: [0.2, 0.21, 0.23] });
+      mb('satin').box(cx, 2.95, -11.0, 0.05, 0.05, 13.6, { color: [0.3, 0.31, 0.33] });                       // target carrier rail
+      for (const [z, s2] of [[-15.5, 1], [-19.5, 0.9], [-23.5, 0.85]]) {
+        if ((i + Math.round(z)) % 2 && z !== -15.5) continue;
+        mb('satin').box(cx, 2.4, z, 0.03, 1.1, 0.03, { color: [0.25, 0.25, 0.27] });                         // hanger
+        mb('rangeTarget').panel(cx, 1.55, z, 0.55 * s2, 0.7 * s2, 'z', 1);                                       // paper bullseye
+      }
+      mb('led').box(cx, 2.2, -11.39, 0.06, 0.03, 0.01);                                                        // lane status light
+    }
+  }
+  col(-22, -11.45, -12, -11.0); // bench line (stay behind it)
+  for (const z of [-13, -16.5, -20]) mb('satin').box(-17, 3.2, z, 10, 0.5, 0.12, { color: [0.16, 0.17, 0.19] }); // safety baffles
+  mb('rubber').box(-17, 1.4, -25.7, 10, 2.8, 0.5, { uv: 0 });                                                  // backstop face
+  mb('satin').box(-17, 2.95, -25.4, 10, 0.12, 1.0, { color: [0.12, 0.12, 0.13] });
+  mb('beaconAmber').box(-13.3, 2.42, -8.24, 0.3, 0.08, 0.04);                                                   // "line hot" lamp
+  if (D >= 1) { mb('satin').rbox(-21.3, 0.9, -9.2, 1.0, 1.8, 0.5, { r: 0.015, color: [0.24, 0.28, 0.22] }); col(-21.85, -9.5, -20.8, -8.9); } // range locker
+  screen('sign_range', 'sign', -13.3, 2.55, -7.88, 1.7, 0.24, 'z', 1, 0, { text: 'RANGE · EYES & EARS REQUIRED' });
+  screen('sign_range_in', 'sign', -17, 2.75, -8.13, 3.2, 0.3, 'z', -1, 0, { text: 'TRAINING RANGE · LINE COMMANDS FROM RANGE MASTER ONLY' });
+  interactables.push({ id: 'range', kind: 'range', label: 'Step up to the firing line (training)', min: [-22, 0, -11.6], max: [-12, 2.2, -9.4], pri: 2 });
 
   // ---------------- sheriff's office ----------------
   mb('wood').rbox(-26, 0.74, 4.6, 2.2, 0.05, 1.0, { r: 0.015, uv: 1 }); mb('wood').box(-26, 0.37, 5.05, 2.2, 0.7, 0.05, { uv: 1 });

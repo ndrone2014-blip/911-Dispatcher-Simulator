@@ -17,7 +17,7 @@ export const H = 3.6; // ceiling height
 export const CONSOLE_XS = [-8.4, -2.8, 2.8, 8.4];
 export const ROW_ZS = [-3.2, 1.8];
 export const PLAYER_CONSOLE = 1;
-export const BUILDING_BOUNDS = [-42.2, 0, -8.2, 12.2, H, 18.2];
+export const BUILDING_BOUNDS = [-42.2, 0, -26.2, 12.2, H, 18.2];
 
 // material key -> [shared batch, vertex colour]
 const SOLID = {
@@ -714,7 +714,13 @@ export function buildNavGraph() {
   add('locker_rm', -24, 12.6); link('locker_rm', 'w_-24');
   add('brief_door', -14.75, 7.0); link('brief_door', 'w_-14'); add('brief_room', -20.4, 6.8); link('brief_room', 'brief_door');
   add('brief_lane', -12.95, 4.0); link('brief_lane', 'brief_door'); add('armory_in', -13.9, -1.4); add('armory_mid', -16, -2.6); link('brief_lane', 'armory_in'); link('armory_in', 'armory_mid');
-  add('sheriff_in', -26.8, 6.6); link('sheriff_in', 'w_-26.8');
+  add('sheriff_in', -26.8, 6.6); link('sheriff_in', 'w_-26.8'); add('sheriff_desk', -26.6, 3.0); link('sheriff_desk', 'sheriff_in');
+  add('armory_n', -13.3, -6.4); link('armory_mid', 'armory_n'); add('range_door', -13.3, -8.7); link('armory_n', 'range_door');
+  add('range_line', -15.5, -9.5); link('range_door', 'range_line');
+  for (let i = 0; i < 6; i++) { add(`range_l${i}`, -22 + (i + 0.5) * (10 / 6), -10.1); link(`range_l${i}`, i < 3 ? 'range_line' : 'range_door'); }
+  add('brief_a1', -18.45, 6.6); add('brief_a2', -16.05, 6.6); link('brief_a1', 'brief_room'); link('brief_a2', 'brief_a1'); link('brief_a2', 'brief_door');
+  add('brief_seat1', -18.45, 4.6); add('brief_seat2', -18.45, 3.6); add('brief_seat3', -16.05, 4.6); add('brief_seat4', -16.05, 3.6); add('brief_podium', -20.4, 4.9);
+  link('brief_seat1', 'brief_a1'); link('brief_seat2', 'brief_seat1'); link('brief_seat3', 'brief_a2'); link('brief_seat4', 'brief_seat3'); link('brief_podium', 'brief_room');
   add('garage_in', -31, 9.3); link('garage_in', 'w_-29'); add('garage', -33, 6.0); link('garage', 'garage_in');
   return nodes;
 }

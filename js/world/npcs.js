@@ -9,7 +9,7 @@ const HAIR = [[0.08, 0.06, 0.05], [0.25, 0.16, 0.09], [0.55, 0.42, 0.25], [0.7, 
 const OUTFIT = {
   dispatcher: { shirt: [0.13, 0.2, 0.36], pants: [0.12, 0.12, 0.14] }, supervisor: { shirt: [0.72, 0.8, 0.9], pants: [0.16, 0.17, 0.2] },
   trainer: { shirt: [0.4, 0.42, 0.45], pants: [0.2, 0.18, 0.15] }, director: { shirt: [0.2, 0.2, 0.23], pants: [0.18, 0.18, 0.2] },
-  police: { shirt: [0.07, 0.1, 0.2], pants: [0.07, 0.1, 0.2] }, fire: { shirt: [0.9, 0.9, 0.88], pants: [0.1, 0.12, 0.2] }, ems: { shirt: [0.1, 0.18, 0.3], pants: [0.1, 0.12, 0.16] },
+  police: { shirt: [0.52, 0.45, 0.32], pants: [0.2, 0.17, 0.12] }, command: { shirt: [0.5, 0.43, 0.3], pants: [0.14, 0.12, 0.09] }, fire: { shirt: [0.9, 0.9, 0.88], pants: [0.1, 0.12, 0.2] }, ems: { shirt: [0.1, 0.18, 0.3], pants: [0.1, 0.12, 0.16] },
 };
 const SEAT_OF = { maria: 0, tyler: 2, denise: 3, ray: 5, priya: 6 };
 const BREAK_SPOTS = ['coffee', 'fridge', 'vending', 'br_chat1', 'br_chat2', 'br_table', 'couch', 'seatT1', 'seatT2'];
@@ -38,6 +38,7 @@ export class NPCManager {
     else if (s.kind === 'supervisor') npc.home = 'sup_desk';
     else if (s.kind === 'director') npc.home = 'dir_desk';
     else if (s.kind === 'trainer') npc.home = 'front_0';
+    else if (s.kind === 'command') npc.home = s.home || 'brief_room';
     else npc.home = 'br_chat1';
     const start = this.node(atNode || npc.home) || this.nodes[0];
     npc.x = start.x; npc.z = start.z; npc.at = start.id;
@@ -50,6 +51,8 @@ export class NPCManager {
     if (npc.consoleIndex != null) { const c = this.consoles[npc.consoleIndex]; npc.x = c.x; npc.z = c.z + 0.78; npc.yaw = 0; npc.sitting = true; npc.state = 'sit'; return; }
     if (npc.home === 'sup_desk') { npc.x = 0; npc.z = 14.75; npc.yaw = 0; npc.sitting = true; npc.state = 'sit'; return; }
     if (npc.home === 'dir_desk') { npc.x = 9.3; npc.z = 14.85; npc.yaw = 0; npc.sitting = true; npc.state = 'sit'; return; }
+    if (npc.home === 'sheriff_desk') { npc.x = -26; npc.z = 3.6; npc.yaw = Math.PI; npc.sitting = true; npc.state = 'sit'; return; } // Captain faces the office door
+    if (npc.home === 'brief_room') { const n = this.node('brief_podium'); if (n) { npc.x = n.x; npc.z = n.z; npc.yaw = -Math.PI / 2; } npc.state = 'idle'; npc.sitting = false; return; }
     npc.state = 'idle'; npc.sitting = false;
   }
 
@@ -126,9 +129,16 @@ export class NPCManager {
     } else if (npc.kind === 'trainer') {
       npc.timer = 8 + Math.random() * 14;
       this.goTo(npc, rng.pick(['front_-11', 'front_0', 'mid_5.6', 'back_-5.6', 'br_chat2', 'coffee', 'front_5.6', 'back_11']));
+    } else if (npc.kind === 'command') {
+      if (npc.gathered && npc.gathered > performance.now()) { npc.timer = 5; return; }
+      npc.timer = 30 + Math.random() * 50;
+      if (npc.sitting) { if (roll < 0.25) this.goTo(npc, rng.pick(['brief_room', 'armory_mid', 'coffee', 'w_-14', 'front_0'])); }
+      else if (roll < 0.35) this.goTo(npc, rng.pick(npc.id === 'watch' ? ['armory_mid', 'garage', 'w_-24', 'front_-5.6', 'range_line', 'brief_room'] : ['brief_room', 'w_-20', 'mid_0']));
+      else this.goTo(npc, npc.home);
     } else if (npc.kind === 'visitor') {
       npc.timer = 10 + Math.random() * 20;
-      if (!npc.leaving) this.goTo(npc, rng.pick(npc.dept === 'police' ? ['brief_room', 'armory_mid', 'garage', 'locker_rm', 'coffee', 'sheriff_in', 'br_chat1'] : ['br_chat1', 'br_chat2', 'coffee', 'seatT1', 'br_table']));
+      if (npc.gathered && npc.gathered > performance.now()) { npc.timer = 5; return; }
+      if (!npc.leaving) this.goTo(npc, rng.pick(npc.dept === 'police' ? ['brief_room', 'armory_mid', 'garage', 'locker_rm', 'coffee', 'sheriff_in', 'br_chat1', 'range_line', `range_l${Math.floor(Math.random() * 6)}`] : ['br_chat1', 'br_chat2', 'coffee', 'seatT1', 'br_table']));
     }
   }
 
@@ -137,7 +147,28 @@ export class NPCManager {
     if (npc.leaving && npc.dest === 'dE_out') { this.npcs.splice(this.npcs.indexOf(npc), 1); return; }
     if (npc.dest === npc.home) { this.sitAtHome(npc); npc.timer = 30 + Math.random() * 60; }
     if (npc.dest === 'coffee') npc.yaw = Math.PI / 2;
+    if (npc.dest?.startsWith('brief_seat')) { npc.sitting = true; npc.state = 'sit'; npc.yaw = Math.PI / 2; npc.timer = 40; }
+    if (npc.dest === 'brief_podium') npc.yaw = -Math.PI / 2;
+    if (npc.dest?.startsWith('range_')) npc.yaw = 0;
     if (npc.dest === 'couch' || npc.dest === 'seatT1' || npc.dest === 'seatT2') { npc.sitting = true; npc.state = 'sit'; npc.yaw = npc.dest === 'couch' ? Math.PI : 0; if (npc.dest === 'couch') npc.z = 17.35; else npc.z = 14.55; }
+  }
+
+  /** Department events pull people together: roll call fills the briefing room, training fills the range. */
+  gather(kind) {
+    const until = performance.now() + 120000;
+    const bring = (id, dest, from = 'garage') => {
+      let n = this.npcs.find((x) => x.id === id);
+      if (!n) { const s = STAFF.find((x) => x.id === id); if (!s) return; n = this.spawn(s, this.node(from) ? from : 'dE_out'); n.leaveAt = 200 + Math.random() * 60; }
+      n.gathered = until; this.goTo(n, dest);
+    };
+    if (kind === 'rollcall' || kind === 'briefing') {
+      bring('watch', 'brief_podium'); if (kind === 'rollcall') bring('captain', 'brief_room');
+      ['ruiz', 'hensley', 'jake', 'hale'].forEach((id, i) => bring(id, `brief_seat${i + 1}`));
+    } else if (kind === 'training') {
+      bring('hale', 'range_line'); ['ruiz', 'hensley', 'jake'].forEach((id, i) => bring(id, `range_l${i * 2}`));
+    } else if (kind === 'meeting') {
+      bring('chief', 'brief_room', 'dE_out'); bring('captain', 'brief_a1'); bring('watch', 'brief_podium');
+    }
   }
 
   /** Interaction volumes for the player's look ray. */

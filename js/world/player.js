@@ -94,7 +94,7 @@ export class Player {
     if (!blocked(this.pos[0] + dx, this.pos[2])) this.pos[0] += dx; else this.vel[0] = 0;
     if (!blocked(this.pos[0], this.pos[2] + dz)) this.pos[2] += dz; else this.vel[1] = 0;
     // stay inside the building envelope
-    this.pos[0] = clamp(this.pos[0], -41.6, 11.6); this.pos[2] = clamp(this.pos[2], -7.6, 17.6);
+    this.pos[0] = clamp(this.pos[0], -41.6, 11.6); this.pos[2] = clamp(this.pos[2], -25.6, 17.6);
   }
 }
 

@@ -3,6 +3,8 @@ import { classifyWith } from './nlu.js';
 import { RANKS } from '../sim/career.js';
 import { WEATHER_TYPES } from '../sim/weather.js';
 import { rng, fill } from '../core/util.js';
+import { StoryTeller } from './stories.js';
+import { LEADERS } from '../sim/department.js';
 
 export const STAFF = [
   { id: 'maria', name: 'Maria Delgado', role: 'Senior Dispatcher', sex: 'f', pitch: 1.02, rate: 1.0, personality: 'warm, patient mentor with 14 years on the floor', desk: 1, kind: 'dispatcher' },
@@ -14,7 +16,14 @@ export const STAFF = [
   { id: 'marcus', name: 'Marcus Reyes', role: 'Training Officer', sex: 'm', pitch: 0.95, rate: 0.98, personality: 'enthusiastic teacher who loves explaining things', kind: 'trainer' },
   { id: 'helen', name: 'Helen Park', role: 'Communications Director', sex: 'f', pitch: 0.97, rate: 0.95, personality: 'thoughtful leader focused on her team\'s growth', kind: 'director' },
   { id: 'jake', name: 'Officer Jake Morrison', role: 'Carmi PD (visiting)', sex: 'm', pitch: 0.9, rate: 1.0, personality: 'friendly patrol cop grabbing coffee between calls', kind: 'visitor', dept: 'police' },
-  { id: 'lou', name: 'Captain Lou Bennett', role: 'Carmi FD (visiting)', sex: 'm', pitch: 0.82, rate: 0.92, personality: 'big-hearted fire captain who tells long stories', kind: 'visitor', dept: 'fire' },
+  { id: 'lou', name: 'Lt. Lou Bennett', role: 'Carmi FD (visiting)', sex: 'm', pitch: 0.82, rate: 0.92, personality: 'big-hearted fire lieutenant who tells long stories', kind: 'visitor', dept: 'fire' },
+  // Department leadership (fictional characters)
+  { id: 'captain', name: LEADERS.captain.name, role: 'Captain', sex: 'm', pitch: 0.88, rate: 0.95, personality: 'steady, plain-spoken leader who backs his people', kind: 'command', home: 'sheriff_desk' },
+  { id: 'watch', name: LEADERS.watch.name, role: 'Watch Commander', sex: 'm', pitch: 0.92, rate: 1.0, personality: 'sharp, dry-humored night-shift veteran who runs the watch', kind: 'command', home: 'brief_room' },
+  { id: 'chief', name: LEADERS.fireChief.name, role: 'Fire Chief', sex: 'm', pitch: 0.84, rate: 0.95, personality: 'calm, safety-first fire chief with a farmer\'s patience', kind: 'visitor', dept: 'fire' },
+  { id: 'ruiz', name: 'Deputy Ana Ruiz', role: 'Patrol Deputy (visiting)', sex: 'f', pitch: 1.0, rate: 1.05, personality: 'quick, upbeat patrol deputy', kind: 'visitor', dept: 'police', storyKey: 'deputy' },
+  { id: 'hensley', name: 'Deputy Cole Hensley', role: 'Patrol Deputy (visiting)', sex: 'm', pitch: 0.9, rate: 1.0, personality: 'laid-back farm-kid deputy', kind: 'visitor', dept: 'police', storyKey: 'deputy' },
+  { id: 'hale', name: 'Sgt. Mike Hale', role: 'Range & Armory Sergeant', sex: 'm', pitch: 0.86, rate: 0.96, personality: 'by-the-book armorer and range master, safety above all', kind: 'visitor', dept: 'police', storyKey: 'deputy' },
   { id: 'sam', name: 'Paramedic Sam Ortiz', role: 'White County Ambulance (visiting)', sex: 'f', pitch: 1.0, rate: 1.05, personality: 'quick-witted medic, dark humor, loves the dispatchers', kind: 'visitor', dept: 'ems' },
 ];
 
@@ -38,6 +47,9 @@ const DEFS = {
   departments: { ex: ['who handles what', 'which units should i send', 'what departments do we have', 'what does swat do', 'when do i send hazmat', 'what units should go to a fire'], re: [/department|which units|what units|who handles|swat|hazmat|k-?9|send to a/] },
   thanks: { ex: ['thank you', 'thanks', 'appreciate it', 'thanks for the help'], re: [/^(thanks|thank you|appreciate|cheers)/] },
   compliment: { ex: ['you are great', 'nice job', 'you are awesome', 'good work today'], re: [/(you.re|you are) (great|awesome|the best)|nice job|good work/] },
+  another: { ex: ['tell me another one', 'another story', 'got another one', 'one more story', 'any more stories', 'what else you got'], re: [/another (one|story)|one more|more stories|what else you got/] },
+  schedule: { ex: ['when is roll call', 'what is on the schedule', 'when is the next briefing', 'what time is shift change', 'is there training today', 'any meetings today'], re: [/roll ?call|schedule|briefing|shift change|training|meeting/] },
+  range: { ex: ['can i use the range', 'where is the shooting range', 'how do i qualify', 'can i check out equipment', 'how does the armory work'], re: [/range|qualif|armory|check ?out|equipment|gear/] },
   bye: { ex: ['bye', 'see you later', 'talk to you later', 'i have to get back to work', 'later', 'gotta go'], re: [/\b(bye|see you|talk (to you )?later|gotta go|get back to work|later)\b/] },
 };
 
@@ -46,6 +58,7 @@ const L = {
   how: { _: ['Doing alright, thanks for asking.', 'Hanging in there. You?', 'Not bad! Busy, but good.'], ray: ['I\'ve been doing this twenty-eight years. I\'m always "fine."', 'My back hurts and the coffee\'s burnt. So, normal.'], tyler: ['Honestly? My heart\'s still racing from that last call. But good!'], sam: ['Living the dream. Smells like diesel and hospital food, but living it.'], lou: ['Can\'t complain! Well, I can, but nobody listens.'] },
   who: { _: ['I\'m {name}, {role}.', '{name}. I\'m the {role} here.'], ray: ['Ray Kowalski. I\'ve been here since the radios were the size of refrigerators.'], helen: ['I\'m Helen Park, the Communications Director. My door\'s always open.'], jake: ['Jake Morrison, Carmi PD. I work nights mostly, west side of town.'], lou: ['Lou Bennett, Captain with Carmi Fire. Been on the job twenty-two years.'], sam: ['Sam Ortiz, paramedic on Medic 12. Your voice is the one that sends me places!'] },
   job: { _: ['I answer calls and keep everybody safe. Best job I\'ve ever had, and the hardest.', 'I love it. You\'re the first first responder, you know?'], ray: ['I came here for six months while I looked for something better. That was 1998.'], tyler: ['Six months in. Still learning. Maria says I\'m doing okay.'], denise: ['I was a paramedic for nine years. Now I send the paramedics. It\'s a different kind of pressure.'], karen: ['I keep the floor running, make sure everyone gets breaks, and catch what falls through the cracks.'], marcus: ['I train new dispatchers. Watching someone handle their first big call calmly? Best feeling.'], helen: ['I run the center – budgets, staffing, equipment, and making sure people like you grow.'] },
+  greet_cmd: { captain: ['Morning. How\'s the floor treating you?', 'Good to see you. Keep my deputies safe out there, alright?'], watch: ['Hey. Quiet so far — don\'t say it out loud.', 'Evening. The watch is yours as much as mine.'], chief: ['Hey there. Just stopped by to see the folks who send us out.', 'Howdy. Got any coffee left?'] },
   bye: { _: ['Talk to you later.', 'Good luck out there.', 'See you around.', 'Go get \'em.'], ray: ['Don\'t let the phones bite.'], tyler: ['Later! Don\'t forget to hydrate!'], karen: ['Head back to your console when you\'re ready.'] },
   thanks: { _: ['Anytime.', 'No problem.', 'Of course!', 'You got it.'] },
   compliment: { _: ['Aw, thanks. You\'re doing great too.', 'That means a lot, seriously.'], ray: ['Don\'t tell anyone. I have a reputation.'] },
@@ -80,7 +93,15 @@ const TIPS = [
 ];
 
 export class StaffDialogue {
-  constructor(game) { this.game = game; this.memory = {}; }
+  constructor(game) { this.game = game; this.memory = {}; this.stories = new StoryTeller(); }
+
+  /** A story this character hasn't told you recently, with a varied lead-in. */
+  story(npc, again = false) {
+    const key = npc.storyKey || npc.id;
+    const leads = again ? ['Alright, one more. ', 'Okay, okay — here\'s another. ', 'You want more? Fine. ', 'Let me think… oh, here\'s one. ']
+      : ['', '', 'Oh, I\'ve got one. ', 'Okay, so. ', 'You want a story? ', 'Here\'s one I don\'t tell often. '];
+    return rng.pick(leads) + this.stories.next(key);
+  }
 
   npc(id) { return STAFF.find((s) => s.id === id); }
 
@@ -89,6 +110,7 @@ export class StaffDialogue {
     m.talks = (m.talks || 0) + 1;
     if (m.talks > 1) return rng.pick([`Back again? What's up?`, 'Hey, what do you need?', 'Yeah?']);
     if (npc.kind === 'supervisor' && sim) return `Hey. ${this.statusLine(npc)} Need anything?`;
+    if (L.greet_cmd[npc.id]) return rng.pick(L.greet_cmd[npc.id]);
     if (npc.kind === 'visitor') return rng.pick(['Hey! Just grabbing a coffee before I head back out.', 'Oh, hey! You\'re the one who sends us all over town, huh?']);
     return fill(rng.pick(L.greet[npc.id] || L.greet._), npc);
   }
@@ -126,7 +148,10 @@ export class StaffDialogue {
       case 'joke': return { text: pick('joke') };
       case 'coffee': return { text: pick('coffee') };
       case 'food': return { text: pick('food') };
-      case 'story': return { text: pick('story') };
+      case 'story': m.lastStory = Date.now(); return { text: this.story(npc) };
+      case 'another': return { text: m.lastStory ? this.story(npc, true) : this.story(npc) };
+      case 'schedule': { const sch = g.department; return { text: sch ? sch.describeNext(npc) : 'Check the shift board in the corridor.' }; }
+      case 'range': return { text: npc.id === 'hale' ? 'Range rules: eye and ear protection on, training firearm checked out from the armory, and you follow my commands on the line. Grab your gear from the armory cage and head through the north door.' : 'The armory cage is north of the briefing room. Check out your gear with Sgt. Hale\'s system, then the range is through the back door. Eyes and ears first!' };
       case 'city': return { text: pick('city') };
       case 'departments': return { text: pick('departments') };
       case 'weather': {
@@ -167,7 +192,7 @@ export class StaffDialogue {
         return res ? { text: `Sure, I'll take ${res.number}. I've got units going on it.`, action: 'delegated' } : { text: 'You don\'t have anything waiting for units right now. Nice work.' };
       }
       default:
-        return { text: rng.pick(['Hm, not sure what you mean.', 'Sorry, say that again?', 'Ha, okay.', 'I\'m not sure about that one. Ask me for tips, the status, or a story.']) };
+        return { text: rng.pick(['Hm, not sure what you mean.', 'Sorry, say that again?', 'Ha, okay.', 'I\'m not sure about that one. Ask me for tips, the status, the schedule, or a story.']) };
     }
   }
 }

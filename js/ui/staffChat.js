@@ -2,7 +2,7 @@
 import { modal, toast } from './dom.js';
 import { esc } from '../core/util.js';
 
-const QUICK = ['How are you?', 'Any tips for me?', 'How busy are we?', 'Can I take a break?', 'How do I get promoted?', 'Tell me a story', 'Tell me a joke', 'Can you take a call for me?'];
+const QUICK = ['How are you?', 'Tell me a story', 'Tell me another one', 'Any tips for me?', 'How busy are we?', 'When is roll call?', 'Can I take a break?', 'How do I get promoted?', 'Tell me a joke', 'Can you take a call for me?'];
 
 export function openStaffChat(game, npc) {
   const sd = game.staffDialogue;

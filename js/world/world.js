@@ -88,6 +88,7 @@ export class World {
     this.tex = Object.fromEntries(Object.entries(T).map(([k, c]) => [k, tex(c)]));
     this.tex.blob = tex(makeBlob(64), { repeat: false }); this.tex.face = tex(makeFace(), { repeat: false });
     this.tex.extSigns = tex(makeSignAtlas(), { repeat: false });
+    this.tex.rangeTarget = tex(this.targetCanvas(), { repeat: false });
     this.tex.vend = tex(this.vendCanvas()); this.tex.rack = tex(this.rackCanvas()); this.tex.books = tex(this.booksCanvas());
     this.texSize = size;
     this.mats = this.makeMaterials();
@@ -147,7 +148,7 @@ export class World {
       books: m({ map: t.books }),
       flagUS: m({ map: t.flagUS, specular: 0.05, doubleSided: true }), flagIL: m({ map: t.flagIL, specular: 0.05, doubleSided: true }),
       seal: m({ map: t.seal, specular: 0.45, shininess: 50, reflect: 0.05 }), lockers: m({ map: t.lockers, specular: 0.45, shininess: 40, reflect: 0.08 }), cork: m({ map: t.cork, specular: 0.03 }),
-      gold: m({ color: [0.85, 0.66, 0.22], specular: 0.9, shininess: 70, reflect: 0.3 }),
+      gold: m({ color: [0.85, 0.66, 0.22], specular: 0.9, shininess: 70, reflect: 0.3 }), rangeTarget: m({ map: t.rangeTarget, specular: 0.02, doubleSided: true, noCast: true }),
       sheriffDoor: m({ map: t.sheriffDoor, specular: 0.6, shininess: 80, reflect: 0.12 }), rollup: m({ map: t.rollup, specular: 0.3, shininess: 30 }),
       whiteboard: m({ map: t.whiteboard, specular: 0.6, shininess: 90, reflect: 0.1 }), briefing: m({ color: [0.02, 0.02, 0.02], emissiveMap: t.briefing, emissive: [1, 1, 1], reflect: 0.06, shininess: 90 }),
       mirror: m({ color: [0.25, 0.27, 0.3], specular: 1.0, shininess: 140, reflect: 0.85 }), glassDark: m({ color: [0.04, 0.05, 0.06], specular: 1.0, shininess: 120, reflect: 0.35 }),
@@ -165,6 +166,14 @@ export class World {
       extFlagUS: { color: [1, 1, 1], map: t.flagUS, unlit: true, noCast: true, receive: false, fogMode: 2, doubleSided: true },
       extFlagIL: { color: [1, 1, 1], map: t.flagIL, unlit: true, noCast: true, receive: false, fogMode: 2, doubleSided: true },
     };
+  }
+
+  targetCanvas() {
+    const c = makeCanvas(128, 160); const g = c.getContext('2d'); g.fillStyle = '#efe9db'; g.fillRect(0, 0, 128, 160);
+    for (const [k, col] of [[56, '#efe9db'], [48, '#1a1a1a'], [38, '#efe9db'], [26, '#1a1a1a'], [12, '#c62828']]) { g.fillStyle = col; g.beginPath(); g.arc(64, 70, k, 0, 6.283); g.fill(); }
+    g.fillStyle = '#1a1a1a'; g.font = '700 12px system-ui'; g.textAlign = 'center'; g.fillText('TRAINING · 25', 64, 148);
+    g.fillStyle = 'rgba(30,30,30,.85)'; for (const [x, y] of [[60, 66], [70, 74], [66, 61], [52, 80], [78, 58]]) { g.beginPath(); g.arc(x, y, 2.2, 0, 6.283); g.fill(); }
+    return c;
   }
 
   vendCanvas() { const c = makeCanvas(128, 256); const g = c.getContext('2d'); g.fillStyle = '#1a1a22'; g.fillRect(0, 0, 128, 256); const cols = ['#e63946', '#f4a261', '#2a9d8f', '#e9c46a', '#8ecae6', '#ffb703']; for (let r = 0; r < 6; r++) { g.fillStyle = '#2a2a33'; g.fillRect(4, 38 + r * 38, 120, 3); for (let k = 0; k < 4; k++) { g.fillStyle = cols[(r + k) % 6]; g.fillRect(8 + k * 29, 10 + r * 38, 22, 28); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(10 + k * 29, 12 + r * 38, 5, 24); } } return c; }

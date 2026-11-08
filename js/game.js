@@ -26,6 +26,9 @@ import { openStaffChat } from './ui/staffChat.js';
 import { reportHTML } from './ui/report.js';
 import { modal, toast, anyModalOpen, closeTopModal, setToastFilter, confirmBox } from './ui/dom.js';
 import { WEATHER_TYPES } from './sim/weather.js';
+import { DepartmentSchedule, LEADERS } from './sim/department.js';
+import { openBriefing, openSchedule } from './ui/rollCall.js';
+import { openArmory, openRange } from './ui/range.js';
 
 const PA_LINES = [
   'Attention White County staff: shift briefing in the training room in fifteen minutes.',
@@ -117,6 +120,7 @@ export class Game {
   }
 
   attachSim() {
+    (this.department ||= new DepartmentSchedule(this)).reset();
     this.sim.career = this.career; this.sim.llm = this.llm; this.sim.audio = this.audio;
     this.cad.screens.calls.callId = null; this.cad.screens.calls.forms = {}; this.cad.screens.incidents.detailId = null; this.cad.selectedIncident = null;
     this.cad.screens.radio.feedKey = null; this.cad.screens.calls.renderedCall = null;
@@ -212,11 +216,12 @@ export class Game {
       case 'tv': toast(`Channel 8: ${this.world.painter.headline(sim)}`, { level: 'info', duration: 6000 }); break;
       case 'radio_room': toast('Radio racks: P25 trunked system, 9 talkgroups, all repeaters online. Backup generator tested Tuesday.', { level: 'info', duration: 6000 }); break;
       case 'director_desk': toast(`Helen's desk: budget reports, a framed photo of the 2019 dispatch team, and your file – "${this.career.rank().name}".`, { level: 'info', duration: 6000 }); break;
-      case 'shiftboard': toast('Shift board: verify addresses · Little Wabash crossings · Thanksgiving potluck Thursday.', { level: 'info', duration: 6000 }); break;
+      case 'shiftboard': this.releasePointer(); openSchedule(this); break;
       case 'console': toast(t.label, { level: 'info' }); break;
       case 'restroom': this.audio.door?.(); toast(rng.pick(['You wash up and splash some water on your face. Back to the console.', 'Quick restroom break. The hand dryer is louder than a siren.', 'You check yourself in the mirror – headset hair, as usual.']), { level: 'info' }); break;
-      case 'armory': toast(`Armory: ${14} patrol rifles, 8 shotguns, 24 duty pistols, less-lethal launchers, riot shields and helmets. Everything is signed out on the clipboard – Sgt. Hale has the keys.`, { level: 'info', duration: 7000 }); break;
-      case 'briefing': toast(`Roll call: ${sim ? `${sim.incidents.open().length} open incidents · weather ${sim.weather.current()} · ` : ''}watch for farm equipment on IL-14 and deer along the river bottoms. Be safe out there.`, { level: 'info', duration: 7000 }); break;
+      case 'armory': this.releasePointer(); openArmory(this); break;
+      case 'range': this.releasePointer(); openRange(this); break;
+      case 'briefing': this.releasePointer(); if (sim?.state.lastBriefing) openBriefing(this, sim.state.lastBriefing, { live: false }); else openSchedule(this); break;
       case 'sheriff_desk': toast("The Sheriff's desk: a county map with patrol districts, a stack of warrants to serve, and a coffee mug that says WORLD'S OKAYEST SHERIFF.", { level: 'info', duration: 7000 }); break;
       case 'evidence': toast('Evidence room: every bag sealed, labeled and logged. Chain of custody is everything.', { level: 'info', duration: 6000 }); break;
       case 'lockers': toast('Deputy lockers – names on every door, duty bags on the bench. Day shift is gearing up.', { level: 'info' }); break;
@@ -370,8 +375,41 @@ export class Game {
         this.audio.setRingLevel(Math.max(0.15, Math.min(1, 1.6 - d / 12)));
       }
       this.updatePA(dt);
+      this.department?.update();
     } catch (e) { console.error(e); }
     requestAnimationFrame((tt) => this.loop(tt));
+  }
+
+  /** A scheduled department event just happened (roll call, shift change, training…). */
+  onDepartmentEvent(ev) {
+    if (this.sim === this.menuSim || this.state !== 'playing') return;
+    const lead = { rollcall: LEADERS.watch, shift: LEADERS.watch, training: LEADERS.range, meeting: LEADERS.fireChief, supervisor: LEADERS.supervisor, announcement: LEADERS.captain, briefing: LEADERS.watch }[ev.kind] || LEADERS.watch;
+    this.audio.pa?.();
+    // the department hears it on the radio too, so it's part of the shift log
+    for (const l of ev.lines.slice(0, 3)) { const w = { captain: LEADERS.captain, watch: LEADERS.watch, chief: LEADERS.fireChief, karen: LEADERS.supervisor, hale: LEADERS.range }[l.who] || lead; this.sim.radio.push({ channel: l.who === 'chief' ? 'fire' : 'sheriff', from: w.short, text: l.text, kind: 'info' }); }
+    this.world?.npcs?.gather?.(ev.kind);
+    const attendable = ['rollcall', 'training', 'briefing', 'meeting'].includes(ev.kind);
+    if (attendable) {
+      const where = ev.kind === 'training' ? 'at the range' : 'in the briefing room';
+      setTimeout(() => this.speech.speak(`Attention all personnel. ${ev.title} ${where}${ev.kind === 'rollcall' ? ' in five minutes' : ''}.`, { key: lead.id, sex: lead.sex, pitch: lead.pitch, rate: lead.rate, category: 'staff' }), 1200);
+      toast(`${ev.title} ${where}. Click to attend.`, { level: 'info', title: `📢 ${lead.short}`, duration: 15000, onClick: () => this.attendEvent(ev) });
+    } else {
+      // short announcements are simply spoken over the PA
+      if (!this.sim.calls.active()) ev.lines.forEach((l, i) => { const w = { captain: LEADERS.captain, watch: LEADERS.watch, chief: LEADERS.fireChief, karen: LEADERS.supervisor, hale: LEADERS.range }[l.who] || lead; setTimeout(() => this.speech.speak(l.text, { key: w.id, sex: w.sex, pitch: w.pitch, rate: w.rate, category: 'staff' }), 1200 + i * 200); });
+      toast(ev.lines.map((l) => l.text).join(' '), { level: 'info', title: `📢 ${ev.title}`, duration: 12000, onClick: () => openBriefing(this, ev, { live: false }) });
+    }
+  }
+
+  attendEvent(ev) {
+    if (this.state !== 'playing') return;
+    if (this.cad.open) this.closeCAD?.();
+    if (!this.world.failed) {
+      const p = this.world.player; p.seated = false;
+      if (ev.kind === 'training') { p.pos = [-15.5, 1.65, -9.6]; p.yaw = 0; } else { p.pos = [-15.2, 1.65, 6.6]; p.yaw = Math.PI / 2 + 0.1; }
+      p.pitch = 0.02;
+    }
+    this.releasePointer();
+    openBriefing(this, ev, { live: true });
   }
 
   updatePA(dt) {
