@@ -152,6 +152,7 @@ export class NPCManager {
 
   drawNPC(n, items, meshes, makeMat) {
     n.mats ||= { skin: makeMat(n.skin), hair: makeMat(n.hair, 0.05), shirt: makeMat(n.shirt), pants: makeMat(n.pants), shoe: makeMat([0.06, 0.06, 0.07], 0.3), dark: makeMat([0.05, 0.05, 0.06], 0.4), badge: makeMat([0.85, 0.7, 0.2], 0.6) };
+    n.mats.face ||= { ...makeMat(n.skin, 0.1), map: this.world?.tex?.face };
     n.parts ||= Array.from({ length: 18 }, () => ({ model: mat4(), mesh: null, mat: null }));
     const M = n.mats; let pi = 0;
     const cy = Math.cos(n.yaw), sy = Math.sin(n.yaw);
@@ -202,7 +203,7 @@ export class NPCManager {
   head(n, put, box, sph, M, x, y, z) {
     const hy = n.headYaw || 0;
     put(box, M.skin, x, y - 0.05, z, 0, 0.1, 0.1, 0.1);
-    put(sph, M.skin, x, y + 0.1, z, 0, 0.115, 0.135, 0.12, hy);
+    put(sph, M.face.map ? M.face : M.skin, x, y + 0.1, z, 0, 0.115, 0.135, 0.12, hy);
     put(sph, M.hair, x, y + 0.155, z + 0.015, 0, 0.125, 0.095, 0.13, hy);
     if (n.hairLong) put(box, M.hair, x, y + 0.04, z + 0.07, 0, 0.22, 0.24, 0.06, hy);
     if (n.kind === 'dispatcher' || n.kind === 'supervisor') { put(box, M.dark, x, y + 0.24, z, 0, 0.26, 0.025, 0.03, hy); put(box, M.dark, x + 0.13, y + 0.1, z, 0, 0.03, 0.07, 0.06, hy); }

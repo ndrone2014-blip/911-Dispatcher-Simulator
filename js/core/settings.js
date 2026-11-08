@@ -3,7 +3,7 @@ import { bus } from './events.js';
 import { deepMerge, deepClone, isTouchDevice } from './util.js';
 
 export const DEFAULT_SETTINGS = {
-  graphics: { preset: 'auto', fpsCounter: false, fov: 72, monitorRefresh: 1 },
+  graphics: { preset: 'auto', adaptive: true, fpsCounter: false, fov: 72, monitorRefresh: 1 },
   audio: {
     master: 0.85, game: 0.7, caller: 1, radio: 0.75, ambience: 0.45, notifications: 0.7,
     muted: { game: false, caller: false, radio: false, ambience: false, notifications: false },

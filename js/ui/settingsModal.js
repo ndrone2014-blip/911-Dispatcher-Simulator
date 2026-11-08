@@ -2,6 +2,11 @@
 import { modal, toast } from './dom.js';
 import { esc } from '../core/util.js';
 
+function gfxStatus(st) {
+  const fx = [st.shadows && 'shadows', st.msaa ? `${st.msaa}× MSAA` : st.post && 'FXAA', st.bloom && 'glow'].filter(Boolean).join(', ') || 'basic lighting';
+  return `${st.preset[0].toUpperCase()}${st.preset.slice(1)} · ${st.width}×${st.height}${st.scale < 1 ? ` (${Math.round(st.scale * 100)}%)` : ''} · ${fx} · ${st.fps} FPS${st.note ? ` · ${st.note}` : ''}`;
+}
+
 export function openSettings(game) {
   const s = game.settings; let tab = 'graphics';
   const body = document.createElement('div');
@@ -16,7 +21,11 @@ export function openSettings(game) {
   function draw() {
     let html = `<div class="row wrap" style="gap:4px;margin-bottom:10px">${Object.entries(tabs).map(([k, v]) => `<button class="chip ${tab === k ? 'active' : ''}" data-act="tab" data-t="${k}">${v}</button>`).join('')}</div><div class="settings-list" style="padding:0">`;
     if (tab === 'graphics') {
-      html += row('Quality preset', `Auto picks a preset for this device (currently <b>${esc(s.graphicsPreset())}</b>).`, sel('graphics.preset', { auto: 'Auto', low: 'Low', medium: 'Medium', high: 'High', ultra: 'Ultra' }))
+      const st = game.world?.status?.() || {};
+      const desc = { low: 'Fastest. Simple furniture, no shadows or post effects – best for older phones.', medium: 'Rounded furniture, soft shadows, reflections and anti-aliasing. Good for most phones and laptops.', high: 'Full detail, 4× MSAA, softer shadows and screen glow. For desktops and recent laptops.', ultra: 'Everything on: sharpest resolution, 12 lights, moving shadows for people.' };
+      html += row('Quality preset', `Auto picks a preset for this device (currently <b>${esc(s.graphicsPreset())}</b>). Changes apply instantly.<br>${esc(desc[s.graphicsPreset()] || '')}`, sel('graphics.preset', { auto: 'Auto', low: 'Low', medium: 'Medium', high: 'High', ultra: 'Ultra' }))
+        + row('Adaptive performance', 'Automatically lowers resolution, then effects, then the preset if the game starts to lag. Smooth gameplay always comes first.', tog('graphics.adaptive'))
+        + (st.preset && st.preset !== 'off' ? row('Current rendering', `<span data-r="gfxstatus">${esc(gfxStatus(st))}</span>`, '') : '')
         + row('Field of view', 'Camera field of view in degrees.', range('graphics.fov', 55, 95, 1))
         + row('FPS counter', '', tog('graphics.fpsCounter'))
         + row('Monitor screen refresh', 'How often the 3D monitors redraw (lower = faster on slow devices).', sel('graphics.monitorRefresh', { 0.5: 'Every 2 seconds', 1: 'Every second', 2: 'Twice a second' }))
@@ -65,6 +74,7 @@ export function openSettings(game) {
     if (t.dataset.invert) v = !v;
     if (p === 'graphics.monitorRefresh') v = parseFloat(v);
     s.set(p, v);
+    if (p === 'graphics.preset') setTimeout(draw, 60);
   }
   async function act(a, t) {
     if (a === 'done') m.close();

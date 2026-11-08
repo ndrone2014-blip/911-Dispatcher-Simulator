@@ -53,7 +53,7 @@ export class HUD {
       ${ringing ? `<span class="tb-item ring" data-act="answer" style="cursor:pointer">📞 ${ringing} ringing – answer</span>` : '<span class="tb-item">📞 0</span>'}
       <span class="tb-item">🚨 ${open}</span><button class="btn sm" data-act="cad">🖥 Console${this.touch ? '' : ' (Tab)'}</button><button class="btn sm" data-act="pause">⏸</button>`;
     this.$('break-banner').hidden = !sim.onBreak;
-    const fps = this.$('fps'); fps.hidden = !g.settings.data.graphics.fpsCounter; fps.textContent = `${this.fps} FPS · ${g.world?.renderer?.stats.draws || 0} draws`;
+    const fps = this.$('fps'); fps.hidden = !g.settings.data.graphics.fpsCounter; if (!fps.hidden) { const st = g.world?.status?.() || {}; fps.textContent = `${this.fps} FPS · ${st.draws || 0} draws · ${st.preset || ''}${st.scale < 1 ? ` ${Math.round(st.scale * 100)}%` : ''}`; }
     const hint = this.$('hint-box');
     hint.hidden = !g.settings.data.ui.showHints || this.touch;
     hint.innerHTML = `<b>Walking</b><br><span class="kbd">W A S D</span> move · <span class="kbd">Shift</span> walk faster<br><span class="kbd">E</span> interact · <span class="kbd">Tab</span> go to your console<br><span class="kbd">Esc</span> pause menu`;

@@ -282,10 +282,15 @@ export class ScreenPainter {
     for (const it of this.skyline) {
       const { x, w } = it;
       if (it.kind === 'bldg') {
-        g.fillStyle = body; g.fillRect(x, ground - it.h, w, it.h);
+        const brick = (it.win % 3 === 0) && day > 0.2; const bk = Math.round(shade * 1.3);
+        g.fillStyle = brick ? `rgb(${bk + 40},${bk + 10},${bk})` : body; g.fillRect(x, ground - it.h, w, it.h);
+        g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(x + w * 0.78, ground - it.h, w * 0.22, it.h); // shaded side
         g.fillStyle = light; g.fillRect(x - 1, ground - it.h - 3, w + 2, 3); // cornice
+        if (day > 0.3 && !winLit()) { g.fillStyle = `rgba(160,190,215,${0.18 + day * 0.15})`; for (let wy = ground - it.h + 7; wy < ground - 8; wy += 11) for (let wxp = x + 5; wxp < x + w * 0.75; wxp += 10) g.fillRect(wxp, wy, 4, 5); }
+        if (it.h > 50) { g.fillStyle = body; g.fillRect(x + w * 0.3, ground - it.h - 8, 8, 5); } // rooftop unit
       } else if (it.kind === 'house') {
         g.fillStyle = body; g.fillRect(x, ground - it.h, w, it.h);
+        g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(x + w * 0.75, ground - it.h, w * 0.25, it.h);
         g.beginPath(); g.moveTo(x - 4, ground - it.h); g.lineTo(x + w / 2, ground - it.h - w * 0.32); g.lineTo(x + w + 4, ground - it.h); g.closePath(); g.fillStyle = light; g.fill();
       } else if (it.kind === 'tree') {
         g.fillStyle = `rgba(30,22,14,${0.6 + day * 0.4})`; g.fillRect(x + it.w / 2 - 2, ground - it.h * 0.45, 4, it.h * 0.45);
@@ -323,6 +328,45 @@ export class ScreenPainter {
     }
   }
 
+  /** Static far layers (haze, tree line, skyline, street) cached per lighting state – the per-frame cost is one drawImage. */
+  exteriorLayer(w, h, day, night, overcast) {
+    const autumn = isThanksgivingSeason();
+    const key = `${w}x${h}:${Math.round(day * 12)}:${Math.round(overcast * 6)}:${autumn}`;
+    if (this.extCache?.key === key) return this.extCache.canvas;
+    const c = (this.extCache?.canvas?.width === w && this.extCache.canvas.height === h) ? this.extCache.canvas : makeCanvas(w, h);
+    const g = c.getContext('2d'); g.clearRect(0, 0, w, h);
+    const ground = h * 0.86; const lum = 0.35 + day * 0.65;
+    // distant haze band + low rolling tree line on the horizon
+    const hz = g.createLinearGradient(0, ground - 120, 0, ground);
+    hz.addColorStop(0, 'rgba(255,255,255,0)'); hz.addColorStop(1, `rgba(${170 * lum | 0},${180 * lum | 0},${195 * lum | 0},${0.25 + overcast * 0.2})`);
+    g.fillStyle = hz; g.fillRect(0, ground - 120, w, 120);
+    g.fillStyle = autumn ? `rgb(${60 * lum + 10 | 0},${48 * lum + 8 | 0},${36 * lum + 10 | 0})` : `rgb(${34 * lum + 8 | 0},${52 * lum + 10 | 0},${40 * lum + 12 | 0})`;
+    g.beginPath(); g.moveTo(0, ground);
+    for (let x = 0; x <= w; x += 8) g.lineTo(x, ground - 28 - Math.sin(x * 0.013) * 7 - Math.sin(x * 0.051 + 1.3) * 4 - Math.sin(x * 0.17) * 1.5);
+    g.lineTo(w, ground); g.closePath(); g.globalAlpha = 0.75; g.fill(); g.globalAlpha = 1;
+    this.drawSkyline(g, ground, day, night, overcast);
+    // street: grass verge, sidewalk, asphalt with lane dashes
+    g.fillStyle = autumn ? `rgb(${70 * lum + 6 | 0},${66 * lum + 6 | 0},${38 * lum + 6 | 0})` : `rgb(${40 * lum + 6 | 0},${70 * lum + 8 | 0},${40 * lum + 8 | 0})`; g.fillRect(0, ground, w, h - ground);
+    g.fillStyle = `rgb(${120 * lum + 10 | 0},${120 * lum + 10 | 0},${116 * lum + 10 | 0})`; g.fillRect(0, ground + 6, w, 5);
+    g.fillStyle = `rgb(${38 * lum + 8 | 0},${40 * lum + 9 | 0},${44 * lum + 10 | 0})`; g.fillRect(0, ground + 11, w, h - ground - 11);
+    g.fillStyle = `rgba(240,210,90,${0.5 + day * 0.3})`; for (let x = 0; x < w; x += 46) g.fillRect(x, ground + 27, 24, 2);
+    // street lights
+    for (let x = 60; x < w; x += 190) {
+      g.fillStyle = `rgb(${40 + day * 40 | 0},${42 + day * 40 | 0},${46 + day * 40 | 0})`; g.fillRect(x, ground - 52, 3, 58); g.fillRect(x, ground - 52, 18, 3);
+      if (night > 0.3) { const gl = g.createRadialGradient(x + 16, ground - 48, 0, x + 16, ground - 48, 34); gl.addColorStop(0, 'rgba(255,214,150,.9)'); gl.addColorStop(1, 'rgba(255,214,150,0)'); g.fillStyle = gl; g.fillRect(x - 20, ground - 82, 72, 72); }
+    }
+    // parked cars
+    const carCols = ['#7a1f1f', '#d8d8d8', '#1f3d7a', '#2b2b2b', '#6b6f75'];
+    for (let i = 0; i < 9; i++) {
+      const x = (i * 131 + 40) % w; const col = carCols[i % carCols.length];
+      g.globalAlpha = 0.55 + day * 0.45; g.fillStyle = col; g.fillRect(x, ground + 12, 34, 8); g.fillRect(x + 7, ground + 6, 18, 7);
+      g.fillStyle = `rgba(150,190,220,${0.4 + day * 0.4})`; g.fillRect(x + 9, ground + 7, 6, 5); g.fillRect(x + 17, ground + 7, 6, 5);
+      g.fillStyle = '#111'; g.fillRect(x + 4, ground + 19, 6, 3); g.fillRect(x + 24, ground + 19, 6, 3); g.globalAlpha = 1;
+    }
+    this.extCache = { key, canvas: c };
+    return c;
+  }
+
   paintExterior(g, w, h, game) {
     const sim = game.sim; const m = sim ? sim.clock() : 720; const hr = m / 60;
     const wx = sim ? sim.weather.current() : 'clear'; const t = performance.now() / 1000;
@@ -331,34 +375,51 @@ export class ScreenPainter {
     const dusk = Math.max(0, 1 - Math.abs(hr - 18.5) / 1.6) + Math.max(0, 1 - Math.abs(hr - 6.5) / 1.4);
     const overcast = { clear: 0, rain: 0.65, thunderstorm: 0.85, snow: 0.55, fog: 0.75, severe: 0.92 }[wx] ?? 0;
     const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
-    let top = mix([8, 12, 30], [70, 140, 220], day), bot = mix([20, 26, 48], [170, 205, 235], day);
-    if (dusk > 0) { top = mix(top, [90, 70, 130], dusk * 0.6); bot = mix(bot, [250, 150, 90], dusk * 0.7); }
-    top = mix(top, [70, 76, 86].map((v) => v * (0.35 + day * 0.65)), overcast); bot = mix(bot, [110, 115, 125].map((v) => v * (0.35 + day * 0.65)), overcast);
-    const grad = g.createLinearGradient(0, 0, 0, h); grad.addColorStop(0, `rgb(${top})`); grad.addColorStop(0.75, `rgb(${bot})`); grad.addColorStop(1, `rgb(${bot})`);
+    let top = mix([8, 12, 30], [52, 118, 205], day), mid = mix([16, 22, 44], [120, 170, 225], day), bot = mix([24, 30, 54], [190, 214, 236], day);
+    if (dusk > 0) { top = mix(top, [70, 60, 120], dusk * 0.6); mid = mix(mid, [200, 120, 120], dusk * 0.55); bot = mix(bot, [255, 160, 95], dusk * 0.7); }
+    const grey = (v) => v.map((x) => x * (0.35 + day * 0.65));
+    top = mix(top, grey([70, 76, 86]), overcast); mid = mix(mid, grey([95, 100, 110]), overcast); bot = mix(bot, grey([115, 120, 130]), overcast);
+    const grad = g.createLinearGradient(0, 0, 0, h); grad.addColorStop(0, `rgb(${top})`); grad.addColorStop(0.5, `rgb(${mid})`); grad.addColorStop(0.86, `rgb(${bot})`); grad.addColorStop(1, `rgb(${bot})`);
     g.fillStyle = grad; g.fillRect(0, 0, w, h);
-    // sun / moon
+    // sun with halo / moon with stars
     if (overcast < 0.6) {
-      if (day > 0.05) { const sx = w * ((hr - 6) / 12); g.fillStyle = `rgba(255,240,200,${0.7 * (1 - overcast)})`; g.beginPath(); g.arc(sx, h * (0.62 - day * 0.45), 26, 0, 6.283); g.fill(); }
-      else { g.fillStyle = 'rgba(230,235,255,.85)'; g.beginPath(); g.arc(w * 0.75, h * 0.18, 16, 0, 6.283); g.fill(); g.fillStyle = 'rgba(255,255,255,.7)'; for (let i = 0; i < 60; i++) g.fillRect((i * 173) % w, (i * 97) % (h * 0.5), 1.5, 1.5); }
+      if (day > 0.05) {
+        const sx = w * ((hr - 6) / 12), sy = h * (0.62 - day * 0.45);
+        const halo = g.createRadialGradient(sx, sy, 0, sx, sy, 140); halo.addColorStop(0, `rgba(255,236,190,${0.55 * (1 - overcast)})`); halo.addColorStop(1, 'rgba(255,236,190,0)');
+        g.fillStyle = halo; g.fillRect(sx - 140, sy - 140, 280, 280);
+        g.fillStyle = `rgba(255,246,220,${0.9 * (1 - overcast)})`; g.beginPath(); g.arc(sx, sy, 22, 0, 6.283); g.fill();
+      } else {
+        g.fillStyle = 'rgba(255,255,255,.7)'; for (let i = 0; i < 90; i++) { const tw = 0.4 + 0.6 * Math.abs(Math.sin(t * 0.7 + i)); g.globalAlpha = tw; g.fillRect((i * 173) % w, (i * 97) % (h * 0.55), i % 7 === 0 ? 2 : 1.3, i % 7 === 0 ? 2 : 1.3); } g.globalAlpha = 1;
+        const mg = g.createRadialGradient(w * 0.75, h * 0.18, 0, w * 0.75, h * 0.18, 60); mg.addColorStop(0, 'rgba(220,230,255,.35)'); mg.addColorStop(1, 'rgba(220,230,255,0)'); g.fillStyle = mg; g.fillRect(w * 0.75 - 60, h * 0.18 - 60, 120, 120);
+        g.fillStyle = 'rgba(235,238,255,.92)'; g.beginPath(); g.arc(w * 0.75, h * 0.18, 15, 0, 6.283); g.fill();
+      }
     }
-    // clouds
-    g.fillStyle = `rgba(${overcast > 0.5 ? '90,95,105' : '255,255,255'},${0.15 + overcast * 0.5})`;
-    for (let i = 0; i < 9; i++) { const cx = ((i * 157 + t * 4) % (w + 300)) - 150; const cy = h * (0.12 + (i % 4) * 0.07); g.beginPath(); g.ellipse(cx, cy, 90 + (i % 3) * 30, 18 + (i % 2) * 8, 0, 0, 6.283); g.fill(); }
-    // skyline
-    const ground = h * 0.86; const night = 1 - day;
-    this.drawSkyline(g, ground, day, night, overcast);
-    g.fillStyle = `rgb(${12 + day * 25},${15 + day * 30},${20 + day * 30})`; g.fillRect(0, ground, w, h - ground);
-    // street lights / car lights at night
-    if (night > 0.4) for (let i = 0; i < 30; i++) { const x = ((i * 61 + t * (i % 2 ? 40 : -55)) % (w + 40) + w + 40) % (w + 40) - 20; g.fillStyle = i % 2 ? 'rgba(255,60,60,.8)' : 'rgba(255,255,220,.85)'; g.fillRect(x, ground + 10 + (i % 3) * 6, 3, 2); }
+    // layered soft clouds
+    const cl = overcast > 0.5 ? [92, 97, 108] : [255, 255, 255];
+    for (let i = 0; i < 11; i++) {
+      const cx = ((i * 157 + t * (3 + (i % 3))) % (w + 320)) - 160; const cy = h * (0.1 + (i % 5) * 0.06);
+      g.fillStyle = `rgba(${cl},${(0.1 + overcast * 0.45) * (0.6 + (i % 3) * 0.2)})`;
+      for (const [dx, dy, rx, ry] of [[0, 0, 80, 16], [-50, 6, 50, 11], [55, 5, 60, 12], [10, -8, 45, 12]]) { g.beginPath(); g.ellipse(cx + dx * (1 + (i % 2) * 0.4), cy + dy, rx * (1 + (i % 3) * 0.3), ry, 0, 0, 6.283); g.fill(); }
+    }
+    // cached static layers
+    const night = 1 - day; const ground = h * 0.86;
+    g.drawImage(this.exteriorLayer(w, h, day, night, overcast), 0, 0);
+    // traffic: headlights / tail lights at night, moving cars by day
+    for (let i = 0; i < 8; i++) {
+      const dir = i % 2 ? 1 : -1; const x = ((i * 173 + t * (38 + (i % 3) * 9) * dir) % (w + 60) + w + 60) % (w + 60) - 30; const y = ground + (dir > 0 ? 30 : 36);
+      if (night > 0.4) { g.fillStyle = dir > 0 ? 'rgba(255,60,60,.85)' : 'rgba(255,255,225,.9)'; g.fillRect(x, y, 4, 2); g.fillRect(x + 12, y, 4, 2); }
+      else { g.fillStyle = ['#8a1d1d', '#d0d0d0', '#20457f', '#2b2b2b'][i % 4]; g.fillRect(x, y - 4, 26, 6); g.fillRect(x + 6, y - 9, 14, 6); }
+    }
     // weather overlays
-    if (wx === 'fog') { g.fillStyle = 'rgba(190,195,200,.55)'; g.fillRect(0, 0, w, h); }
+    if (wx === 'fog') { const fg = g.createLinearGradient(0, h * 0.3, 0, h); fg.addColorStop(0, 'rgba(190,195,200,.35)'); fg.addColorStop(1, 'rgba(190,195,200,.75)'); g.fillStyle = fg; g.fillRect(0, 0, w, h); }
     if (['rain', 'thunderstorm', 'severe'].includes(wx)) {
+      g.fillStyle = 'rgba(40,48,60,.18)'; g.fillRect(0, 0, w, h);
       g.strokeStyle = `rgba(200,215,235,${wx === 'rain' ? 0.35 : 0.5})`; g.lineWidth = 1.2; g.beginPath();
       const n = wx === 'rain' ? 140 : 240;
       for (let i = 0; i < n; i++) { const x = (i * 97 + t * 300) % w; const y = (i * 53 + t * 900) % h; g.moveTo(x, y); g.lineTo(x - 4, y + 16); }
       g.stroke();
     }
-    if (wx === 'snow') { g.fillStyle = 'rgba(255,255,255,.85)'; for (let i = 0; i < 200; i++) { const x = (i * 97 + Math.sin(t + i) * 20 + t * 15) % w; const y = (i * 53 + t * 40) % h; g.fillRect(x, y, 2.5, 2.5); } }
+    if (wx === 'snow') { g.fillStyle = 'rgba(255,255,255,.85)'; for (let i = 0; i < 200; i++) { const x = (i * 97 + Math.sin(t + i) * 20 + t * 15) % w; const y = (i * 53 + t * 40) % h; g.fillRect(x, y, 2.5, 2.5); } g.fillStyle = 'rgba(245,248,255,.6)'; g.fillRect(0, ground, w, 6); }
     if (game.world?.flash > 0) { g.fillStyle = `rgba(230,235,255,${game.world.flash * 0.8})`; g.fillRect(0, 0, w, h); }
   }
 

@@ -155,6 +155,8 @@ export class SettingsScreen extends Screen {
     const sel = (key, label, sub, opts) => `<div class="set"><div>${label}<small>${sub}</small></div><select class="input" style="width:auto" data-cfg="${key}">${Object.entries(opts).map(([k, v]) => `<option value="${k}" ${String(c[key]) === String(k) ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`;
     this.root.querySelector('[data-r="body"]').innerHTML = `<div class="settings-list">
       <div class="row wrap"><button class="btn" data-act="brk">${this.sim.onBreak ? '☕ End break' : '☕ Take a break'}</button><button class="btn" data-act="save">💾 Save now</button><button class="btn" data-act="full">All settings…</button></div>
+      <div class="set"><div>Graphics quality<small>Low · Medium · High · Ultra – applies instantly. Auto picks for this device.</small></div><select class="input" style="width:auto" data-set="graphics.preset">${Object.entries({ auto: 'Auto', low: 'Low', medium: 'Medium', high: 'High', ultra: 'Ultra' }).map(([k, v]) => `<option value="${k}" ${st.graphics.preset === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+      ${tog('graphics.adaptive', 'Adaptive performance', 'Lower resolution/effects automatically if the game lags.', 'set')}
       ${sel('callFrequency', 'Call frequency', 'How often new 911 calls come in.', FREQUENCY_LABELS)}
       ${sel('majorFrequency', 'Major incidents', 'How often big emergencies happen.', { rare: 'Rare', occasional: 'Occasional', frequent: 'Frequent' })}
       ${tog('availabilityOverride', 'Availability override (sandbox)', 'Allow assigning busy / out-of-service units.')}

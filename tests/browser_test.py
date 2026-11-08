@@ -42,6 +42,7 @@ with sync_playwright() as p:
     shot(page, '01_menu')
     page.click('text=Free Play'); time.sleep(0.4); shot(page, '02_freeplay_setup')
     page.click('text=Start shift'); time.sleep(2.5)
+    page.evaluate('() => window.__game.settings.set("graphics.adaptive", false)')
     shot(page, '03_world_start')
     # look at the video wall / walk a bit
     page.evaluate('() => { const p = window.__game.world.player; p.pos=[0,1.65,3.5]; p.yaw=0; p.pitch=0.08; }'); time.sleep(0.8); shot(page, '04_world_videowall')
@@ -61,9 +62,12 @@ with sync_playwright() as p:
     shot(page, '09_assign_modal')
     page.click('[data-act="selrec"]'); time.sleep(0.3)
     # also add SWAT to prove freedom
-    page.fill('[data-r="search"]', 'SWAT'); time.sleep(0.4)
-    cb = page.query_selector('.assign-row input[type=checkbox]:not([disabled])')
-    if cb: cb.check()
+    page.fill('[data-r="search"]', 'SWAT'); time.sleep(0.8)
+    for _ in range(5):  # the list re-renders while filtering; retry until the row is stable
+        try:
+            page.locator('.assign-row input[type=checkbox]:not([disabled])').first.check(timeout=2000); break
+        except Exception:
+            time.sleep(0.4)
     page.click('.modal-foot [data-act="assign"]'); time.sleep(1)
     st = page.evaluate('() => { const s = window.__game.sim; const i = s.incidents.list[0]; return { units: i.units.map(id => s.units.byId(id).callsign), status: i.status }; }')
     print('  incident after assign:', st)

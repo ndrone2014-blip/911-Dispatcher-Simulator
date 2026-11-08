@@ -1,7 +1,7 @@
 // Service worker: network-first with an offline fallback cache, so updates
 // deployed to Netlify show up immediately but the game still opens offline
 // after the first visit.
-const CACHE = 'wc911-v1';
+const CACHE = 'wc911-v2';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './css/main.css', './css/cad.css', './js/main.js'];
 
 self.addEventListener('install', (e) => {

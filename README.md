@@ -101,9 +101,22 @@ Automatic and manual saves in browser storage, resume an in-progress shift, and 
 
 **Mobile:** left joystick to walk, drag the right side to look, **USE** to interact, **DESK** to jump to your console. The CAD uses tabs along the bottom.
 
+## Graphics settings
+
+*Settings → Graphics* (or the CAD's ⚙ Settings screen, mid-shift) has four presets that apply instantly — no reload:
+
+| Preset | What you get | Good for |
+|---|---|---|
+| **Low** | Rounded furniture, new textures, contact shadows, 4 lights, 70% resolution, no post effects | Older phones, Chromebooks |
+| **Medium** | + full prop detail, baked soft shadows, reflections, FXAA anti-aliasing, vignette | Most phones and laptops |
+| **High** | + extra detail (casters, sprinklers, desk mics, plant leaves), 4× MSAA, softer shadows, screen glow (bloom) | Desktops, recent laptops |
+| **Ultra** | + 12 lights, 9-tap shadows, moving shadows for people, up to 2× device resolution | Gaming PCs |
+
+**Auto** picks a preset for your device. **Adaptive performance** (on by default) watches the frame rate and, if the game starts to lag, lowers resolution first, then effects, then the preset — smooth gameplay always wins over looks. Everything is procedural (no texture downloads), the static scene is merged into ~60 draw calls, shadows are baked once instead of every frame, and the game recovers automatically if the browser resets the GPU.
+
 ## Honest notes about the technology
 
-- **3D renderer:** Three.js was recommended, but this project was built in an environment with no internet access, so it ships with a small purpose-built **WebGL2 renderer** instead (per-pixel lighting with the nearest 3–8 point lights, emissive live screens, fog, ACES tone mapping, transparency, static batching). It has no external dependencies, so the site works offline and on any static host. The renderer is isolated in `js/engine/`, so it could be swapped for Three.js later. If WebGL2 is unavailable, the game falls back to console-only mode — every dispatch feature still works.
+- **3D renderer:** Three.js was recommended, but this project was built in an environment with no internet access, so it ships with a small purpose-built **WebGL2 renderer** instead (per-pixel lighting with up to 12 point lights, baked shadow maps, environment reflections, MSAA/FXAA, bloom, emissive live screens, fog, ACES tone mapping, static batching). It has no external dependencies, so the site works offline and on any static host. The renderer is isolated in `js/engine/`, so it could be swapped for Three.js later. If WebGL2 is unavailable, the game falls back to console-only mode — every dispatch feature still works.
 - **Conversations:** the caller engine is a local, rule-based system with intent recognition, memory and personality. It understands a wide range of phrasings, but it is **not** a large language model and can misunderstand unusual sentences — suggested questions always work.
 - **Optional local AI:** in *Settings → Speech & AI* you can connect a free model running on your own computer via [Ollama](https://ollama.com) or LM Studio. It only rephrases caller lines in character; the game's engine still decides what callers know, and any failure falls back instantly. Never required, no keys. (For Ollama, start it with `OLLAMA_ORIGINS="*"` so the browser may connect.)
 - **Speech recognition** availability depends on the browser (Chrome, Edge and Safari support it; Firefox doesn't yet).
@@ -138,4 +151,5 @@ tests/                logic tests (Node) and browser tests (Playwright)
 npm test                         # 3,000+ headless logic checks (Node 18+)
 python3 tests/browser_test.py    # desktop/mobile/tablet playthrough in headless Chrome (needs Playwright)
 python3 tests/training_test.py   # plays the full tutorial
+python3 tests/graphics_test.py   # every preset: stats, screenshots, leak/adaptive/context-loss checks
 ```

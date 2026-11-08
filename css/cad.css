@@ -177,3 +177,51 @@
   .mon-tabs { display: none; }
   .assign-layout { height: auto; }
 }
+
+/* ===== Visual polish layer (colour, depth and glow only – no layout changes) ===== */
+#cad { background: radial-gradient(120% 90% at 50% 0%, rgba(14,24,40,.55), rgba(3,6,11,.25) 70%); }
+.cad-top { background: linear-gradient(180deg, rgba(16,24,38,.96), rgba(8,13,22,.96)); border-color: #22324c; box-shadow: 0 6px 24px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05); backdrop-filter: blur(8px); }
+.cad-top .brand { text-shadow: 0 0 12px rgba(100,210,255,.35); }
+.cad-top .ti { background: linear-gradient(180deg, #0f1724, #0a111b); border-color: #1d2b42; font-variant-numeric: tabular-nums; }
+.cad-top .ti.ring { box-shadow: 0 0 14px rgba(255,60,60,.45); }
+/* monitor hardware: matte bezel, chamfer highlight, faint glass sheen */
+.monitor { background: linear-gradient(180deg, #20262f 0%, #12161c 55%, #0b0e12 100%); border-color: #2c333e; box-shadow: 0 18px 50px rgba(0,0,0,.7), 0 2px 0 rgba(255,255,255,.03), inset 0 1px 0 rgba(255,255,255,.07), inset 0 -2px 6px rgba(0,0,0,.6); position: relative; }
+.monitor .screen { position: relative; background: linear-gradient(180deg, #0d1420, #0a0f18); box-shadow: inset 0 0 0 1px rgba(100,160,255,.05), inset 0 0 40px rgba(61,165,255,.06), 0 0 18px rgba(61,165,255,.05); }
+.monitor .screen::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; background: linear-gradient(155deg, rgba(255,255,255,.035) 0%, rgba(255,255,255,0) 32%); z-index: 5; }
+.mon-label { color: #566275; text-shadow: 0 1px 0 rgba(0,0,0,.6); }
+.mon-label::before { content: ''; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #2fd08a; box-shadow: 0 0 6px #2fd08a; margin-right: 7px; vertical-align: 1px; }
+.mon-tabs { background: linear-gradient(180deg, #0c121d, #090e17); }
+.mon-tab { transition: color .12s, background .12s; }
+.mon-tab.active { background: linear-gradient(180deg, #121c2c, var(--bg2)); box-shadow: inset 0 2px 0 var(--accent); }
+.pane-head { background: linear-gradient(180deg, #131d2d, #0f1725); color: #93a6c1; box-shadow: inset 0 -1px 0 rgba(255,255,255,.02); }
+.toolbar, .say-row, .suggest, .tx-box, .subtabs { background: linear-gradient(180deg, #0e1622, #0b121c); }
+.table th { background: linear-gradient(180deg, #131e30, #0f1827); }
+.table tbody tr:nth-child(even) td { background: rgba(255,255,255,.012); }
+.table tr.click:hover td { background: #13213a; }
+.table tr.sel td { background: linear-gradient(90deg, #17325a, #132744) !important; }
+.table td { font-variant-numeric: tabular-nums; }
+.status-pill { box-shadow: inset 0 0 0 1px rgba(255,255,255,.05); }
+.line-card { background: linear-gradient(180deg, #121c2b, #0f1724); transition: border-color .12s, transform .08s; }
+.line-card:hover { transform: translateY(-1px); }
+.line-card.active { background: linear-gradient(180deg, #13294a, #0f2039); box-shadow: 0 0 0 1px rgba(44,133,234,.35), 0 6px 18px rgba(23,103,194,.18); }
+.line-card.ringing { box-shadow: 0 0 16px rgba(193,52,52,.35); }
+.ani-box { background: linear-gradient(180deg, #0c1828, #0a1422); color: #b9d3f0; }
+.tl.caller { background: linear-gradient(180deg, #1c2739, #182233); box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+.tl.dispatcher { background: linear-gradient(180deg, #1a5594, #144577); box-shadow: 0 2px 8px rgba(20,80,150,.3); }
+.inc-head { background: linear-gradient(180deg, #121c2b, #0f1724); }
+.card, .settings-list .set { background: linear-gradient(180deg, #121b2a, #0f1622); box-shadow: inset 0 1px 0 rgba(255,255,255,.03); }
+.map-wrap { background: #080e18; }
+.map-info, .map-legend { backdrop-filter: blur(6px); box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.chan.active { background: linear-gradient(90deg, #17325a, #13284a); box-shadow: inset 3px 0 0 var(--accent); }
+.dept-filter.active { box-shadow: inset 3px 0 0 var(--accent); }
+.rmsg .ch { box-shadow: 0 0 8px rgba(255,255,255,.08); }
+.rmsg.urgent { background: linear-gradient(90deg, rgba(255,90,78,.14), rgba(255,90,78,.03)); }
+.scroll::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #2d4262, #24364f); border: 2px solid transparent; background-clip: padding-box; }
+.scroll::-webkit-scrollbar-thumb:hover { background: #3a5680; background-clip: padding-box; }
+@media (max-width: 900px) {
+  .monitor { background: none; box-shadow: none; }
+  .monitor .screen::after { display: none; }
+  .cad-bottom-tabs { background: linear-gradient(180deg, rgba(14,22,36,.97), rgba(8,13,22,.97)); box-shadow: 0 -6px 20px rgba(0,0,0,.4); }
+  .cad-bottom-tabs button.active { background: linear-gradient(180deg, #1a3a66, #15294a); box-shadow: inset 0 2px 0 var(--accent); }
+}
+@media (prefers-reduced-motion: reduce) { .line-card, .mon-tab { transition: none; } .line-card:hover { transform: none; } }

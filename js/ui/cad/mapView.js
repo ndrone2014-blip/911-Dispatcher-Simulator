@@ -42,8 +42,9 @@ export class MapRenderer {
       const F = 640;
       for (let fx = 0; fx < 11600; fx += F) for (let fy = 0; fy < 10600; fy += F) {
         const k = ((fx * 7 + fy * 13) / F) % 5;
-        ctx.fillStyle = ['#152018', '#18221a', '#1a2219', '#161f19', '#1c241a'][Math.floor(k)];
+        ctx.fillStyle = ['#152018', '#18221a', '#1c2318', '#161f19', '#1e2519'][Math.floor(k)];
         ctx.fillRect(X(fx + 8), Y(fy + 8), (F - 16) * s, (F - 16) * s);
+        if (s > 0.12 && detail > 0) { ctx.fillStyle = 'rgba(255,255,255,.018)'; const rows = Math.floor(k) % 2; for (let r = 30; r < F - 30; r += 60) rows ? ctx.fillRect(X(fx + r), Y(fy + 12), 2, (F - 24) * s) : ctx.fillRect(X(fx + 12), Y(fy + r), (F - 24) * s, 2); }
       }
     }
     ctx.restore();
@@ -52,7 +53,12 @@ export class MapRenderer {
     for (const [x, y, r] of city.woods) { const px = X(x), py = Y(y); if (px < -50 || py < -50 || px > w + 50 || py > h + 50) continue; ctx.beginPath(); ctx.arc(px, py, Math.max(1.5, r * s), 0, 6.283); ctx.fill(); }
     // rivers
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    for (const rv of RIVERS) { path(rv.points); ctx.strokeStyle = '#1b4a72'; ctx.lineWidth = Math.max(rv.width > 80 ? 3 : 1.6, rv.width * s); ctx.stroke(); }
+    for (const rv of RIVERS) {
+      const wd = Math.max(rv.width > 80 ? 3 : 1.6, rv.width * s);
+      if (detail > 0) { path(rv.points); ctx.strokeStyle = 'rgba(30,70,60,.55)'; ctx.lineWidth = wd + Math.max(3, 60 * s); ctx.stroke(); }
+      path(rv.points); ctx.strokeStyle = '#1b4a72'; ctx.lineWidth = wd; ctx.stroke();
+      if (detail > 0 && wd > 3) { path(rv.points); ctx.strokeStyle = 'rgba(120,180,230,.18)'; ctx.lineWidth = wd * 0.35; ctx.stroke(); }
+    }
     // county line
     path(COUNTY_LINE); ctx.closePath(); ctx.setLineDash([10, 6]); ctx.strokeStyle = 'rgba(160,175,140,.45)'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
     // town blocks & buildings
@@ -61,9 +67,13 @@ export class MapRenderer {
       const x = X(b.x0 + 5), y = Y(b.y0 + 5), bw = (b.x1 - b.x0 - 10) * s, bh = (b.y1 - b.y0 - 10) * s;
       if (x > w || y > h || x + bw < 0 || y + bh < 0) continue;
       ctx.fillStyle = ZF[b.zone] || '#1a2333'; ctx.fillRect(x, y, Math.max(1, bw), Math.max(1, bh));
+      if (detail > 0 && s > 0.25) { ctx.strokeStyle = 'rgba(150,170,200,.12)'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, Math.max(1, bw - 1), Math.max(1, bh - 1)); }
       if (buildings && s > 0.14 && detail > 0) for (const [bx, by, bw2, bh2, shade] of b.buildings) {
-        const l = Math.round(32 + shade * 40); ctx.fillStyle = b.zone === 'industrial' ? `rgb(${l},${l + 4},${l + 2})` : `rgb(${l - 6},${l + 4},${l + 22})`;
-        ctx.fillRect(X(bx), Y(by), Math.max(1, bw2 * s), Math.max(1, bh2 * s));
+        const l = Math.round(32 + shade * 40); const px = X(bx), py = Y(by), pw = Math.max(1, bw2 * s), ph = Math.max(1, bh2 * s);
+        if (pw > 3) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(px + 1.5, py + 1.5, pw, ph); }
+        ctx.fillStyle = b.zone === 'industrial' ? `rgb(${l},${l + 4},${l + 2})` : `rgb(${l - 6},${l + 4},${l + 22})`;
+        ctx.fillRect(px, py, pw, ph);
+        if (pw > 6) { ctx.fillStyle = 'rgba(255,255,255,.07)'; ctx.fillRect(px, py, pw, Math.max(1, ph * 0.3)); }
       }
     }
     // farmsteads & oil wells
@@ -76,7 +86,10 @@ export class MapRenderer {
     const style = { street: ['#2b3a55', 9, 1], county: ['#5a5440', 9, 1.2], state: ['#9a8540', 13, 1.6], us: ['#b8963c', 15, 2], interstate: ['#d08a2a', 20, 2.6] };
     for (const kind of ['street', 'county', 'state', 'us', 'interstate']) {
       const [col, wd, min] = style[kind];
-      if (kind === 'interstate') { ctx.strokeStyle = '#3b2a10'; ctx.lineWidth = Math.max(min + 2.5, wd * 1.6 * s); for (const e of city.edges) if (e.kind === kind) { const A = city.nodes[e.a], Bn = city.nodes[e.b]; ctx.beginPath(); ctx.moveTo(X(A.x), Y(A.y)); ctx.lineTo(X(Bn.x), Y(Bn.y)); ctx.stroke(); } }
+      if (kind === 'interstate' || (detail > 0 && kind !== 'street')) {
+        ctx.strokeStyle = kind === 'interstate' ? '#3b2a10' : 'rgba(8,10,12,.75)'; ctx.lineWidth = Math.max(min + (kind === 'interstate' ? 2.5 : 1.6), wd * (kind === 'interstate' ? 1.6 : 1.45) * s);
+        ctx.beginPath(); for (const e of city.edges) if (e.kind === kind) { const A = city.nodes[e.a], Bn = city.nodes[e.b]; ctx.moveTo(X(A.x), Y(A.y)); ctx.lineTo(X(Bn.x), Y(Bn.y)); } ctx.stroke();
+      }
       ctx.strokeStyle = col; ctx.lineWidth = Math.max(min, wd * s);
       ctx.beginPath();
       for (const e of city.edges) {
@@ -86,6 +99,11 @@ export class MapRenderer {
         ctx.moveTo(X(A.x), Y(A.y)); ctx.lineTo(X(Bn.x), Y(Bn.y));
       }
       ctx.stroke();
+      if (detail > 0 && s > 0.3 && (kind === 'interstate' || kind === 'us' || kind === 'state')) {
+        ctx.strokeStyle = kind === 'interstate' ? 'rgba(255,240,200,.55)' : 'rgba(255,240,200,.35)'; ctx.lineWidth = 1; ctx.setLineDash([6, 7]); ctx.beginPath();
+        for (const e of city.edges) if (e.kind === kind) { const A = city.nodes[e.a], Bn = city.nodes[e.b]; ctx.moveTo(X(A.x), Y(A.y)); ctx.lineTo(X(Bn.x), Y(Bn.y)); }
+        ctx.stroke(); ctx.setLineDash([]);
+      }
       if (kind === 'street') { ctx.strokeStyle = '#9a8540'; ctx.lineWidth = Math.max(1.6, 11 * s); ctx.beginPath(); for (const e of city.edges) if (e.alias) { const A = city.nodes[e.a], Bn = city.nodes[e.b]; ctx.moveTo(X(A.x), Y(A.y)); ctx.lineTo(X(Bn.x), Y(Bn.y)); } ctx.stroke(); }
     }
     ctx.lineCap = 'butt';
@@ -188,8 +206,10 @@ export class MapRenderer {
       const [col, glyph] = FAC_STYLE[f.kind] || ['#888', '?']; const x = X(f.x), y = Y(f.y);
       if (x < -20 || y < -20 || x > w + 20 || y > h + 20) continue;
       const r = Math.max(5, Math.min(10, 14 * s));
-      ctx.fillStyle = '#0b1220'; ctx.strokeStyle = col; ctx.lineWidth = 1.6;
-      roundRect(ctx, x - r, y - r, r * 2, r * 2, 3); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(0,0,0,.45)'; roundRect(ctx, x - r + 1.5, y - r + 2, r * 2, r * 2, 4); ctx.fill();
+      ctx.fillStyle = '#0b1220'; ctx.strokeStyle = col; ctx.lineWidth = 1.8;
+      roundRect(ctx, x - r, y - r, r * 2, r * 2, 4); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = `${col}22`; roundRect(ctx, x - r + 2, y - r + 2, r * 2 - 4, r - 2, 2); ctx.fill();
       if (r >= 7) { ctx.fillStyle = f.kind === 'hospital' ? '#ff5a4e' : col; ctx.font = `800 ${Math.round(r * (glyph.length > 2 ? 0.75 : 1.05))}px system-ui`; ctx.fillText(glyph, x, y + 0.5); }
       if (s > 0.42 && opts.labels !== false) { ctx.font = '10px system-ui'; ctx.fillStyle = 'rgba(220,230,245,.8)'; ctx.fillText(f.short, x, y + r + 8); }
     }
@@ -225,6 +245,7 @@ export class MapRenderer {
       const x = X(u.x), y = Y(u.y); if (x < -20 || y < -20 || x > w + 20 || y > h + 20) continue;
       const dept = DEPT_BY_ID[u.dept]; const ty = TYPE_BY_ID[u.type];
       const r = u.id === opts.selectedUnit ? 9 : 7;
+      ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.beginPath(); ctx.arc(x + 1.2, y + 1.8, r + 1, 0, 6.283); ctx.fill();
       ctx.fillStyle = dept?.color || '#ccc'; ctx.strokeStyle = UNIT_STATUS_COLORS[u.status] || '#fff'; ctx.lineWidth = 2.2;
       if (ty.air) { ctx.beginPath(); ctx.moveTo(x, y - r - 2); ctx.lineTo(x + r + 2, y); ctx.lineTo(x, y + r + 2); ctx.lineTo(x - r - 2, y); ctx.closePath(); }
       else { ctx.beginPath(); ctx.arc(x, y, r, 0, 6.283); }
