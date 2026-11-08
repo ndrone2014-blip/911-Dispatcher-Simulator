@@ -236,7 +236,7 @@ export default [
     facts: { name: 'Operator {first} with {co}.' }, clear: ['building secure, alarm reset by keyholder.', 'false alarm, keyholder on scene.'],
     developments: [{ at: 0.25, chance: 0.15, text: 'Glass is broken out at the front, possible suspects inside. Requesting K-9.', addNeeds: { k9: 1, patrol: 2 }, workload: 90, priority: 1 }] }),
   S({ id: 'panic_alarm', typeId: 'PANIC', weight: 0.8, severity: 'medium', zones: ['downtown', 'commercial'], callerSex: 'f',
-    nature: [`This is Metro Alarm, we have a silent hold-up alarm activation at the White County Credit Union, {address}.`],
+    nature: [`This is Metro Alarm, we have a silent hold-up alarm activation at the Prairie Credit Union, {address}.`],
     note: 'Silent hold-up alarm – credit union', personas: ['calm'], callerAtScene: false, revealOnOpen: ['location'],
     clear: ['employee accidentally hit the panic button, verified code word.'],
     developments: [{ at: 0.2, chance: 0.2, text: 'Confirmed robbery just occurred, suspect fled on foot. Requesting K-9, detectives, and FBI notification.', addNeeds: { k9: 1, investigation: 1, federal: 1 }, workload: 120 }] }),

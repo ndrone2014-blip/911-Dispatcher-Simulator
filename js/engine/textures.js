@@ -241,7 +241,7 @@ export function makeTextures(size = 256) {
     const cx = 64, cy = 64; g.fillStyle = '#d9b23a'; g.beginPath(); for (let i = 0; i < 14; i++) { const a = -Math.PI / 2 + i * Math.PI / 7; const rr = i % 2 ? 22 : 46; g.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); } g.closePath(); g.fill();
     g.fillStyle = '#0a0a0b'; g.beginPath(); g.arc(cx, cy, 14, 0, 6.283); g.fill();
     g.fillStyle = '#f4f4f2'; g.font = '900 58px system-ui, sans-serif'; g.textBaseline = 'middle'; g.fillText('SHERIFF', 124, 52);
-    g.fillStyle = '#d9b23a'; g.font = '800 22px system-ui, sans-serif'; g.fillText('WHITE COUNTY · ILLINOIS', 126, 100); T.sheriffDoor = c; }
+    g.fillStyle = '#d9b23a'; g.font = '800 22px system-ui, sans-serif'; g.fillText('COUNTY SHERIFF', 126, 100); T.sheriffDoor = c; }
   // Roll-up garage door
   T.rollup = paint(S, (x, y, n) => { const slat = (y % Math.round(S / 12)); const v = 168 + (n - 0.5) * 18 + (slat < 2 * k ? -40 : slat < 4 * k ? 18 : 0); return [clamp(v), clamp(v + 2), clamp(v + 6)]; }, { offset: 13 });
   // Whiteboard with marker notes
@@ -255,7 +255,7 @@ export function makeTextures(size = 256) {
     g.fillStyle = '#2f8a3a'; g.fillText('Range qual Fri ✓', 316, 128); g.fillStyle = '#222'; g.fillText('K-9 Bo: vet Tue', 316, 156); T.whiteboard = c; }
   // Roll-call slide on the briefing display
   { const c = cv(512, 288); const g = c.getContext('2d'); const grd = g.createLinearGradient(0, 0, 0, 288); grd.addColorStop(0, '#13223d'); grd.addColorStop(1, '#0a1222'); g.fillStyle = grd; g.fillRect(0, 0, 512, 288);
-    g.fillStyle = '#d9b23a'; g.fillRect(0, 0, 512, 40); g.fillStyle = '#0a1222'; g.font = '900 24px system-ui'; g.fillText("ROLL CALL · WHITE COUNTY SHERIFF'S OFFICE", 14, 28);
+    g.fillStyle = '#d9b23a'; g.fillRect(0, 0, 512, 40); g.fillStyle = '#0a1222'; g.font = '900 24px system-ui'; g.fillText("ROLL CALL · COUNTY SHERIFF'S OFFICE", 14, 28);
     g.fillStyle = '#dfe8f5'; g.font = '700 18px system-ui';
     ['• BOLO: dark green pickup, dented tailgate (IL-14 thefts)', '• Deer activity high – river bottoms after dusk', '• Harvest traffic on IL-1 & IL-14', '• Grain bin safety checks – Enfield area', '• Courthouse security: 0800–1700'].forEach((l, i) => g.fillText(l, 18, 78 + i * 34));
     g.fillStyle = '#64d2ff'; g.font = '700 14px system-ui'; g.fillText('BE SAFE · WEAR YOUR VEST · CHECK YOUR RADIO', 18, 270); T.briefing = c; }

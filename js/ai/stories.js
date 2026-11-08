@@ -15,7 +15,7 @@ export const STORIES = {
     'The best compliment I ever got was from a deputy who said, "When you\'re on the radio I stop worrying." That\'s what we\'re here for.',
   ],
   tyler: [
-    'My second week, a guy called to report a "suspicious UFO." It was the Walmart parking lot light flickering. I still sent a unit. I\'m thorough.',
+    'My second week, a guy called to report a "suspicious UFO." It was the supercenter parking lot light flickering. I still sent a unit. I\'m thorough.',
     'I had a call from a kid who dialed 911 to ask if dinosaurs were real. I said yes, but they live in museums now. His mom took the phone and apologized like six times.',
     'One night a lady called because a possum was in her kitchen eating her cat\'s food and staring at her. Animal control was off, so the deputy went. He said the possum won the staring contest.',
     'I took my first structure fire call on Thanksgiving. I was so nervous I said "Engine One, respond to the turkey—" instead of the address. Ray still brings it up.',
@@ -95,7 +95,7 @@ export const STORIES = {
     'When I was a young deputy, I got lost on a county road at night during a pursuit. The dispatcher talked me through every turn from memory. That night I promised myself I\'d always back my dispatchers.',
     'The best roll call I ever gave was thirty seconds long: "Be safe, be kind, come home." Some days that\'s all that needs saying.',
     'We once found a missing child asleep in a neighbor\'s hay barn because a dispatcher noticed the family\'s barn cat followed the kid everywhere. Ask the odd questions.',
-    'During the big flood, I watched dispatch coordinate boats, deputies, fire crews and the Red Cross for thirty hours straight. I\'ve been in this job a long time and I\'ve never seen a better team.',
+    'During the big flood, I watched dispatch coordinate boats, deputies, fire crews and disaster-relief volunteers for thirty hours straight. I\'ve been in this job a long time and I\'ve never seen a better team.',
     'I keep a radio log page framed in my office from the night a deputy was in a crash. Every line is the dispatcher staying calm. That\'s what professionalism looks like.',
     'First week as Captain, I tried to run roll call without coffee. The Watch Commander slid a cup across the podium without saying a word. That\'s partnership.',
   ],

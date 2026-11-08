@@ -81,7 +81,7 @@ export class ScreenPainter {
   paintMonitor(i, g, w, h, game) {
     const sim = game.sim;
     g.fillStyle = '#0b111b'; g.fillRect(0, 0, w, h);
-    if (!sim) { g.fillStyle = '#3da5ff'; g.font = `bold ${w * 0.05}px system-ui`; g.textAlign = 'center'; g.fillText('WHITE COUNTY 911 CAD', w / 2, h / 2); return; }
+    if (!sim) { g.fillStyle = '#3da5ff'; g.font = `bold ${w * 0.05}px system-ui`; g.textAlign = 'center'; g.fillText('REGIONAL 911 CAD', w / 2, h / 2); return; }
     const fs = Math.round(w * 0.03); g.textBaseline = 'top'; g.textAlign = 'left';
     if (i === 0) {
       this.header(g, w, 'CAD · CALLS & INCIDENTS');
@@ -150,7 +150,7 @@ export class ScreenPainter {
     g.fillStyle = '#060b14'; g.fillRect(0, 0, w, h);
     g.fillStyle = '#0d1a2e'; g.fillRect(0, 0, w, h * 0.1);
     g.fillStyle = '#dfe8f5'; g.font = `bold ${fs}px system-ui`; g.textBaseline = 'middle'; g.textAlign = 'left';
-    g.fillText('WHITE COUNTY 911 · CARMI, IL · OPERATIONS', w * 0.01, h * 0.05);
+    g.fillText('REGIONAL 911 · CARMI · OPERATIONS', w * 0.01, h * 0.05);
     if (!sim) return;
     const wx = WEATHER_TYPES[sim.weather.current()];
     g.textAlign = 'right'; g.fillText(`${wx.icon} ${wx.label}   ${fmtClock(sim.clock())}`, w * 0.99, h * 0.05);

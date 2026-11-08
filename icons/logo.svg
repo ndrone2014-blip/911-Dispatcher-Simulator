@@ -28,6 +28,6 @@
     <!-- banner -->
     <rect x="96" y="408" width="320" height="56" rx="12" fill="#f3f6fb"/>
     <text x="256" y="449" font-family="Inter, 'Arial Black', 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="38" letter-spacing="6" text-anchor="middle" fill="#0e1c33">DISPATCH</text>
-    <text x="256" y="494" font-family="Inter, 'Arial Black', 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="21" letter-spacing="5" text-anchor="middle" fill="#8fb4dd">WHITE COUNTY · IL</text>
+    <text x="256" y="494" font-family="Inter, 'Arial Black', 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="21" letter-spacing="5" text-anchor="middle" fill="#8fb4dd">SIMULATOR</text>
   </g>
 </svg>

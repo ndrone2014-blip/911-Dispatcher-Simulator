@@ -1,6 +1,6 @@
 # 911 Dispatch Simulator
 
-A first-person 3D emergency communications center simulator that runs entirely in your web browser — on PC, Mac, iPhone, Android and tablets. Sit at your console in the **White County Emergency Communications center in Carmi, Illinois**, answer calls from Carmi and every town and back road of White County, talk to callers (with your microphone or keyboard), create incidents, and send **any unit you want to any incident**.
+A first-person 3D emergency communications center simulator that runs entirely in your web browser — on PC, Mac, iPhone, Android and tablets. Sit at your console in the **fictional regional 911 center in Carmi, Illinois**, answer calls from Carmi and every town and back road of White County, talk to callers (with your microphone or keyboard), create incidents, and send **any unit you want to any incident**.
 
 **No API keys. No accounts. No servers. No paid services.** It's a static website.
 
@@ -48,7 +48,7 @@ You're stationed at the 911 center in **Carmi**, the county seat, but you dispat
 - **Carmi streets** (Main St, Main Cross St, Robinson, Fair, Oak, Walnut, Church, Jessup, Slocumb, Kerney, Locust, College Blvd, Stewart, Rice and more). Town street grids and exact positions are a simplified, game-friendly approximation — not a survey-accurate map. Distances are compressed about 3× so drives take minutes instead of half an hour, while staying in proportion (Carmi → Grayville is still the long run).
 - **Rural addresses** ("2145 Burnt Prairie Rd"), interstate mile markers, and town addresses ("412 W Main St, Carmi") all work in the CAD and when callers give them.
 - **Rural White County calls:** grain bin entrapments, tractor rollovers, combine/field fires, oil-field tank battery fires and H2S releases, barn fires, livestock on the road, deer strikes, hunters hurt in the river bottoms, boats on the Wabash.
-- Hospitals: Carmi Township Hospital locally, with transfers to Evansville, Eldorado and Fairfield. Mutual aid from Hamilton, Wayne, Gallatin and Edwards counties.
+- Hospitals: Riverbend Medical Center locally, with transfers to Evansville, Eldorado and Fairfield. Mutual aid from Hamilton, Wayne, Gallatin and Edwards counties.
 
 ### Thanksgiving
 Every November the center is decorated: harvest banners, leaf garlands around the video wall, hay bales and pumpkins, a pumpkin on every console, and a potluck table in the break room with a turkey and pies. Holiday calls (turkey fryer fires, family disputes, holiday travel crashes) show up more often. Settings → Interface → *Holiday decorations* lets you force it on or off.
@@ -60,7 +60,7 @@ Every November the center is decorated: harvest banners, leaf garlands around th
 - Live **video wall** (operations stats, city map, active incidents), **news TVs** whose ticker reports your actual incidents, **department status boards**, working wall clock
 - Windows looking out on a real 3D small town — patrol lot, street, storefronts, houses, water tower, church steeple, grain elevator, seasonal trees — lit for the **time of day** and **weather** (rain on the glass, snow, fog that swallows the distance, lightning)
 - Corridor, **break room** (coffee, fridge, vending machine, TV, couch), **supervisor office**, **radio equipment room**, **director's office**
-- **White County Sheriff's Office wing** through the west end of the corridor: men's and women's restrooms, deputy locker room, briefing / roll-call room, **armory** (rifle and shotgun racks, handgun wall, ammo cabinets, riot shields, helmets and vests, cleaning bench, clearing barrel), evidence/property room, the Sheriff's office and a **sally port** garage with marked Sheriff patrol cars
+- **County Sheriff's Office wing** through the west end of the corridor: men's and women's restrooms, deputy locker room, briefing / roll-call room, **armory** (rifle and shotgun racks, handgun wall, ammo cabinets, riot shields, helmets and vests, cleaning bench, clearing barrel), evidence/property room, the Sheriff's office and a **sally port** garage with marked Sheriff patrol cars
 - Coworkers who work their consoles, take coffee breaks and walk the floor; visiting police, fire and EMS personnel drop by; the Captain works from his office and the Watch Commander runs the briefing room
 - **Indoor training range** north of the armory, with an equipment checkout system
 - Your three desk monitors show your real CAD, map and radio log
@@ -75,7 +75,7 @@ Every November the center is decorated: harvest banners, leaf garlands around th
 - Adapts from **three side-by-side monitors** on wide screens to **two**, to a **tabbed single screen** on phones
 
 ### Departments & units (~125 units, configurable up to ~200)
-Police (Patrol, Traffic, Supervisors, Detectives, CID, K-9, SWAT, Gang, Cybercrime, CSI, Bomb Squad, Aviation, Marine, Special Investigations), Sheriff, Federal (FBI, DEA, Federal Investigators, Task Force), Fire (Engines, Ladders, Heavy Rescue, Investigation, HazMat, Technical Rescue, Wildland, Fire Marshal, Battalion Chiefs, Safety Officers), EMS (BLS, ALS, Paramedics, Ambulances, Supervisor, Critical Care, LifeFlight), Emergency Management, Search & Rescue, Public Works, Animal Control, DOT, Utilities, Coast Guard, Disaster Response, Mobile Command.
+Police (Patrol, Traffic, Supervisors, Detectives, CID, K-9, SWAT, Gang, Cybercrime, CSI, Bomb Squad, Aviation, Marine, Special Investigations), Sheriff, Federal (FBI, DEA, Federal Investigators, Task Force), Fire (Engines, Ladders, Heavy Rescue, Investigation, HazMat, Technical Rescue, Wildland, Fire Marshal, Battalion Chiefs, Safety Officers), EMS (BLS, ALS, Paramedics, Ambulances, Supervisor, Critical Care, Air Medical), Emergency Management, Search & Rescue, Public Works, Animal Control, DOT, Utilities, Coast Guard, Disaster Response, Mobile Command.
 
 Units have statuses (Available, Assigned, Responding, On Scene, Transporting, Busy, Out of Service, Returning to Station, Clearing), drive along the road network from their home stations, transport patients to hospitals, self-initiate traffic stops, and have their own radio personalities.
 
@@ -175,3 +175,10 @@ python3 tests/browser_test.py    # desktop/mobile/tablet playthrough in headless
 python3 tests/training_test.py   # plays the full tutorial
 python3 tests/graphics_test.py   # every preset: stats, screenshots, leak/adaptive/context-loss checks
 ```
+
+## Legal, privacy & license
+
+- **Fictional:** This is an independently developed fictional emergency dispatch simulator inspired by White County, Illinois. It is not affiliated with, endorsed by, or operated by White County or any real emergency services agency.
+- **Names:** All agencies, hospitals, businesses, schools, units, people and calls in the game are fictional or generic. Real town, county and road names are used only to describe the setting.
+- **Privacy:** No accounts, ads, analytics or tracking. Saves stay in your browser. Microphone speech recognition is handled by your browser (some browsers send the audio to their own speech service); typing always works instead.
+- **License:** © 2026 Drone Hive Studios. All rights reserved. See [LICENSE](LICENSE).

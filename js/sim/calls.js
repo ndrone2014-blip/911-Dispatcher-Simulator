@@ -153,7 +153,7 @@ export class CallManager {
     if (call.sc.kind !== 'emergency' && call.sc.kind !== 'duplicate') sim.stats.nonEmergency++;
     sim.stats.ringTimes.push(sim.t - call.receivedAt);
     this.addLine(call, 'system', `Line ${call.line} answered. ANI: ${call.sc.ani.phone} (${call.sc.ani.kind}). ALI: ${call.sc.ani.address}`);
-    this.addLine(call, 'dispatcher', call.isCallback ? 'Hello, this is White County 911 calling you back, we received a call from this number.' : '911, what is the address of your emergency?');
+    this.addLine(call, 'dispatcher', call.isCallback ? 'Hello, this is Regional 911 calling you back, we received a call from this number.' : '911, what is the address of your emergency?');
     call.pendingReply = true;
     sim.later(sim.rng.float(0.6, 1.3), () => {
       call.pendingReply = false;

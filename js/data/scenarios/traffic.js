@@ -29,7 +29,7 @@ export default [
     instructions: { away: ['Okay, I\'m stepping back from the car.'], evac: ['I moved away from the car.'] },
     patients: 1, critical: true, needs: { patrol: 2, traffic: 1, rescue: 1, suppression: 1, als: 1, fire_command: 0.5 },
     developments: [{ after: 80, chance: 0.5, text: 'Bystanders report the engine compartment is now on fire.', addNeeds: { suppression: 1 }, callerLine: 'Oh god, there\'s flames under the hood now!' },
-      { at: 0.4, chance: 0.4, text: 'Patient is deteriorating, requesting LifeFlight to the scene.', addNeeds: { air_medical: 1 }, critical: true }],
+      { at: 0.4, chance: 0.4, text: 'Patient is deteriorating, requesting Air Medical to the scene.', addNeeds: { air_medical: 1 }, critical: true }],
     sizeup: ['Single vehicle into a utility pole, heavy entrapment, starting extrication.', 'Car versus truck, one trapped, we\'ll need the tools.'],
     duplicate: ['There\'s a horrible crash, someone\'s stuck in their car!'] }),
   S({ id: 'mva_pileup', typeId: 'MVA_MAJOR', weight: 0.7, severity: 'major', zones: ['highway'], weather: { clear: 0.4, rain: 1.6, thunderstorm: 1.8, snow: 4, fog: 4.5, severe: 2.2 }, personas: ['panicked', 'worried', 'calm'],

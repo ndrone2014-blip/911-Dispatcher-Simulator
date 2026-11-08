@@ -194,7 +194,7 @@ export default [
     instructions: { away: ['I\'m staying back by the road.'] }, patients: (r) => (r.chance(0.4) ? 1 : 0), needs: { suppression: 3, ladder: 1, als: 1, fire_command: 1, patrol: 1 },
     duplicate: ['There\'s a trailer on fire!', 'I can see a big fire from my house.'],
     developments: [{ at: 0.3, chance: 0.5, text: 'All occupants accounted for – family was at church.', workload: -20 }],
-    clear: ['fire knocked down, unit is a total loss, Red Cross notified for the family.'] }),
+    clear: ['fire knocked down, unit is a total loss, disaster-relief volunteers notified for the family.'] }),
   S({ id: 'fire_car_garage', typeId: 'FIRE_VEH', weight: 0.9, severity: 'medium',
     nature: ['My car is on fire in the garage and it\'s getting into the house!'],
     note: 'Vehicle fire in attached garage', callerAtScene: true, personas: ['panicked', 'worried'],

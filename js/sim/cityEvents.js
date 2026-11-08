@@ -58,7 +58,7 @@ export class CityEvents {
       case 'power_outage':
         e.title = `Power outage – ${district}`; e.desc = `The electric co-op reports about ${r.int(150, district === 'Carmi' ? 2400 : 600)} customers without power in and around ${district}.`; break;
       case 'public_event': {
-        const opts = [['White County Fairgrounds', 'Carmi'], ['the courthouse square', 'Carmi'], ['Bicentennial Park', 'Carmi'], ['Grayville Riverfront Park', 'Grayville'], ['Norris City-Omaha-Enfield High School', 'Norris City'], ['Crossville Community Park', 'Crossville']];
+        const opts = [['White County Fairgrounds', 'Carmi'], ['the courthouse square', 'Carmi'], ['Bicentennial Park', 'Carmi'], ['Grayville Riverfront Park', 'Grayville'], ['Southern Prairie High School', 'Norris City'], ['Crossville Community Park', 'Crossville']];
         const [venue, at] = r.pick(opts);
         const what = r.pick(['a Friday night football game', 'the Thanksgiving parade', 'a tractor pull', 'a holiday craft fair', 'a charity 5K run', 'a fall festival', 'a community Thanksgiving dinner']);
         e.district = at; e.title = `${what.replace(/^(a|the) /, '').replace(/^\w/, (c) => c.toUpperCase())} – ${venue}`; e.desc = `Large crowds expected for ${what} at ${venue} in ${at}.`; e.venue = venue;

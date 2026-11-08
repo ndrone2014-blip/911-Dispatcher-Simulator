@@ -1,4 +1,4 @@
-// Builds the White County Emergency Communications Center (Carmi, IL): geometry batches,
+// Builds the fictional regional 911 dispatch center (Carmi, IL): geometry batches,
 // colliders, interactables, light positions, screens and the NPC path graph.
 //
 // opts.detail controls how much small-prop geometry is generated:
@@ -254,7 +254,7 @@ export function buildCenter(opts = {}) {
     mb('blackgloss').box(sx * 7.4, 2.45, -7.87, 2.0, 1.18, 0.08, { uv: 0 });
     screen(`tv${sx > 0 ? 'R' : 'L'}`, 'tv', sx * 7.4, 2.45, -7.82, 1.86, 1.05, 'z', 1, 0, { shared: 'scr_tv' });
   }
-  screen('logo', 'sign', 0, 3.38, -7.9, 6.2, 0.36, 'z', 1, 0, { text: 'WHITE COUNTY EMERGENCY COMMUNICATIONS · CARMI, ILLINOIS' });
+  screen('logo', 'sign', 0, 3.38, -7.9, 6.2, 0.36, 'z', 1, 0, { text: 'REGIONAL EMERGENCY DISPATCH · CARMI, ILLINOIS' });
   // department boards on the west wall
   for (const [i, z] of [[0, -4.2], [1, 0.4], [2, 4.6]]) {
     mb('blackgloss').box(-11.9, 1.95, z, 0.08, 1.62, 2.72, { uv: 0 });

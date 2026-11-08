@@ -1,4 +1,4 @@
-// White County Sheriff's Office wing (west of the 911 center).
+// County Sheriff's Office wing (west of the 911 center).
 //
 //            x: -42 ........ -30 ........ -22 ........ -12 | 911 center
 //   z -8  ┌──────────────┬──────────────┬──────────────┐
@@ -84,7 +84,7 @@ export function buildSheriffWing(k) {
   screen('sign_sally', 'sign', -29.88, 2.55, 9.3, 1.2, 0.24, 'x', 1, 0, { text: 'SALLY PORT' });
   screen('sign_armory', 'sign', -13.9, 2.55, 0.12, 1.9, 0.24, 'z', 1, 0, { text: 'ARMORY · AUTHORIZED ONLY' });
   screen('sign_evidence', 'sign', -30.12, 2.55, -1.0, 1.2, 0.24, 'x', -1, 0, { text: 'EVIDENCE INTAKE' });
-  screen('sign_wing', 'sign', -12.1, 2.75, 9.3, 2.2, 0.24, 'x', -1, 0, { text: "WHITE COUNTY SHERIFF'S OFFICE" });
+  screen('sign_wing', 'sign', -12.1, 2.75, 9.3, 2.2, 0.24, 'x', -1, 0, { text: "COUNTY SHERIFF'S OFFICE" });
 
   // ---------------- briefing / roll call ----------------
   mb('blackgloss').box(-21.9, 1.75, 4, 0.06, 1.15, 2.0); mb('briefing').panel(-21.86, 1.75, 4, 1.9, 1.07, 'x', 1);  // wall display

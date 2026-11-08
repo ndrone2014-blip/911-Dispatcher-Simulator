@@ -145,7 +145,7 @@ export class CAD {
     const shift = sim.config.shiftLength ? `<span class="ti hide-sm" title="Shift progress">⏱ ${Math.round(sim.shiftProgress() * 100)}%</span>` : '';
     const ts = sim.config.timeScale || 1;
     this.top.innerHTML = `
-      <span class="brand">WHITE CO. <span>911</span> CAD</span>
+      <span class="brand">REGIONAL <span>911</span> CAD</span>
       <span class="ti mono" title="Game clock">🕒 ${clock(sim.clock(), g)}</span>
       <span class="ti hide-sm" title="Weather">${wx.icon} ${wx.label}</span>
       ${shift}

@@ -7,7 +7,7 @@
 import { city, SCALE, miles, nearestFacility, TOWNS } from '../../data/city.js';
 import { TOWNSHIPS } from './mapDetail.js';
 
-const PD_TOWNS = { carmi: 'Carmi PD', norris: 'Norris City PD', grayville: 'Grayville PD', crossville: 'Crossville PD', enfield: 'Enfield PD' };
+const PD_TOWNS = { carmi: 'Police – Carmi', norris: 'Police – Norris City', grayville: 'Police – Grayville', crossville: 'Police – Crossville', enfield: 'Police – Enfield' };
 
 function hash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
 function townOf(x, y) { return TOWNS.find((t) => x >= t.x0 - 40 && x <= t.x1 + 40 && y >= t.y0 - 40 && y <= t.y1 + 40) || null; }
@@ -23,9 +23,9 @@ function sheriffDistrict(x, y) {
 
 export function jurisdiction(x, y) {
   const t = townOf(x, y);
-  const law = t && PD_TOWNS[t.id] ? PD_TOWNS[t.id] : "White County Sheriff's Office";
+  const law = t && PD_TOWNS[t.id] ? PD_TOWNS[t.id] : "County Sheriff's Office";
   let beat;
-  if (t?.id === 'carmi') beat = `Carmi PD Beat ${(x < t.x ? 1 : 2) + (y < t.y ? 0 : 2)}`;
+  if (t?.id === 'carmi') beat = `City Police Beat ${(x < t.x ? 1 : 2) + (y < t.y ? 0 : 2)}`;
   else if (t && PD_TOWNS[t.id]) beat = `${PD_TOWNS[t.id]} – Town`;
   else beat = `WCSO ${sheriffDistrict(x, y)}`;
   const fire = nearestFacility(x, y, ['fire']); const ems = nearestFacility(x, y, ['ems']); const hosp = nearestFacility(x, y, ['hospital']);
@@ -93,7 +93,7 @@ export function incidentTimers(inc, nowClock) {
   };
 }
 
-const CARRIERS_W = ['AT&T Mobility', 'Verizon Wireless', 'T-Mobile USA', 'UScellular'];
+const CARRIERS_W = ['Prairie Wireless', 'Heartland Cellular', 'Tri-State Mobile', 'Midwest Telecom'];
 const CARRIERS_L = ['Frontier Communications', 'Wabash Telephone Co-op', 'Spectrum (Charter)'];
 /** Extra ANI/ALI fields shown on the call-taking screen. */
 export function aniDetail(ani) {
@@ -104,7 +104,7 @@ export function aniDetail(ani) {
   return {
     cos, carrier, j,
     confidence: ani.kind === 'wireless' ? `${90}% within ±${ani.radius}m` : 'Registered address',
-    psap: 'White Co 911 · PSAP 1193',
+    psap: 'Regional 911 · PSAP 1193',
     callback: ani.phone,
     tower: ani.sector || null,
   };

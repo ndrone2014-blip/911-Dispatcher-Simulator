@@ -31,8 +31,8 @@ const CLEARING = {
 };
 
 const ALERTS = {
-  thunderstorm: 'The National Weather Service has issued a Severe Thunderstorm Warning for White County.',
-  severe: 'The National Weather Service has issued a Tornado Warning for White County. Take shelter now.',
+  thunderstorm: 'A Severe Thunderstorm Warning has been issued for White County.',
+  severe: 'A Tornado Warning has been issued for White County. Take shelter now.',
   snow: 'A Winter Weather Advisory is in effect for White County. Expect slick roads.',
   fog: 'A Dense Fog Advisory is in effect. Visibility under a quarter mile.',
 };

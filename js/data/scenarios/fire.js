@@ -23,7 +23,7 @@ export default [
     needs: { suppression: 2, ladder: 0.5, fire_command: 0.5, bls: 1 }, patients: (r) => (r.chance(0.5) ? 1 : 0), workload: 160,
     developments: [{ after: 90, chance: 0.6, text: 'Fire has extended beyond the kitchen into the dining room.', addNeeds: { suppression: 1, ladder: 0.5 }, workload: 100, callerLine: 'It\'s in the dining room now, the whole house is filling with smoke!' }],
     sizeup: ['Two-story residential, light smoke showing from the front door, fire in the kitchen.', 'Smoke showing from the rear, going in with a line.'],
-    clear: ['fire contained to the kitchen, overhaul complete, Red Cross notified.'] }),
+    clear: ['fire contained to the kitchen, overhaul complete, relief volunteers notified.'] }),
   S({ id: 'fire_house', typeId: 'FIRE_STR', weight: 1.8, severity: 'major', time: { night: 1.8, evening: 1.3 }, personas: ['panicked', 'worried', 'calm'],
     vars: (r) => ({ stories: r.pick(['two-story', 'one-story', 'split-level']), where: r.pick(['the garage', 'the upstairs windows', 'the roof', 'the back of the house']), color: r.pick(['black', 'thick black', 'gray']) }),
     nature: [`The house next door is on fire! There's flames coming out of {where}!`, `Fire! My neighbor's house is on fire, the whole {stories} house is filling up with smoke!`, `There's a house fire on {street}, flames are shooting out of {where}!`],

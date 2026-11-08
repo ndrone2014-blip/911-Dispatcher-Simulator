@@ -25,7 +25,7 @@ export default [
     facts: { conscious: 'He\'s awake but he\'s in a lot of pain.', breathing: 'Yes, he\'s breathing.', bleeding: { say: 'He\'s bleeding pretty bad.', note: 'Significant bleeding' }, access: 'We\'re out in the back field, I\'ll leave the gate open by the road.', hazards: 'The engine\'s off. Diesel\'s leaking a little.' },
     instructions: { pressure: ['I\'ve got a rag on it, pushing hard.'], position: ['Okay, I won\'t try to move him.'], light: ['I\'ll send my son to the road to flag them down.'] },
     patients: 1, critical: (r) => r.chance(0.5),
-    developments: [{ at: 0.3, chance: 0.4, text: 'Patient has a serious leg injury and a long transport – requesting LifeFlight to a landing zone in the field.', addNeeds: { air_medical: 1 }, critical: true }],
+    developments: [{ at: 0.3, chance: 0.4, text: 'Patient has a serious leg injury and a long transport – requesting Air Medical to a landing zone in the field.', addNeeds: { air_medical: 1 }, critical: true }],
     sizeup: ['Tractor overturned in a ditch, one male pinned, conscious. Stabilizing the tractor.'], clear: ['patient extricated and flown out.', 'patient transported, tractor stabilized.'] }),
   S({ id: 'combine_fire', typeId: 'FIRE_BRUSH', weight: 1.0, severity: 'medium', zones: ['rural'], weather: { clear: 2, rain: 0.1, snow: 0, thunderstorm: 0.3 }, time: { afternoon: 2, morning: 1, evening: 1, night: 0.2 },
     vars: (r) => ({ crop: r.pick(['corn', 'bean', 'wheat stubble']) }),

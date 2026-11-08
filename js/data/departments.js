@@ -124,7 +124,7 @@ export const UNIT_TYPES = [
     numbers: [1], speed: 1.1, caps: { ems_command: 1, als: 0.5 } },
   { id: 'cct', dept: 'ems', name: 'Critical Care Transport', prefix: 'CCT', glyph: 'CC', station: ['hospital'], channel: 'ems',
     numbers: [2], speed: 1.0, caps: { critical_care: 1, als: 1, transport: 1 } },
-  { id: 'air_medical', dept: 'ems', name: 'Air Medical', prefix: 'LifeFlight', glyph: 'LF', station: ['hospital_helipad'], channel: 'ems',
+  { id: 'air_medical', dept: 'ems', name: 'Air Medical', prefix: 'Air Medical', glyph: 'LF', station: ['hospital_helipad'], channel: 'ems',
     numbers: [1], speed: 2.6, air: true, caps: { air_medical: 1, critical_care: 1, transport: 1, als: 1 } },
   // ---- Additional services ----
   { id: 'em', dept: 'em', name: 'Emergency Management', prefix: 'EM', glyph: 'EM', station: ['eoc'], channel: 'em',
@@ -169,6 +169,6 @@ export const CAPABILITY_REQUEST_PHRASE = {
   ladder: 'a ladder truck', rescue: 'heavy rescue', fire_investigation: 'a fire investigator', hazmat: 'HazMat',
   tech_rescue: 'technical rescue', wildland: 'brush units', fire_command: 'a battalion chief', bls: 'an ambulance',
   als: 'ALS / a medic unit', transport: 'a transport unit', ems_command: 'an EMS supervisor', critical_care: 'critical care transport',
-  air_medical: 'LifeFlight', em: 'emergency management', sar: 'search and rescue', public_works: 'public works', animal: 'animal control',
+  air_medical: 'Air Medical', em: 'emergency management', sar: 'search and rescue', public_works: 'public works', animal: 'animal control',
   dot: 'DOT', utility: 'the utility company', coast_guard: 'the Coast Guard', disaster: 'disaster response', comms: 'mobile command',
 };
