@@ -6,6 +6,19 @@ A first-person 3D emergency communications center simulator that runs entirely i
 
 *Developed by Drone Hive Studios | Developer @ndrone40*
 
+> **This is an independently developed fictional emergency dispatch simulator inspired by White County, Illinois. It is not affiliated with, endorsed by, or operated by White County or any real emergency services agency.** All characters, calls, units and storylines are made up.
+
+## What's new in this update
+- **Live map:** every section-line county road across White County (named on the county grid, e.g. *County Road 1200 E*), Brownsville at its real location (plus Stokes, Roland and Epworth), realistic roads with casings, lane and center-line markings, divided interstate, gabled roofs and building shadows, a **Day (aerial)** and **Night (CAD)** style, a place picker, and a 🌐 **region view** that zooms out to the surrounding counties, towns, the Wabash and Ohio rivers – clearly shaded as *outside the jurisdiction* (calls and incidents are only ever generated inside White County).
+- **Station:** a real 3D town outside the windows (patrol lot, Main Cross St, downtown storefronts, houses, church, water tower, grain elevator) under a live sky with rain on the glass, a ceiling coffer with LED cove lighting, wainscoting, pilasters, door details, under-desk lighting, better wood and wall textures, properly proportioned flags, and fixed supervisor/director desks (monitors, chairs and seated characters now face the right way).
+- **Armory & training range:** sign out training gear at the armory cage (eye/ear protection required), then shoot timed bullseye drills on a six-lane indoor range for a qualification score. Deputies use the range too.
+- **Department schedule:** roll calls, shift changes, range training, a Fire/EMS coordination meeting, supervisor updates, announcements and night briefings at set game times. **Captain Nolan Drone**, **Watch Commander John Nolan** and **Fire Chief Bentley Allen** speak to the department (voice, PA, radio log) – click the notice to attend roll call in the briefing room.
+- **Voices & speech-to-text:** the browser's most natural voices are chosen automatically, lines are spoken sentence by sentence with natural pauses, every character has their own voice fingerprint, and the mic picks the recognizer guess the caller engine understands best. Optional hands-free mode re-opens the mic after each caller reply.
+- **Callers understand more:** plain-language questions, follow-ups ("what color?", "how bad?"), "how is he doing now?" status questions, related facts, and natural replies ("I don't know", "Okay, doing it now") instead of "I don't understand".
+- **111 new call scenarios** (231 total) and a stronger anti-repeat that remembers recent calls across shifts.
+- **Stories:** ~90 character-specific stories plus shared floor legends, dealt without repeats.
+- **Weather:** rain and storms pass through (typically 20–45 game minutes), wet spells never run past ~90 minutes, and the sky eases between weather states.
+
 ---
 
 ## Play it
@@ -45,10 +58,11 @@ Every November the center is decorated: harvest banners, leaf garlands around th
 ### The dispatch center (3D, first person)
 - Main floor with 8 three-monitor dispatch consoles, privacy partitions, radio consoles, phones and chairs
 - Live **video wall** (operations stats, city map, active incidents), **news TVs** whose ticker reports your actual incidents, **department status boards**, working wall clock
-- Windows looking out on Carmi — water tower, church steeple, grain elevators, autumn trees — that follows the **time of day** and **weather** (rain, snow, fog, thunderstorms with lightning and thunder)
+- Windows looking out on a real 3D small town — patrol lot, street, storefronts, houses, water tower, church steeple, grain elevator, seasonal trees — lit for the **time of day** and **weather** (rain on the glass, snow, fog that swallows the distance, lightning)
 - Corridor, **break room** (coffee, fridge, vending machine, TV, couch), **supervisor office**, **radio equipment room**, **director's office**
 - **White County Sheriff's Office wing** through the west end of the corridor: men's and women's restrooms, deputy locker room, briefing / roll-call room, **armory** (rifle and shotgun racks, handgun wall, ammo cabinets, riot shields, helmets and vests, cleaning bench, clearing barrel), evidence/property room, the Sheriff's office and a **sally port** garage with marked Sheriff patrol cars
-- Coworkers who work their consoles, take coffee breaks and walk the floor; visiting police, fire and EMS personnel drop by the break room
+- Coworkers who work their consoles, take coffee breaks and walk the floor; visiting police, fire and EMS personnel drop by; the Captain works from his office and the Watch Commander runs the briefing room
+- **Indoor training range** north of the armory, with an equipment checkout system
 - Your three desk monitors show your real CAD, map and radio log
 
 ### Computer-Aided Dispatch (CAD)
@@ -66,7 +80,7 @@ Police (Patrol, Traffic, Supervisors, Detectives, CID, K-9, SWAT, Gang, Cybercri
 Units have statuses (Available, Assigned, Responding, On Scene, Transporting, Busy, Out of Service, Returning to Station, Clearing), drive along the road network from their home stations, transport patients to hospitals, self-initiate traffic stops, and have their own radio personalities.
 
 ### Calls & scenarios
-- **120 scenario templates** with procedural variation (locations, callers, personalities, details, vehicles, suspects, developments) — thousands of distinct calls
+- **231 scenario templates** with procedural variation (locations, callers, personalities, details, vehicles, suspects, developments) — thousands of distinct calls
 - Mostly everyday calls (noise, parking, alarms, fender benders, welfare checks…), regular medium incidents, and occasional major ones (structure fires, pileups, shootings, hazmat, severe weather…)
 - Misdials, pocket-dials, prank calls and non-emergency questions
 - Incidents evolve: fires spread, suspects flee, patients deteriorate — and units radio for what they need
@@ -85,6 +99,10 @@ Units have statuses (Available, Assigned, Responding, On Scene, Transporting, Bu
 - **Custom Shift** — set shift length, difficulty, weather and more, then get a shift report
 - **Training** — a 14-step guided tutorial
 - Relaxed by design: no countdowns, no game over, no penalties — only bonuses. Pause anytime, take breaks, 1×/2×/4× time speed.
+
+### Department life
+- Daily schedule (on the corridor shift board): roll call 06:45 / 18:45, shift change 07:00 / 19:00, range training 10:00, Fire/EMS meeting 11:30, supervisor update 14:00, announcement 16:00, night briefing 22:00, mid-watch check-in 02:00
+- Leadership: Captain Nolan Drone, Watch Commander John Nolan, Fire Chief Bentley Allen (all fictional)
 
 ### Saving
 Automatic and manual saves in browser storage, resume an in-progress shift, and **export/import** a save file (or copy/paste text) to move progress between devices. There is no cloud sync.
@@ -146,10 +164,13 @@ tests/                logic tests (Node) and browser tests (Playwright)
 - **New scenarios:** add a template to any file in `js/data/scenarios/` (see existing ones for facts, developments, size-ups and caller instructions).
 - **New incident types:** `js/data/incidentTypes.js`.
 
+## Map data note
+Highway corridors, rivers, towns and the communities on the map are placed from real coordinates (see `GEO` / `geoToGame` in `js/data/city.js`). The section-line county roads follow Illinois' one-mile survey grid with realistic gaps (river bottoms, fields, only some bridges); they reproduce the *pattern* of White County's road network rather than a survey of every real road, and town street grids are simplified.
+
 ## Tests
 
 ```bash
-npm test                         # 3,000+ headless logic checks (Node 18+)
+npm test                         # 5,700+ headless logic checks (Node 18+)
 python3 tests/browser_test.py    # desktop/mobile/tablet playthrough in headless Chrome (needs Playwright)
 python3 tests/training_test.py   # plays the full tutorial
 python3 tests/graphics_test.py   # every preset: stats, screenshots, leak/adaptive/context-loss checks
