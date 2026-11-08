@@ -43,7 +43,12 @@ export function chooseTemplate(r, { config = {}, weather = 'clear', clock = 720,
     if (t.event) w *= events.some((e) => e.kind === t.event) ? 6 : 0.05;
     else if (events.some((e) => EVENT_SCENARIO_BOOST[e.kind]?.includes(t.id))) w *= 3;
     if (t.season === 'thanksgiving') w *= mon === 10 ? 4 : 0.3; // November holiday calls
-    if (recent.includes(t.id)) w *= 0.15; // avoid repeats
+    // Avoid repeats: the last dozen calls essentially never come back, older ones are just less likely.
+    const ago = recent.length - 1 - recent.lastIndexOf(t.id);
+    if (recent.includes(t.id)) w *= ago < 12 ? 0.01 : ago < 25 ? 0.25 : 0.6;
+    // keep variety across categories too: the same category three times running is less likely
+    const cat = categoryOf(t); const lastCats = recent.slice(-3).map((id) => { const x = SCENARIO_BY_ID[id]; return x ? categoryOf(x) : null; });
+    if (lastCats.length === 3 && lastCats.every((c) => c === cat)) w *= 0.35;
     return w;
   });
 }

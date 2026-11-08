@@ -6,6 +6,9 @@ import medical from './medical.js';
 import rescueService from './rescue_service.js';
 import misc from './misc.js';
 import rural from './rural.js';
+import expMedTraffic from './expansion_medical_traffic.js';
+import expCommunity from './expansion_community.js';
+import expMore from './expansion_more.js';
 
-export const SCENARIOS = [...police, ...traffic, ...fire, ...medical, ...rescueService, ...misc, ...rural];
+export const SCENARIOS = [...police, ...traffic, ...fire, ...medical, ...rescueService, ...misc, ...rural, ...expMedTraffic, ...expCommunity, ...expMore];
 export const SCENARIO_BY_ID = Object.fromEntries(SCENARIOS.map((s) => [s.id, s]));

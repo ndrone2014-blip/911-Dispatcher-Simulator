@@ -14,7 +14,14 @@ export const FREQUENCY_LABELS = { very_quiet: 'Very Quiet', relaxed: 'Relaxed', 
 const MAX_RINGING = 5;
 
 export class CallManager {
-  constructor(sim) { this.sim = sim; this.recentTemplates = []; }
+  constructor(sim) { this.sim = sim; }
+  // Recently used scenarios, remembered across shifts (browser storage) so a new shift doesn't open with yesterday's calls.
+  get recentTemplates() {
+    const st = this.sim.state;
+    if (!st.recentTemplates) { let prev = []; try { prev = JSON.parse(globalThis.localStorage?.getItem('wc911_recent_calls') || '[]'); } catch { prev = []; } st.recentTemplates = Array.isArray(prev) ? prev.slice(-40) : []; }
+    return st.recentTemplates;
+  }
+  rememberTemplate(id) { const list = this.recentTemplates; list.push(id); if (list.length > 40) list.shift(); try { globalThis.localStorage?.setItem('wc911_recent_calls', JSON.stringify(list)); } catch { /* storage unavailable */ } }
   get list() { return this.sim.state.calls; }
   byId(id) { return this.list.find((c) => c.id === id); }
   ringing() { return this.list.filter((c) => c.status === 'ringing'); }
@@ -105,7 +112,7 @@ export class CallManager {
     const template = templateId ? SCENARIO_BY_ID[templateId] : chooseTemplate(r, {
       config: sim.config, weather: sim.weather?.current() || 'clear', clock: sim.clock(), recent: this.recentTemplates, events: sim.state.events,
     });
-    this.recentTemplates.push(template.id); if (this.recentTemplates.length > 6) this.recentTemplates.shift();
+    if (!this.sim.menuDemo) this.rememberTemplate(template.id);
     const sc = buildScenario(r, template);
     return this.makeCall(sc);
   }
