@@ -371,7 +371,8 @@ export class World {
     // Zone culling: the Sheriff's wing is only visible from the corridor or from inside it
     const p = this.player.pos; const wingVisible = p[2] > 7.3 || p[0] < -11.4;
     const outVisible = !(p[0] < -12.2 && p[2] < 8); // deep inside the Sheriff's wing no window looks outside
-    for (const s of this.static) { if (s.zone !== 'out') all.push(s); if ((s.zone !== 'wing' || wingVisible) && (s.zone !== 'out' || outVisible)) items.push(s); }
+    const rangeVisible = p[0] < -11.4 && p[2] < 1.2; // the range is only visible from the armory or inside it
+    for (const s of this.static) { if (s.zone !== 'out') all.push(s); if ((s.zone !== 'wing' || wingVisible) && (s.zone !== 'out' || outVisible) && (s.zone !== 'range' || rangeVisible)) items.push(s); }
     const before = items.length;
     this.npcs.draw(items, this.unit, (color, spec = 0.12) => ({ color, specular: spec, shininess: 20 }));
     for (let i = before; i < items.length; i++) all.push(items[i]);

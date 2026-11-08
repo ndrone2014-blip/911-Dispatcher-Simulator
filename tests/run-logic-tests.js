@@ -180,6 +180,67 @@ console.error = origErr;
 ok(lerr === 0, 'restored sim keeps running without errors');
 console.log(`  snapshot size ${(snap.length / 1024).toFixed(0)} KB`);
 
+
+// ---------- Update: county map, conversations, weather, schedule, stories ----------
+section('County road network & region');
+{
+  const C = await import('../js/data/city.js');
+  const R = new C.Router();
+  const grid = C.city.roads.filter((r) => r.grid).length;
+  ok(grid > 100, `section-line county roads generated (${grid} runs)`);
+  const bv = C.TOWNS.find((t) => t.id === 'brownsville');
+  ok(bv && Math.abs(C.gameToGeo(bv.x, bv.y).lat - 38.041) < 0.01 && Math.abs(C.gameToGeo(bv.x, bv.y).lon + 88.245) < 0.01, 'Brownsville placed at its real coordinates');
+  for (const t of C.TOWNS) { const rt = R.route(6000, 6200, t.x, t.y); ok(rt.points.length > 3 || t.id === 'carmi', `${t.name} reachable by road`); }
+  const rr = new RNG(9); let outside = 0;
+  for (let i = 0; i < 400; i++) { const l = C.randomLocation(rr, rr.pick([['residential'], ['highway'], ['rural'], ['water'], ['forest'], ['commercial']])); if (!C.insideCounty(l.x, l.y)) outside++; }
+  ok(outside === 0, `generated call locations stay inside White County (${outside} outside)`);
+  ok(C.OUTER_TOWNS.length >= 10 && !C.insideCounty(C.OUTER_TOWNS[0].x, C.OUTER_TOWNS[0].y), 'surrounding towns exist outside the jurisdiction');
+}
+
+section('Caller understanding (plain language)');
+{
+  const s2 = new Sim({ mode: 'free', seed: 11, callFrequency: 'off' });
+  const call = s2.calls.spawnCall({ templateId: 'mva_rollover_ditch' }); s2.calls.answer(call.id); run(s2, 2);
+  const ask = (q) => { const n = call.transcript.length; s2.calls.say(call.id, q); run(s2, 5); return call.transcript.slice(n).filter((e) => e.who === 'caller').map((e) => e.text).join(' '); };
+  const bad = /what\?|what do you mean|don.t understand|didn.t get that|different way/i;
+  for (const q of ['was the driver hurt?', 'is the car smoking?', 'what kind of vehicle is it', 'whos calling', 'lock your doors and wait for us', 'how is he doing now?']) ok(!bad.test(ask(q)), `natural question answered: "${q}"`);
+  ok(/bleed|head|crawled/i.test(ask('is the guy bleeding')), 'keyword fallback finds the injury fact');
+}
+
+section('Weather spells');
+{
+  const W = await import('../js/sim/weather.js');
+  ok(W.DURATIONS.rain[1] < W.DURATIONS.clear[0], 'rain spells are shorter than clear spells');
+  const ws = new Sim({ mode: 'free', seed: 5, callFrequency: 'off', dynamicWeather: true, weather: 'rain' });
+  let maxWet = 0, wetStart = null;
+  for (let i = 0; i < 20000; i++) { ws.update(0.5); const wet = ['rain', 'thunderstorm', 'severe', 'snow'].includes(ws.weather.current()); if (wet && wetStart == null) wetStart = ws.t; if (!wet && wetStart != null) { maxWet = Math.max(maxWet, ws.t - wetStart); wetStart = null; } }
+  ok(maxWet < 1500, `longest wet spell ${Math.round(maxWet)} sim-s (≈${Math.round(maxWet * 6 / 60)} game min)`);
+}
+
+section('Department schedule & leadership');
+{
+  const D = await import('../js/sim/department.js');
+  ok(D.LEADERS.captain.name === 'Captain Nolan Drone' && D.LEADERS.watch.name === 'Watch Commander John Nolan' && D.LEADERS.fireChief.name === 'Fire Chief Bentley Allen', 'leadership names');
+  const fake = { sim: busy, state: 'playing', onDepartmentEvent: (ev) => fired.push(ev) }; const fired = [];
+  const sch = new D.DepartmentSchedule(fake);
+  for (const k of ['rollcall', 'shift', 'training', 'meeting', 'supervisor', 'announcement', 'briefing']) { const L = sch.script(k, { id: `${k}_am`, title: k }); ok(L.length >= 1 && L.every((l) => l.text && !l.text.includes('undefined')), `${k} script (${L.length} lines)`); }
+  const rc = sch.script('rollcall', { id: 'rollcall_am' });
+  ok(rc.some((l) => l.who === 'captain') && rc.some((l) => l.who === 'watch'), 'roll call has the Captain and the Watch Commander speaking');
+  busy.state.time.clockStart = 6 * 60 + 40 - (busy.state.time.sim * busy.state.time.clockRate) / 60; busy.paused = false;
+  sch.update(); for (let i = 0; i < 200 && !fired.length; i++) { busy.update(0.5); sch.update(); }
+  ok(fired.some((e) => e.kind === 'rollcall'), 'roll call fires at its scheduled time');
+}
+
+section('Stories');
+{
+  const { StoryTeller, STORIES } = await import('../js/ai/stories.js');
+  const st = new StoryTeller(); const told = [];
+  for (let i = 0; i < 12; i++) told.push(st.next('ray'));
+  ok(told.every((t, i) => i === 0 || t !== told[i - 1]), 'no story repeats back-to-back');
+  ok(new Set(told.slice(0, 8)).size === 8, 'eight stories in a row are all different');
+  ok(Object.values(STORIES).flat().length >= 80, `story library size ${Object.values(STORIES).flat().length}`);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('Failures:\n - ' + failures.slice(0, 40).join('\n - ')); process.exit(1); }
 bus.clear();

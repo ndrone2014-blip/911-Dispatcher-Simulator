@@ -149,14 +149,16 @@
 }
 @container (max-width: 620px) {
   .calls-layout { display: flex; flex-direction: column; overflow-y: auto; touch-action: pan-y; }
-  .calls-layout > .pane.convo-pane [data-r="tscroll"] { min-height: 200px; }
+  .calls-layout > .pane.convo-pane [data-r="tscroll"] { min-height: 180px; max-height: 46cqh; flex: none; }
   .calls-layout > .pane.form-pane .pane-body { overflow: visible; }
   .calls-layout .suggest { max-height: 120px; }
   .calls-layout > .pane { border-right: none; border-bottom: 1px solid var(--line); }
   .calls-layout > .pane.lines-pane { max-height: 118px; }
   .calls-layout > .pane.lines-pane .pane-body { display: flex; overflow-x: auto; overflow-y: hidden; }
   .calls-layout > .pane.lines-pane .line-card { min-width: 170px; }
-  .calls-layout > .pane.convo-pane { flex: none; height: max(420px, 62cqh); }
+  /* size to content so the message box can never slide under the Call Information panel */
+  .calls-layout > .pane.convo-pane { flex: none; height: auto; overflow: visible; }
+  .calls-layout .ani-box { font-size: .74em; }
   .calls-layout > .pane.form-pane { max-height: none; flex: none; }
   .inc-layout { display: flex; flex-direction: column; overflow: auto; }
   .inc-layout > .pane:first-child { border-right: none; }
@@ -245,3 +247,6 @@
 .haz.bad { background: #2d1212; border-color: #a83232; color: #ffc9c4; }
 @container (max-width: 620px) { .cad-grid { grid-template-columns: 1fr; } }
 .table.compact td.mono, .table.compact th { white-space: nowrap; }
+
+/* listening state for the caller message box */
+.input.listening { border-color: #ff5a4e; box-shadow: 0 0 0 2px rgba(255,90,78,.25); }

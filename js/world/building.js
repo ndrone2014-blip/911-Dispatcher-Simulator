@@ -512,7 +512,7 @@ export function buildCenter(opts = {}) {
   buildArchitecture({ mb, col, screen, D });
   if (D >= 1) buildLawEnforcement({ mb, col, D });
   mb = mbZone('wing'); // wing geometry goes in its own batches so it can be culled
-  buildSheriffWing({ mb, col, wallSeg, floor, ceiling, light, door, screen, interactables, tableChair, chair, plant, D, H });
+  buildSheriffWing({ mb, mbZone, col, wallSeg, floor, ceiling, light, door, screen, interactables, tableChair, chair, plant, D, H });
   mb = mbZone(null);
 
   if (opts.thanksgiving) buildThanksgiving({ mb, col, screen, consoles });

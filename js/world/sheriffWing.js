@@ -20,7 +20,8 @@
 import { MeshBuilder } from '../engine/geometry.js';
 
 export function buildSheriffWing(k) {
-  const { mb, col, wallSeg, floor, ceiling, light, door, screen, interactables, tableChair, chair, plant, D, H } = k;
+  const { col, wallSeg, floor, ceiling, light, door, screen, interactables, tableChair, chair, plant, D, H } = k;
+  let { mb } = k;
   const R = (cx, cz, rot) => { const c = Math.cos(rot), s = Math.sin(rot); return (dx, dz) => [cx + dx * c + dz * s, cz - dx * s + dz * c]; };
 
   // ---------------- shell ----------------
@@ -167,6 +168,8 @@ export function buildSheriffWing(k) {
   interactables.push({ id: 'armory_bench', kind: 'armory', label: 'Armory – check out equipment', min: [-22, 0.6, -5.4], max: [-21.4, 2.1, -3.0], pri: 1 });
 
   // ---------------- indoor training range (north of the armory) ----------------
+  // its geometry lives in its own batches so it's only drawn from the armory/range
+  const mbWing = mb; if (k.mbZone) mb = k.mbZone('range');
   //   six lanes, firing line at z ≈ -10.6, targets out to z -24, rubber-block backstop at z -25.6
   floor(-22, -26, -12, -8, 'concrete', 2.5); ceiling(-22, -26, -12, -8);
   wallSeg(-22, -26, -22, -8, 'concrete'); wallSeg(-12, -26, -12, -8, 'concrete'); wallSeg(-22, -26, -12, -26, 'concrete');
@@ -199,6 +202,7 @@ export function buildSheriffWing(k) {
   screen('sign_range', 'sign', -13.3, 2.55, -7.88, 1.7, 0.24, 'z', 1, 0, { text: 'RANGE · EYES & EARS REQUIRED' });
   screen('sign_range_in', 'sign', -17, 2.75, -8.13, 3.2, 0.3, 'z', -1, 0, { text: 'TRAINING RANGE · LINE COMMANDS FROM RANGE MASTER ONLY' });
   interactables.push({ id: 'range', kind: 'range', label: 'Step up to the firing line (training)', min: [-22, 0, -11.6], max: [-12, 2.2, -9.4], pri: 2 });
+  mb = mbWing;
 
   // ---------------- sheriff's office ----------------
   mb('wood').rbox(-26, 0.74, 4.6, 2.2, 0.05, 1.0, { r: 0.015, uv: 1 }); mb('wood').box(-26, 0.37, 5.05, 2.2, 0.7, 0.05, { uv: 1 });

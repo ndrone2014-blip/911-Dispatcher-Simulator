@@ -242,7 +242,7 @@ function buildCity(defs) {
     for (let d = r.float(150, 500); d < total - 100; d += r.float(380, 820)) {
       const p = pointAlong(rd, d); const side = r.chance(0.5) ? 1 : -1;
       const x = p.x + p.nx * side * 75, y = p.y + p.ny * side * 75;
-      if (townAt(x, y, 120) || nearRiver(x, y, 60)) continue;
+      if (townAt(x, y, 120) || nearRiver(x, y, 60) || !insideCounty(x, y)) continue;
       farms.push({ x, y, road: rd.id, along: d, side, barn: r.chance(0.7) });
       if (r.chance(0.28)) wells.push({ x: x + p.nx * side * 140 + r.float(-60, 60), y: y + p.ny * side * 140 + r.float(-60, 60), road: rd.id });
     }
@@ -253,7 +253,7 @@ function buildCity(defs) {
     const [ax, ay] = rv.points[i], [bx, by] = rv.points[i + 1]; const L = dist(ax, ay, bx, by);
     for (let d = 0; d < L; d += 260) { const k = d / L; const s = r.chance(0.5) ? 1 : -1; const nx = -(by - ay) / L, ny = (bx - ax) / L;
       const x = ax + (bx - ax) * k + nx * s * r.float(80, 260), y = ay + (by - ay) * k + ny * s * r.float(80, 260);
-      if (!townAt(x, y, 80)) woods.push([x, y, r.float(90, 190)]); }
+      if (!townAt(x, y, 80) && insideCounty(x, y)) woods.push([x, y, r.float(90, 190)]); }
   }
   return { nodes, adj, edges, roads, blocks, farms, wells, woods };
 }
@@ -589,14 +589,21 @@ export function randomLocation(r, zones = ['residential'], opts = {}) {
   }
   if (zones.includes('highway')) {
     const hw = city.edges.filter((e) => ['interstate', 'us', 'state'].includes(e.kind) && !e.town && !e.outside && e.len > 150 && insideCounty((city.nodes[e.a].x + city.nodes[e.b].x) / 2, (city.nodes[e.a].y + city.nodes[e.b].y) / 2));
-    const e = r.weighted(hw, (x) => x.len * (x.kind === 'interstate' ? 1.4 : 1)); const A = city.nodes[e.a], Bn = city.nodes[e.b]; const k = r.float(0.1, 0.9);
+    let e, A, Bn, k;
+    for (let tries = 0; tries < 12; tries++) { e = r.weighted(hw, (x) => x.len * (x.kind === 'interstate' ? 1.4 : 1)); A = city.nodes[e.a]; Bn = city.nodes[e.b]; k = r.float(0.1, 0.9); if (insideCounty(A.x + (Bn.x - A.x) * k, A.y + (Bn.y - A.y) * k)) break; }
     const dir = e.kind === 'interstate' ? r.pick(['eastbound', 'westbound']) : Math.abs(Bn.x - A.x) > Math.abs(Bn.y - A.y) ? r.pick(['eastbound', 'westbound']) : r.pick(['northbound', 'southbound']);
     return finalizeLocation(A.x + (Bn.x - A.x) * k, A.y + (Bn.y - A.y) * k, r, { dir, highway: true });
   }
   if (zones.includes('water')) {
     const rv = r.weighted(RIVERS, (x) => (x.name === 'Wabash River' ? 1.2 : x.name === 'Little Wabash River' ? 1.5 : 0.6));
-    const i = r.int(1, rv.points.length - 3); const [ax, ay] = rv.points[i], [bx, by] = rv.points[i + 1]; const k = r.float(0.1, 0.9);
-    return finalizeLocation(ax + (bx - ax) * k, ay + (by - ay) * k, r, { water: true });
+    let x = 0, y = 0;
+    for (let tries = 0; tries < 12; tries++) {
+      const i = r.int(1, rv.points.length - 3); const [ax, ay] = rv.points[i], [bx, by] = rv.points[i + 1]; const k = r.float(0.1, 0.9);
+      x = ax + (bx - ax) * k; y = ay + (by - ay) * k;
+      if (rv.name === 'Wabash River') x -= rv.width * 0.3; // the Wabash is the state line – stay on the Illinois half
+      if (insideCounty(x, y)) break;
+    }
+    return finalizeLocation(x, y, r, { water: true });
   }
   if (zones.includes('forest')) {
     const w = r.pick(city.woods); return finalizeLocation(w[0], w[1], r, { zone: 'forest' });

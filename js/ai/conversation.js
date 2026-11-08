@@ -149,7 +149,13 @@ function answerSlot(call, slot, r) {
     }
     case 'nature': return { text: fill(sc.natureShort || sc.nature, ctx, r), note: fill(sc.natureNote || sc.nature, ctx, r) };
     default: {
-      const f = factOf(sc, slot);
+      let f = factOf(sc, slot);
+      // no fact for this exact question, but a closely related one answers it ("is he bleeding?" → the injuries fact)
+      const RELATED = { bleeding: 'injuries', injuries: 'bleeding', count: 'inside', inside: 'count', direction: 'still', conscious: 'injuries', vehicle: 'suspect', suspect: 'vehicle' };
+      if (!f && RELATED[slot] && factOf(sc, RELATED[slot]) && factOf(sc, RELATED[slot]).say !== 'unknown') {
+        const rf = factOf(sc, RELATED[slot]); const rel = fill(rf.say, ctx, r);
+        if (!(slot === 'bleeding' && !/blood|bleed|cut|lac/i.test(rel)) && !(slot === 'conscious' && !/awake|talk|conscious|respond|moving|moan/i.test(rel))) f = rf;
+      }
       if (!f) {
         const medical = !!(sc.facts?.breathing || sc.facts?.conscious);
         const none = { weapons: 'none_weapons', injuries: 'none_injuries', suspect: medical ? 'none_suspect' : 'none_suspect_look', vehicle: 'none_vehicle', hazards: 'none_hazards', fire: 'none_fire',
