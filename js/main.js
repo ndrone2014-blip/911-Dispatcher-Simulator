@@ -8,3 +8,8 @@ game.boot().catch((e) => {
   const l = document.getElementById('loading');
   if (l) l.innerHTML = `<div class="logo">911 Dispatch Simulator</div><div style="color:#ff8a80;max-width:520px;text-align:center;padding:0 20px">Something went wrong while starting the game:<br><code>${String(e.message || e).replace(/</g, '&lt;')}</code><br><br>Try a current version of Chrome, Edge, Firefox or Safari.</div>`;
 });
+
+// Offline support + installable home-screen app (only on http(s), e.g. Netlify).
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !/[?&]nosw\b/.test(location.search)) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch((e) => console.warn('Service worker not registered:', e.message)));
+}

@@ -116,6 +116,13 @@ export const INCIDENT_TYPES = [
   T('EVAC', 'Large-Scale Evacuation', 'EVAC', 'weather', 1, 'major', 520, { em: 1, patrol: 4, traffic: 2, disaster: 1, comms: 1, bls: 1 }),
   T('INFRA', 'Infrastructure Failure', 'INFR', 'weather', 1, 'major', 450, { em: 1, public_works: 2, utility: 1, dot: 1, rescue: 1, traffic: 1 }),
   T('PUBLIC_MAJOR', 'Major Public Incident', 'PUBL', 'police', 1, 'major', 420, { patrol: 5, police_command: 1, bls: 2, comms: 1, em: 0.5 }),
+  // Rural White County
+  T('GRAIN_BIN', 'Grain Bin Entrapment', 'GRBN', 'rescue', 1, 'major', 380, { tech_rescue: 1, rescue: 1, suppression: 2, als: 1, fire_command: 1 }),
+  T('FARM_ACCIDENT', 'Farm Machinery Accident', 'FARM', 'rescue', 1, 'medium', 200, { rescue: 1, als: 1, suppression: 1, patrol: 0.5 }),
+  T('BARN_FIRE', 'Barn / Outbuilding Fire', 'BARN', 'fire', 2, 'medium', 240, { suppression: 2, fire_command: 0.5, bls: 0.5 }),
+  T('OIL_FIRE', 'Oil Well / Tank Battery Fire', 'OILF', 'fire', 1, 'major', 420, { suppression: 3, hazmat: 1, fire_command: 1, bls: 1, patrol: 1 }),
+  T('H2S', 'H2S / Oil Field Gas Release', 'H2S', 'hazard', 1, 'medium', 260, { hazmat: 1, suppression: 1, patrol: 1, bls: 1 }),
+  T('LIVESTOCK', 'Livestock on Roadway', 'LVSK', 'service', 3, 'small', 70, { patrol: 1, animal: 0.5 }),
   T('OTHER', 'Other / Unknown', 'UNK', 'service', 3, 'small', 60, { patrol: 1 }),
 ];
 
@@ -143,6 +150,7 @@ export const UNIT_STATUS_COLORS = {
 export function guessTypeFromText(text) {
   const t = (text || '').toLowerCase();
   const rules = [
+    [/grain bin|grain silo|in the corn|in the beans/, 'GRAIN_BIN'], [/tractor|combine|auger|farm equipment|baler|pto/, 'FARM_ACCIDENT'], [/oil well|tank battery|pump jack|crude/, 'OIL_FIRE'], [/h2s|rotten egg.*well|sour gas/, 'H2S'], [/cows?\b|cattle|horses? (out|loose)|hogs? (out|loose)|livestock/, 'LIVESTOCK'], [/barn|machine shed|outbuilding/, 'BARN_FIRE'], [/turkey fryer|deep fryer/, 'FIRE_STR'],
     [/hostage/, 'HOSTAGE'], [/barricad/, 'BARRICADE'], [/shot|gunfire|shooting/, 'SHOTS'], [/gun|armed|weapon|knife/, 'ARMED'],
     [/bomb|explosive|suspicious package/, 'BOMB'], [/explo/, 'EXPLOSION'], [/drug lab|meth/, 'DRUG_LAB'],
     [/cardiac|not breathing|no pulse|cpr/, 'MED_ARREST'], [/chest/, 'MED_CHEST'], [/breath/, 'MED_BREATH'], [/stroke/, 'MED_STROKE'],

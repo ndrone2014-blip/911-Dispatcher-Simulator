@@ -20,13 +20,14 @@ export class MapScreen extends Screen {
   build() {
     this.root.innerHTML = `<div class="map-wrap" data-r="wrap"><canvas data-r="cv"></canvas>
       <div class="map-layers" data-r="layers"></div>
-      <div class="map-ctrl"><button class="btn" data-act="zin" title="Zoom in">＋</button><button class="btn" data-act="zout" title="Zoom out">－</button><button class="btn" data-act="fit" title="Show whole city">⤢</button></div>
+      <div class="map-ctrl"><button class="btn" data-act="zin" title="Zoom in">＋</button><button class="btn" data-act="zout" title="Zoom out">－</button><button class="btn" data-act="fit" title="Whole county">⤢</button><button class="btn sm" data-act="carmi" title="Zoom to Carmi" style="width:auto;padding:0 6px">Carmi</button></div>
       <div class="map-info" data-r="info" hidden></div>
       <div class="map-legend hide-narrow"><span>▲</span><span>Incident (color = priority)</span><span>●</span><span>Unit (ring = status)</span><span>◆</span><span>Aircraft</span><span>▢</span><span>Facility</span></div></div>`;
     this.wrap = this.root.querySelector('[data-r="wrap"]'); this.cv = this.root.querySelector('[data-r="cv"]'); this.ctx = this.cv.getContext('2d');
     this.base = document.createElement('canvas'); this.bctx = this.base.getContext('2d');
     bindActions(this.root, {
       zin: () => this.zoom(1.4), zout: () => this.zoom(1 / 1.4), fit: () => { this.view = null; this.baseDirty = true; },
+      carmi: () => { const { w, h } = this.size(); this.view = this.renderer.focusTown('carmi', w, h); this.baseDirty = true; },
       layer: (t) => { this.layers[t.dataset.l] = !this.layers[t.dataset.l]; this.renderLayers(); },
       openinc: (t) => this.cad.selectIncident(t.dataset.id),
       assigninc: (t) => this.cad.screens.incidents.openAssign(t.dataset.id),
@@ -62,7 +63,7 @@ export class MapScreen extends Screen {
 
   draw() {
     const { w, h, dpr } = this.size(); if (!w || !h) return;
-    if (!this.view) { this.view = this.renderer.fit(w, h); this.baseDirty = true; }
+    if (!this.view) { this.view = this.firstView ? this.renderer.fit(w, h) : this.renderer.focusTown('carmi', w, h); this.firstView = true; this.baseDirty = true; }
     if (this.follow && this.sel?.kind === 'unit') { const u = this.sim.units.byId(this.sel.id); if (u) { this.view.cx = u.x; this.view.cy = u.y; this.baseDirty = true; } }
     if (this.baseDirty) {
       this.baseDirty = false; this.bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -81,12 +82,12 @@ export class MapScreen extends Screen {
     const { w, h } = this.size();
     px ??= w / 2; py ??= h / 2;
     const wx = (px - w / 2) / this.view.scale + this.view.cx, wy = (py - h / 2) / this.view.scale + this.view.cy;
-    this.view.scale = clamp(this.view.scale * f, 0.05, 3);
+    this.view.scale = clamp(this.view.scale * f, 0.02, 3);
     this.view.cx = wx - (px - w / 2) / this.view.scale; this.view.cy = wy - (py - h / 2) / this.view.scale;
     this.baseDirty = true;
   }
 
-  focusOn(x, y, scale = 0.7) { const { w, h } = this.size(); if (!this.view) this.view = this.renderer.fit(w || 600, h || 400); this.view.cx = x; this.view.cy = y; this.view.scale = Math.max(this.view.scale, scale); this.baseDirty = true; }
+  focusOn(x, y, scale = 0.45) { const { w, h } = this.size(); if (!this.view) this.view = this.renderer.fit(w || 600, h || 400); this.view.cx = x; this.view.cy = y; this.view.scale = Math.max(this.view.scale, scale); this.baseDirty = true; }
 
   setupInput() {
     const cv = this.cv; const pointers = new Map(); let drag = null; let pinch = null; let moved = false;

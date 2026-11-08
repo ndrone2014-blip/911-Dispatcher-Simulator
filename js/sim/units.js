@@ -1,6 +1,6 @@
 // Unit management: creation, status machine, road movement, assignment rules.
 import { UNIT_TYPES, TYPE_BY_ID, DEPT_BY_ID } from '../data/departments.js';
-import { city, addressFor, nearestFacility } from '../data/city.js';
+import { city, addressFor, nearestFacility, blockText } from '../data/city.js';
 import { UNIT_STATUS_LABELS } from '../data/incidentTypes.js';
 import { bus } from '../core/events.js';
 import { dist } from '../core/util.js';
@@ -305,13 +305,13 @@ export class UnitManager {
   /** Request mutual aid units from a neighboring county (Director unlock). */
   requestMutualAid(typeId, count = 2) {
     const type = TYPE_BY_ID[typeId]; if (!type) return [];
-    const edge = this.sim.rng.pick([{ x: -1.1 * 220, y: 7 * 220 }, { x: 15 * 220, y: 3 * 220 }, { x: 7 * 220, y: -1.1 * 220 }]);
-    const fakeStation = { id: `ma_${typeId}`, x: edge.x, y: edge.y, name: 'Neighboring county', short: 'Mutual Aid' };
+    const edge = this.sim.rng.pick([{ x: -380, y: 5900, from: 'Hamilton County' }, { x: 1700, y: -380, from: 'Wayne County' }, { x: 2650, y: 10880, from: 'Gallatin County' }, { x: 10950, y: -380, from: 'Edwards County' }]);
+    const fakeStation = { id: `ma_${typeId}`, x: edge.x, y: edge.y, name: edge.from, short: 'Mutual Aid' };
     const created = [];
     for (let i = 0; i < count; i++) {
       const num = 900 + this.list.filter((u) => u.mutualAid).length + i + 1;
       const u = this.makeUnit(type, num, fakeStation, this.sim.rng, { mutualAid: true, callsign: `MA ${type.prefix} ${num}` });
-      u.callsign = `MA ${type.prefix} ${num}`; u.station = fakeStation.id;
+      u.callsign = `MA ${type.prefix} ${num}`; u.station = fakeStation.id; u.stationName = edge.from;
       this.list.push(u); created.push(u);
       this.addHistory(u, 'Mutual aid unit staged at county line');
     }
@@ -329,7 +329,7 @@ export class UnitManager {
       const st = this.station(u); if (st && dist(u.x, u.y, st.x, st.y) < 25) return `At ${st.short || st.name}`;
     }
     const a = addressFor(u.x, u.y);
-    return a.kind === 'street' ? `${Math.floor(a.number / 100) * 100} block of ${a.street}` : a.full;
+    return blockText(a);
   }
 
   counts() {

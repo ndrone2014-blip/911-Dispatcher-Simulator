@@ -180,7 +180,7 @@ export class RadioSystem {
   dispatchTone(inc, units) {
     const byChannel = {};
     for (const u of units) (byChannel[u.channel] ||= []).push(u);
-    const cross = inc.location.cross ? `, cross street ${inc.location.cross}` : '';
+    const L = inc.location; const cross = !L.cross || (L.full || '').includes(L.cross) ? '' : L.kind === 'street' ? `, cross street ${L.cross}` : `, ${L.cross}`;
     for (const [ch, list] of Object.entries(byChannel)) {
       const names = oxford(list.map((u) => u.callsign));
       const desc = inc.description ? ` ${inc.description.split(/[.!?]/)[0].slice(0, 90)}.` : '';

@@ -10,7 +10,7 @@ export const DEFAULT_SETTINGS = {
   },
   speech: { tts: true, radioTTS: true, staffTTS: true, recognition: true, lang: 'en-US', autoSend: true, handsFree: false },
   controls: { mouseSensitivity: 1, invertY: false, touchSensitivity: 1, headBob: true },
-  ui: { textScale: 1, toasts: true, toastCalls: true, toastRadio: true, toastIncidents: true, compactCad: false, showHints: true, clock24: true },
+  ui: { textScale: 1, toasts: true, toastCalls: true, toastRadio: true, toastIncidents: true, compactCad: false, showHints: true, clock24: true, seasonal: 'auto' },
   radio: { muted: {}, monitored: { police: true, sheriff: true, specops: true, investigations: true, federal: true, fire: true, ems: true, em: true, services: true }, speakChannels: { police: true, fire: true, ems: true, sheriff: true, specops: true, investigations: false, federal: false, em: true, services: false } },
   llm: { enabled: false, kind: 'ollama', endpoint: 'http://localhost:11434', model: 'llama3.2' },
 };

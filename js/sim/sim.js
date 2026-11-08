@@ -2,7 +2,7 @@
 // subsystem. It runs headless (no DOM) so it can be unit-tested in Node.
 import { RNG, clamp, deepMerge, deepClone } from '../core/util.js';
 import { bus } from '../core/events.js';
-import { Router, NS_STREETS, EW_STREETS, B, addressFor } from '../data/city.js';
+import { Router, addressFor, geocodeAddress, blockText } from '../data/city.js';
 import { matchStreet, extractAddress } from '../ai/nlu.js';
 import { UnitManager } from './units.js';
 import { IncidentManager } from './incidents.js';
@@ -133,28 +133,20 @@ export class Sim {
       const u = this.units.list.find((x) => ['patrol', 'traffic', 'deputy'].includes(x.type) && this.units.isAssignable(x));
       if (!u) return;
       const a = addressFor(u.x, u.y);
-      this.radio.unitSays(u, 'bolo_found', { inc, location: a.kind === 'street' ? `${Math.floor(a.number / 100) * 100} block of ${a.street}` : a.full });
+      this.radio.unitSays(u, 'bolo_found', { inc, location: blockText(a) });
       this.units.assign([u.id], inc.id, { silent: true });
       this.incidents.addHistory(inc, `${u.callsign} located a subject/vehicle matching the BOLO`);
       inc.sim.workload = Math.max(30, inc.sim.workload * 0.8);
     }
   }
 
-  /** Turn a typed address ("1423 Elm St") into map coordinates. */
+  /** Turn a typed address ("412 W Main St", "2145 Burnt Prairie Rd, Grayville") into map coordinates. */
   geocode(text) {
     if (!text) return null;
     const { number, street } = extractAddress(text);
     const s = street || matchStreet(text);
     if (!s) return null;
-    const ci = NS_STREETS.indexOf(s), ri = EW_STREETS.indexOf(s);
-    const n = number || 0;
-    const blockIdx = n ? clamp(Math.floor(n / 100) - 1, 0, 13) : 6;
-    const frac = n ? clamp((n % 100) / 96, 0.05, 0.95) : 0.5;
-    let x, y;
-    if (ci >= 0) { x = ci * B + (n % 2 === 0 ? 30 : -30); y = (blockIdx + frac) * B; }
-    else { y = ri * B + (n % 2 === 0 ? 30 : -30); x = (blockIdx + frac) * B; }
-    x = clamp(x, 10, 14 * B - 10); y = clamp(y, 10, 14 * B - 10);
-    return { x, y, ...addressFor(x, y) };
+    return geocodeAddress(/^(I-|IL-|US-)/.test(s) ? null : number, s, text);
   }
 
   serialize() {

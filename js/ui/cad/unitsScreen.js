@@ -116,7 +116,7 @@ export class DepartmentsScreen extends Screen {
   mutualAid(dept) {
     const typeId = { police: 'patrol', fire: 'engine', ems: 'ambulance', sheriff: 'deputy' }[dept];
     const units = this.sim.units.requestMutualAid(typeId, 2);
-    for (const u of units) { this.sim.radio.push({ channel: u.channel, from: u.callsign, text: `${u.callsign}, mutual aid from Westfield County, staged at the county line and available.`, kind: 'available' }); }
+    for (const u of units) { this.sim.radio.push({ channel: u.channel, from: u.callsign, text: `${u.callsign}, mutual aid from ${u.stationName || 'a neighboring county'}, staged at the county line and available.`, kind: 'available' }); }
     toast(`Mutual aid: ${units.map((u) => u.callsign).join(', ')} available`, { level: 'good' });
   }
 }

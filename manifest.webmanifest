@@ -1,11 +1,21 @@
 {
-  "name": "911 Dispatch Simulator",
+  "id": "/",
+  "name": "911 Dispatch Simulator – White County, IL",
   "short_name": "911 Dispatch",
-  "start_url": "./index.html",
+  "start_url": "/",
+  "scope": "/",
   "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
   "orientation": "any",
-  "background_color": "#070b12",
-  "theme_color": "#070b12",
-  "description": "First-person 3D 911 dispatch simulator. No API keys, runs in the browser.",
-  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+  "background_color": "#070d1a",
+  "theme_color": "#070d1a",
+  "description": "First-person 3D 911 dispatch simulator set in Carmi and White County, Illinois. No API keys, runs in the browser.",
+  "categories": ["games", "simulation"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
 }

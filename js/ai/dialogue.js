@@ -85,7 +85,7 @@ export const DIRECTIONS = ['north', 'south', 'east', 'west'];
 // ---- Generic slot phrasing. {x} placeholders are filled from the call context. ----
 export const SLOT_LINES = {
   location: ['I\'m at {address}.', 'It\'s {address}.', 'The address is {address}.', '{address}.', 'We\'re at {address}.', 'It\'s happening at {address}.'],
-  location_highway: ['I\'m on {street} {dir}, near the {cross} exit.', 'We\'re on {street}, {dir}, right around {cross}.', '{street} {dir}, just past {cross}.'],
+  location_highway: ['I\'m on {street} {dir}, near {cross}.', 'We\'re on {street}, {dir}, about {cross}.', '{street} {dir}, right around {cross}.'],
   location_water: ['It\'s in {street}, near {cross}.', 'Out on {street}, you can see it from {cross}.', 'In the water, {street}, by {cross}.'],
   location_poi: ['I\'m at {poi}, that\'s {address}.', 'It\'s {poi}, at {address}.', 'We\'re at {poi} — {address}.'],
   location_vague: ['I don\'t know the exact number — it\'s on {street}, near {cross}.', 'Um, it\'s on {street}... near {cross}, I think. I don\'t know the number.', 'I\'m not sure of the address. It\'s on {street} close to {cross}.'],

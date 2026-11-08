@@ -28,7 +28,7 @@ import { modal, toast, anyModalOpen, closeTopModal, setToastFilter, confirmBox }
 import { WEATHER_TYPES } from './sim/weather.js';
 
 const PA_LINES = [
-  'Attention Ridgeview staff: shift briefing in the training room in fifteen minutes.',
+  'Attention White County staff: shift briefing in the training room in fifteen minutes.',
   'Reminder: the quarterly radio system test is tomorrow at oh-nine-hundred.',
   'Attention: there is fresh coffee in the break room. Thank you, Priya.',
   'Staff reminder: please verify every address with your callers.',
@@ -212,7 +212,7 @@ export class Game {
       case 'tv': toast(`Channel 8: ${this.world.painter.headline(sim)}`, { level: 'info', duration: 6000 }); break;
       case 'radio_room': toast('Radio racks: P25 trunked system, 9 talkgroups, all repeaters online. Backup generator tested Tuesday.', { level: 'info', duration: 6000 }); break;
       case 'director_desk': toast(`Helen's desk: budget reports, a framed photo of the 2019 dispatch team, and your file – "${this.career.rank().name}".`, { level: 'info', duration: 6000 }); break;
-      case 'shiftboard': toast('Shift board: verify addresses · only three river bridges · potluck Friday.', { level: 'info', duration: 6000 }); break;
+      case 'shiftboard': toast('Shift board: verify addresses · Little Wabash crossings · Thanksgiving potluck Thursday.', { level: 'info', duration: 6000 }); break;
       case 'console': toast(t.label, { level: 'info' }); break;
       default: break;
     }

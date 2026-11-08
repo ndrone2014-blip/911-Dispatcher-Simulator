@@ -1,6 +1,6 @@
 // Local, no-key city map renderer (Canvas 2D). Used by the CAD map screen and the
 // 3D monitor/video-wall textures.
-import { city, B, N, NS_STREETS, EW_STREETS, RIVER, BAY, HIGHWAYS, MAP_BOUNDS, DISTRICTS } from '../../data/city.js';
+import { city, TOWNS, RIVERS, ROADS, COUNTY_LINE, MAP_BOUNDS, DISTRICTS } from '../../data/city.js';
 import { DEPT_BY_ID, TYPE_BY_ID } from '../../data/departments.js';
 import { UNIT_STATUS_COLORS } from '../../data/incidentTypes.js';
 import { EVENT_KINDS } from '../../sim/cityEvents.js';
@@ -13,90 +13,147 @@ const FAC_STYLE = {
   airport: ['#8b9bb4', '✈'], marina: ['#4fc3f7', '⚓'], coastguard: ['#ff7a59', 'CG'], sar: ['#ff9f43', 'SR'], public_works: ['#f2c94c', 'PW'],
   animal_control: ['#a3d977', 'AC'], dot: ['#ffb84d', 'DT'], utility: ['#7fd1d9', 'U'],
 };
-const DISTRICT_CENTERS = (() => {
-  const acc = {};
-  for (const b of city.blocks) { if (b.district === 'Halston River') continue; const a = acc[b.district] ||= { x: 0, y: 0, n: 0 }; a.x += (b.bx + 0.5) * B; a.y += (b.by + 0.5) * B; a.n++; }
-  return Object.entries(acc).map(([name, a]) => ({ name, x: a.x / a.n, y: a.y / a.n }));
-})();
-
 export class MapRenderer {
   constructor() { this.time = 0; }
 
   fit(w, h) {
     const mw = MAP_BOUNDS.x1 - MAP_BOUNDS.x0, mh = MAP_BOUNDS.y1 - MAP_BOUNDS.y0;
     const scale = Math.min(w / mw, h / mh) * 0.98;
-    return { cx: (MAP_BOUNDS.x0 + MAP_BOUNDS.x1) / 2, cy: (MAP_BOUNDS.y0 + MAP_BOUNDS.y1) / 2 - B * 0.2, scale };
+    return { cx: (MAP_BOUNDS.x0 + MAP_BOUNDS.x1) / 2, cy: (MAP_BOUNDS.y0 + MAP_BOUNDS.y1) / 2, scale };
   }
 
-  /** Draw static city layers. */
+  focusTown(id, w, h) {
+    const t = TOWNS.find((x) => x.id === id) || TOWNS[0];
+    const span = Math.max(t.x1 - t.x0, t.y1 - t.y0) * 1.9;
+    return { cx: t.x, cy: t.y, scale: Math.min(w, h) / span };
+  }
+
+  /** Draw static county layers. */
   drawBase(ctx, view, w, h, { labels = true, buildings = true, detail = 1 } = {}) {
     const s = view.scale; const ox = w / 2 - view.cx * s, oy = h / 2 - view.cy * s;
     const X = (x) => ox + x * s, Y = (y) => oy + y * s;
-    ctx.fillStyle = '#0b1320'; ctx.fillRect(0, 0, w, h);
-    // land
-    ctx.fillStyle = '#0f1826'; ctx.fillRect(X(-1.1 * B), Y(-1.1 * B), 16.2 * B * s, (BAY.y0 + 1.1 * B) * s);
-    // water
-    ctx.fillStyle = '#0c2a46';
-    ctx.fillRect(X(RIVER.x0), Y(-1.2 * B), (RIVER.x1 - RIVER.x0) * s, (BAY.y0 + 1.2 * B) * s);
-    ctx.fillRect(X(-1.2 * B), Y(BAY.y0), 16.6 * B * s, 2 * B * s);
-    // blocks
+    const path = (pts) => { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y)))); };
+    ctx.fillStyle = '#0c120f'; ctx.fillRect(0, 0, w, h);
+    // Indiana (east of the Wabash)
+    ctx.fillStyle = '#0e1412'; ctx.fillRect(X(11300), Y(-600), 1400 * s, 11800 * s);
+    // county farmland with field patchwork
+    ctx.save(); path(COUNTY_LINE); ctx.closePath(); ctx.fillStyle = '#141d16'; ctx.fill(); ctx.clip();
+    if (detail > 0 && s > 0.02) {
+      const F = 640;
+      for (let fx = 0; fx < 11600; fx += F) for (let fy = 0; fy < 10600; fy += F) {
+        const k = ((fx * 7 + fy * 13) / F) % 5;
+        ctx.fillStyle = ['#152018', '#18221a', '#1a2219', '#161f19', '#1c241a'][Math.floor(k)];
+        ctx.fillRect(X(fx + 8), Y(fy + 8), (F - 16) * s, (F - 16) * s);
+      }
+    }
+    ctx.restore();
+    // woods in the river bottoms
+    ctx.fillStyle = '#0f2a18';
+    for (const [x, y, r] of city.woods) { const px = X(x), py = Y(y); if (px < -50 || py < -50 || px > w + 50 || py > h + 50) continue; ctx.beginPath(); ctx.arc(px, py, Math.max(1.5, r * s), 0, 6.283); ctx.fill(); }
+    // rivers
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    for (const rv of RIVERS) { path(rv.points); ctx.strokeStyle = '#1b4a72'; ctx.lineWidth = Math.max(rv.width > 80 ? 3 : 1.6, rv.width * s); ctx.stroke(); }
+    // county line
+    path(COUNTY_LINE); ctx.closePath(); ctx.setLineDash([10, 6]); ctx.strokeStyle = 'rgba(160,175,140,.45)'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
+    // town blocks & buildings
+    const ZF = { residential: '#1a2333', commercial: '#1e2740', downtown: '#222c48', industrial: '#22292b', park: '#133a22', institutional: '#1d2342' };
     for (const b of city.blocks) {
-      const fill = ZONE_FILL[b.zone]; if (!fill) continue;
-      const x = X(b.bx * B + 10), y = Y(b.by * B + 10), sz = (B - 20) * s;
-      if (x > w || y > h || x + sz < 0 || y + sz < 0) continue;
-      ctx.fillStyle = fill; ctx.fillRect(x, y, sz, sz);
-      if (buildings && s > 0.12 && detail > 0) {
-        for (const [bx, by, bw, bh, shade] of b.buildings) {
-          const l = Math.round(30 + shade * 40);
-          ctx.fillStyle = b.zone === 'industrial' ? `rgb(${l},${l + 6},${l + 4})` : `rgb(${l - 6},${l + 4},${l + 22})`;
-          ctx.fillRect(X(bx), Y(by), Math.max(1, bw * s), Math.max(1, bh * s));
-        }
-      }
-      if ((b.zone === 'park' || b.zone === 'forest') && s > 0.1 && detail > 0) {
-        ctx.fillStyle = b.zone === 'forest' ? '#14402a' : '#185a35';
-        for (let i = 0; i < 9; i++) { const tx = X(b.bx * B + 30 + ((i * 53) % 160)), ty = Y(b.by * B + 30 + ((i * 97) % 160)); ctx.beginPath(); ctx.arc(tx, ty, Math.max(1.5, 9 * s), 0, 6.283); ctx.fill(); }
+      const x = X(b.x0 + 5), y = Y(b.y0 + 5), bw = (b.x1 - b.x0 - 10) * s, bh = (b.y1 - b.y0 - 10) * s;
+      if (x > w || y > h || x + bw < 0 || y + bh < 0) continue;
+      ctx.fillStyle = ZF[b.zone] || '#1a2333'; ctx.fillRect(x, y, Math.max(1, bw), Math.max(1, bh));
+      if (buildings && s > 0.14 && detail > 0) for (const [bx, by, bw2, bh2, shade] of b.buildings) {
+        const l = Math.round(32 + shade * 40); ctx.fillStyle = b.zone === 'industrial' ? `rgb(${l},${l + 4},${l + 2})` : `rgb(${l - 6},${l + 4},${l + 22})`;
+        ctx.fillRect(X(bx), Y(by), Math.max(1, bw2 * s), Math.max(1, bh2 * s));
       }
     }
-    // streets
-    const sw = Math.max(1, 12 * s);
-    for (const e of city.edges) {
-      if (e.kind === 'highway' || e.kind === 'ramp') continue;
-      const a = city.nodes[e.a], b2 = city.nodes[e.b];
-      ctx.strokeStyle = e.kind === 'bridge' ? '#53627a' : e.speed > 1.05 ? '#3a4f72' : '#283a56';
-      ctx.lineWidth = e.speed > 1.05 ? sw * 1.4 : sw;
-      ctx.beginPath(); ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(X(b2.x), Y(b2.y)); ctx.stroke();
+    // farmsteads & oil wells
+    if (s > 0.07 && detail > 0) {
+      for (const f of city.farms) { const px = X(f.x), py = Y(f.y); if (px < -10 || py < -10 || px > w + 10 || py > h + 10) continue; ctx.fillStyle = '#5d6b7d'; const z = Math.max(2, 14 * s); ctx.fillRect(px - z / 2, py - z / 2, z, z); if (f.barn) { ctx.fillStyle = '#7a2f25'; ctx.fillRect(px + z * 0.8, py - z * 0.6, z * 1.3, z * 1.1); } }
+      ctx.fillStyle = '#c9a227';
+      for (const wl of city.wells) { const px = X(wl.x), py = Y(wl.y); const z = Math.max(2.5, 10 * s); ctx.beginPath(); ctx.moveTo(px, py - z); ctx.lineTo(px + z * 0.8, py + z * 0.6); ctx.lineTo(px - z * 0.8, py + z * 0.6); ctx.closePath(); ctx.fill(); }
     }
-    // highways
-    ctx.lineCap = 'round';
-    for (const pass of [0, 1]) {
-      ctx.strokeStyle = pass ? '#c98b2b' : '#3b2a10'; ctx.lineWidth = Math.max(2, (pass ? 14 : 22) * s);
-      ctx.beginPath(); ctx.moveTo(X(HIGHWAYS.i47.x), Y(HIGHWAYS.i47.y0)); ctx.lineTo(X(HIGHWAYS.i47.x), Y(HIGHWAYS.i47.y1));
-      ctx.moveTo(X(HIGHWAYS.rt9.x0), Y(HIGHWAYS.rt9.y)); ctx.lineTo(X(HIGHWAYS.rt9.x1), Y(HIGHWAYS.rt9.y)); ctx.stroke();
+    // roads (low priority first)
+    const style = { street: ['#2b3a55', 9, 1], county: ['#5a5440', 9, 1.2], state: ['#9a8540', 13, 1.6], us: ['#b8963c', 15, 2], interstate: ['#d08a2a', 20, 2.6] };
+    for (const kind of ['street', 'county', 'state', 'us', 'interstate']) {
+      const [col, wd, min] = style[kind];
+      if (kind === 'interstate') { ctx.strokeStyle = '#3b2a10'; ctx.lineWidth = Math.max(min + 2.5, wd * 1.6 * s); for (const e of city.edges) if (e.kind === kind) { const A = city.nodes[e.a], Bn = city.nodes[e.b]; ctx.beginPath(); ctx.moveTo(X(A.x), Y(A.y)); ctx.lineTo(X(Bn.x), Y(Bn.y)); ctx.stroke(); } }
+      ctx.strokeStyle = col; ctx.lineWidth = Math.max(min, wd * s);
+      ctx.beginPath();
+      for (const e of city.edges) {
+        if (e.kind !== kind) continue;
+        const A = city.nodes[e.a], Bn = city.nodes[e.b];
+        if (kind === 'street' && e.alias) continue;
+        ctx.moveTo(X(A.x), Y(A.y)); ctx.lineTo(X(Bn.x), Y(Bn.y));
+      }
+      ctx.stroke();
+      if (kind === 'street') { ctx.strokeStyle = '#9a8540'; ctx.lineWidth = Math.max(1.6, 11 * s); ctx.beginPath(); for (const e of city.edges) if (e.alias) { const A = city.nodes[e.a], Bn = city.nodes[e.b]; ctx.moveTo(X(A.x), Y(A.y)); ctx.lineTo(X(Bn.x), Y(Bn.y)); } ctx.stroke(); }
     }
-    ctx.strokeStyle = '#8a6420'; ctx.lineWidth = Math.max(1, 6 * s);
-    for (const e of city.edges) if (e.kind === 'ramp') { const a = city.nodes[e.a], b2 = city.nodes[e.b]; ctx.beginPath(); ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(X(b2.x), Y(b2.y)); ctx.stroke(); }
     ctx.lineCap = 'butt';
     if (!labels) return;
-    // labels
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    if (s > 0.28) {
-      ctx.font = `${Math.min(13, 10 + s * 3)}px system-ui, sans-serif`; ctx.fillStyle = 'rgba(160,180,210,.75)';
-      for (let c = 0; c < N; c++) { const x = X(c * B); for (let r = 1; r < N; r += s > 0.6 ? 2 : 4) { ctx.save(); ctx.translate(x, Y((r - 0.5) * B)); ctx.rotate(-Math.PI / 2); ctx.fillText(NS_STREETS[c], 0, 0); ctx.restore(); } }
-      for (let r = 0; r < N; r++) { const y = Y(r * B); for (let c = 1; c < N; c += s > 0.6 ? 2 : 4) ctx.fillText(EW_STREETS[r], X((c - 0.5) * B), y); }
+    // street names in towns
+    if (s > 0.42) {
+      ctx.font = `${Math.min(12, 9 + s * 2)}px system-ui, sans-serif`; ctx.fillStyle = 'rgba(170,190,215,.78)';
+      for (const t of TOWNS) {
+        if (X(t.x1) < 0 || X(t.x0) > w || Y(t.y1) < 0 || Y(t.y0) > h) continue;
+        t.ns.forEach((name, i) => { for (let j = 0; j < t.ys.length - 1; j += s > 0.9 ? 1 : 2) { ctx.save(); ctx.translate(X(t.xs[i]), Y((t.ys[j] + t.ys[j + 1]) / 2)); ctx.rotate(-Math.PI / 2); ctx.fillText(name, 0, -1); ctx.restore(); } });
+        t.ew.forEach((name, j) => { for (let i = 0; i < t.xs.length - 1; i += s > 0.9 ? 1 : 2) ctx.fillText(name, X((t.xs[i] + t.xs[i + 1]) / 2), Y(t.ys[j]) - 1); });
+      }
     }
-    if (s > 0.1 && s < 0.7) {
-      ctx.font = `700 ${Math.round(11 + s * 10)}px system-ui, sans-serif`; ctx.fillStyle = 'rgba(120,150,190,.42)';
-      for (const d of DISTRICT_CENTERS) ctx.fillText(d.name.toUpperCase(), X(d.x), Y(d.y));
+    // county road names
+    if (s > 0.09) {
+      ctx.font = 'italic 10px system-ui, sans-serif'; ctx.fillStyle = 'rgba(200,190,150,.7)';
+      for (const rd of ROADS) if (rd.kind === 'county' && rd.pts.length > 1) {
+        const m = Math.floor((rd.pts.length - 1) / 2); const [ax, ay] = rd.pts[m], [bx, by] = rd.pts[m + 1];
+        let ang = Math.atan2(by - ay, bx - ax); if (ang > Math.PI / 2) ang -= Math.PI; if (ang < -Math.PI / 2) ang += Math.PI;
+        ctx.save(); ctx.translate(X((ax + bx) / 2), Y((ay + by) / 2)); ctx.rotate(ang); ctx.fillText(rd.name, 0, -7); ctx.restore();
+      }
     }
-    ctx.font = `italic ${Math.max(10, Math.min(15, 12 * s + 6))}px system-ui, sans-serif`; ctx.fillStyle = 'rgba(100,170,230,.7)';
-    ctx.save(); ctx.translate(X((RIVER.x0 + RIVER.x1) / 2), Y(4 * B)); ctx.rotate(-Math.PI / 2); ctx.fillText(RIVER.name, 0, 0); ctx.restore();
-    ctx.fillText(BAY.name, X(7 * B), Y(BAY.y0 + B * 0.6));
-    ctx.fillStyle = '#e8b45a'; ctx.font = `700 ${Math.max(9, 11 * Math.min(1.4, s * 2))}px system-ui, sans-serif`;
-    ctx.fillText('I-47', X(HIGHWAYS.i47.x) + 16, Y(-0.4 * B)); ctx.fillText('RT 9', X(-0.4 * B), Y(HIGHWAYS.rt9.y) - 12);
-    if (s > 0.55) {
-      ctx.font = '10px system-ui, sans-serif'; ctx.fillStyle = 'rgba(200,210,230,.65)';
+    // highway shields
+    const shielded = new Set();
+    for (const rd of ROADS) {
+      if (rd.kind === 'county') continue;
+      for (const name of rd.name.split(' / ')) {
+        const key = `${name}:${rd.id}`; if (shielded.has(key)) continue; shielded.add(key);
+        const m = Math.floor((rd.pts.length - 1) / 2); const [ax, ay] = rd.pts[m], [bx, by] = rd.pts[m + 1];
+        const off = rd.name.includes(' / ') && name === 'IL-1' ? 26 : 0;
+        this.shield(ctx, name, X((ax + bx) / 2) + off, Y((ay + by) / 2));
+      }
+    }
+    // river names
+    ctx.font = 'italic 12px system-ui, sans-serif'; ctx.fillStyle = 'rgba(110,170,225,.8)';
+    for (const rv of RIVERS) { const m = Math.floor(rv.points.length * 0.3); const [ax, ay] = rv.points[m], [bx, by] = rv.points[m + 1]; let ang = Math.atan2(by - ay, bx - ax); if (ang > Math.PI / 2) ang -= Math.PI; if (ang < -Math.PI / 2) ang += Math.PI; ctx.save(); ctx.translate(X((ax + bx) / 2), Y((ay + by) / 2)); ctx.rotate(ang); ctx.fillText(rv.name, 0, -10); ctx.restore(); }
+    ctx.fillStyle = 'rgba(140,150,140,.5)'; ctx.font = '700 13px system-ui'; ctx.fillText('INDIANA', X(11950), Y(6000));
+    // town names
+    for (const t of TOWNS) {
+      const big = t.id === 'carmi'; const sz = big ? Math.max(13, Math.min(22, 14 + s * 6)) : Math.max(10, Math.min(16, 10 + s * 5));
+      if (s > 0.5 && big) continue;
+      ctx.font = `800 ${sz}px system-ui, sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(8,12,18,.85)';
+      const ty = Y(t.y0) - 10; ctx.strokeText(t.name.toUpperCase(), X(t.x), ty); ctx.fillStyle = big ? '#f2f5fa' : '#c9d3e2'; ctx.fillText(t.name.toUpperCase(), X(t.x), ty);
+    }
+    if (s > 0.6) {
+      ctx.font = '10px system-ui, sans-serif'; ctx.fillStyle = 'rgba(210,220,235,.7)';
       for (const p of city.pois) { ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), 2.5, 0, 6.283); ctx.fill(); ctx.fillText(p.name, X(p.x), Y(p.y) + 10); }
     }
+  }
+
+  shield(ctx, name, x, y) {
+    ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (name.startsWith('I-')) {
+      ctx.fillStyle = '#1d4ea8'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x - 12, y - 10); ctx.lineTo(x + 12, y - 10); ctx.lineTo(x + 12, y + 2); ctx.quadraticCurveTo(x + 12, y + 10, x, y + 13); ctx.quadraticCurveTo(x - 12, y + 10, x - 12, y + 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#c4161c'; ctx.fillRect(x - 11, y - 9, 22, 5);
+      ctx.fillStyle = '#fff'; ctx.font = '800 10px system-ui'; ctx.fillText(name.slice(2), x, y + 2.5);
+    } else if (name.startsWith('US-')) {
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#111'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(x - 11, y - 10); ctx.lineTo(x + 11, y - 10); ctx.lineTo(x + 11, y + 1); ctx.quadraticCurveTo(x + 10, y + 10, x, y + 12); ctx.quadraticCurveTo(x - 10, y + 10, x - 11, y + 1); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#111'; ctx.font = '800 10px system-ui'; ctx.fillText(name.slice(3), x, y);
+    } else {
+      const label = name.replace('IL-', ''); const wd = label.length > 2 ? 26 : 20;
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#111'; ctx.lineWidth = 1.2; ctx.fillRect(x - wd / 2, y - 9, wd, 18); ctx.strokeRect(x - wd / 2, y - 9, wd, 18);
+      ctx.fillStyle = '#111'; ctx.font = '800 10px system-ui'; ctx.fillText(label, x, y + 0.5);
+    }
+    ctx.restore();
   }
 
   /** Draw dynamic layers: events, facilities, incidents, units. */
@@ -126,6 +183,8 @@ export class MapRenderer {
     }
     // facilities
     if (layers.facilities) for (const f of city.facilities) {
+      if (s < 0.13 && !['hospital', 'eoc', 'sheriff', 'fire', 'police_hq', 'precinct'].includes(f.kind)) continue;
+      if (s < 0.06 && f.kind !== 'hospital' && f.kind !== 'eoc') continue;
       const [col, glyph] = FAC_STYLE[f.kind] || ['#888', '?']; const x = X(f.x), y = Y(f.y);
       if (x < -20 || y < -20 || x > w + 20 || y > h + 20) continue;
       const r = Math.max(5, Math.min(10, 14 * s));

@@ -220,7 +220,7 @@ export class IncidentsScreen extends Screen {
 
   editLocation() {
     const i = this.inc();
-    const m = modal({ title: 'Edit location', body: `<label class="field">Address / location<input class="input" data-r="loc" value="${esc(i.location.full)}" autofocus></label><div class="dim" style="margin-top:8px;font-size:.85em">Typing a Ridgeview street address moves the incident on the map and re-routes units.</div>`,
+    const m = modal({ title: 'Edit location', body: `<label class="field">Address / location<input class="input" data-r="loc" value="${esc(i.location.full)}" autofocus></label><div class="dim" style="margin-top:8px;font-size:.85em">Typing a White County address moves the incident on the map and re-routes units.</div>`,
       foot: [{ label: 'Cancel', act: 'cancel' }, { label: 'Save', act: 'save', cls: 'primary' }],
       onAction: (a) => {
         if (a === 'save') {
@@ -252,7 +252,7 @@ export class IncidentsScreen extends Screen {
   newIncidentModal() {
     const m = modal({ title: 'New incident', body: `<div class="col">
       <label class="field">Type<select class="input" data-r="t">${typeOptions('ASSIST')}</select></label>
-      <label class="field">Location (Ridgeview street address)<input class="input" data-r="l" placeholder="e.g. 1420 Main St" autofocus></label>
+      <label class="field">Location (White County address)<input class="input" data-r="l" placeholder="e.g. 412 W Main St, or 2145 Burnt Prairie Rd" autofocus></label>
       <label class="field">Priority<select class="input" data-r="p">${[1, 2, 3, 4].map((p) => `<option value="${p}" ${p === 3 ? 'selected' : ''}>P${p}</option>`).join('')}</select></label>
       <label class="field">Description<textarea class="input" rows="2" data-r="d"></textarea></label></div>`,
       foot: [{ label: 'Cancel', act: 'cancel' }, { label: 'Create', act: 'create', cls: 'primary' }],
@@ -260,7 +260,7 @@ export class IncidentsScreen extends Screen {
         if (a !== 'create') { m.close(); return; }
         const v = (k) => m.body.querySelector(`[data-r="${k}"]`).value.trim();
         const geo = this.sim.geocode(v('l'));
-        if (!geo) { toast('Could not find that address. Use a Ridgeview street, e.g. "1420 Main St".', { level: 'warn' }); return; }
+        if (!geo) { toast('Could not find that address. Use a White County street, e.g. "412 W Main St" or "205 Court St, Grayville".', { level: 'warn' }); return; }
         const inc = this.sim.incidents.create({ typeId: v('t'), priority: parseInt(v('p'), 10), location: { ...geo, full: v('l'), short: v('l') }, description: v('d'), source: 'manual', locationVerified: true });
         m.close(); this.openDetail(inc.id);
       } });

@@ -3,7 +3,7 @@
 import { chooseTemplate, buildScenario, SCENARIO_BY_ID, timeOfDay } from './scenarioGen.js';
 import { newConvo, openingLine, respond, spontaneous } from '../ai/conversation.js';
 import { TYPE } from '../data/incidentTypes.js';
-import { addressFor, B } from '../data/city.js';
+import { addressFor } from '../data/city.js';
 import { bus } from '../core/events.js';
 import { dist, fill, clamp } from '../core/util.js';
 
@@ -146,7 +146,7 @@ export class CallManager {
     if (call.sc.kind !== 'emergency' && call.sc.kind !== 'duplicate') sim.stats.nonEmergency++;
     sim.stats.ringTimes.push(sim.t - call.receivedAt);
     this.addLine(call, 'system', `Line ${call.line} answered. ANI: ${call.sc.ani.phone} (${call.sc.ani.kind}). ALI: ${call.sc.ani.address}`);
-    this.addLine(call, 'dispatcher', call.isCallback ? 'Hello, this is Ridgeview 911 calling you back, we received a call from this number.' : '911, what is the address of your emergency?');
+    this.addLine(call, 'dispatcher', call.isCallback ? 'Hello, this is White County 911 calling you back, we received a call from this number.' : '911, what is the address of your emergency?');
     call.pendingReply = true;
     sim.later(sim.rng.float(0.6, 1.3), () => {
       call.pendingReply = false;
@@ -305,7 +305,7 @@ export class CallManager {
   /** A development spawns a related incident (e.g. evacuation from a wildfire). */
   spawnFollowUp(inc, typeId) {
     const sim = this.sim; const t = TYPE[typeId]; if (!t) return null;
-    const loc = { ...inc.location, x: inc.location.x + sim.rng.float(-1, 1) * B * 0.6, y: inc.location.y + sim.rng.float(-1, 1) * B * 0.6 };
+    const loc = { ...inc.location, x: inc.location.x + sim.rng.float(-1, 1) * 120, y: inc.location.y + sim.rng.float(-1, 1) * 120 };
     const a = addressFor(loc.x, loc.y); Object.assign(loc, a);
     const child = sim.incidents.create({ typeId, location: loc, source: 'event', description: `Related to ${inc.number}: ${t.label}`, locationVerified: true });
     sim.incidents.addHistory(inc, `Related incident ${child.number} created (${t.label})`);

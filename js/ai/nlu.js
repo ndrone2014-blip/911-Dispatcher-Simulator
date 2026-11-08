@@ -5,7 +5,7 @@
 // model: unusual phrasings can still be misunderstood (the UI always offers
 // suggested questions as a fallback).
 import { levenshtein } from '../core/util.js';
-import { STREET_WORDS, NS_STREETS, EW_STREETS } from '../data/city.js';
+import { STREET_WORDS, ALL_STREETS } from '../data/city.js';
 
 const CONTRACTIONS = {
   "what's": 'what is', "where's": 'where is', "who's": 'who is', "how's": 'how is', "it's": 'it is', "he's": 'he is', "she's": 'she is',
@@ -284,19 +284,18 @@ export function extractAddress(text) {
 }
 
 export function matchStreet(text) {
-  const norm = ` ${normalize(text)} `;
-  const all = [...NS_STREETS, ...EW_STREETS];
+  const norm = ` ${normalize(text).replace(/\b(street|avenue|road|drive|boulevard|route|highway|hwy)\b/g, (m) => ({ street: 'st', avenue: 'ave', road: 'rd', drive: 'dr', boulevard: 'blvd', route: 'route', highway: 'hwy', hwy: 'hwy' }[m]))} `;
+  const SUFFIX = new Set(['st', 'rd', 'ave', 'blvd', 'dr']);
   let best = null, bestScore = 0;
-  for (const s of all) {
-    const parts = normalize(s).split(' ');
-    const key = parts[0];
-    const ordinal = { '2nd': 'second', '3rd': 'third', '4th': 'fourth', '5th': 'fifth', '6th': 'sixth', '8th': 'eighth', '9th': 'ninth', '10th': 'tenth', '11th': 'eleventh', '12th': 'twelfth' }[key];
+  for (const s of ALL_STREETS) {
+    const words = normalize(s).split(' ').filter((w) => !SUFFIX.has(w));
+    const phrase = words.join(' ');
     let score = 0;
-    if (norm.includes(` ${key} `) || (ordinal && norm.includes(` ${ordinal} `))) score = 2;
-    else {
-      for (const w of norm.trim().split(' ')) if (w.length >= 4 && key.length >= 4 && levenshtein(w, key) <= 1) { score = 1.2; break; }
+    if (phrase && norm.includes(` ${phrase} `)) score = 3 + words.length;
+    else if (/^(il|us|i) \d+/.test(phrase)) { const num = phrase.split(' ')[1]; if (new RegExp(`\\b(${phrase.split(' ')[0]}|route|hwy)\\s*${num}\\b`).test(norm)) score = 4; }
+    else if (words[0] && words[0].length >= 4) {
+      for (const w of norm.trim().split(' ')) if (w.length >= 4 && levenshtein(w, words[0]) <= 1) { score = 1.2 + (words.length === 1 ? 0.3 : 0); break; }
     }
-    if (score && parts[1] && norm.includes(` ${parts[1]} `)) score += 0.5;
     if (score > bestScore) { bestScore = score; best = s; }
   }
   return best;

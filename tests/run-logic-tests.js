@@ -122,7 +122,7 @@ ok(minc.sim.transported >= 1, 'patient delivered');
 section('Wrong address relocation');
 const wcall = sim.calls.spawnCall({ templateId: 'mva_injury' });
 sim.calls.answer(wcall.id); run(sim, 2);
-const winc = sim.calls.createIncident(wcall.id, { location: '205 Aspen Ave' });
+const winc = sim.calls.createIncident(wcall.id, { location: '205 S Locust St' });
 const wtrue = wcall.sc.loc;
 const wunit = sim.units.list.find((u) => u.type === 'patrol' && sim.units.isAssignable(u));
 sim.units.assign([wunit.id], winc.id);

@@ -1,404 +1,553 @@
-// The fictional City of Ridgeview: street grid, neighborhoods, river, highways,
-// facilities, points of interest, address system and road-graph routing.
-// Everything is generated deterministically from a fixed seed so the city is the
-// same every time you play.
+// White County, Illinois — county road network centered on Carmi (county seat).
+// Distances are compressed ~3.2x so drives take realistic game-minutes. Highway
+// routes follow the real corridors (I-64, US-45, IL-1, IL-14, IL-141); town street
+// grids use real Carmi street names, arranged approximately.
 import { RNG, dist, clamp } from '../core/util.js';
 
-export const B = 220; // block size in meters
-export const N = 15; // streets per direction (0..14)
-export const CITY_NAME = 'Ridgeview';
-export const COUNTY_NAME = 'Halston County';
+export const CITY_NAME = 'Carmi';
+export const COUNTY_NAME = 'White County';
+export const STATE_NAME = 'Illinois';
+export const SCALE = 3.2; // real meters per game meter
+export const B = 115; // Carmi block size (kept for compatibility)
+export const MAP_BOUNDS = { x0: -500, y0: -500, x1: 12450, y1: 11000 };
+export const COUNTY_LINE = [[0, 0], [11320, 0], [11500, 1600], [11350, 3200], [11550, 4800], [11400, 6400], [11650, 8000], [11500, 9400], [11300, 10500], [0, 10500]];
 
-export const NS_STREETS = ['Westgate Rd', 'Aspen Ave', 'Birch Ave', 'Cedar Ave', 'Dogwood Ave', 'Elm St', 'Franklin Ave', 'Main St',
-  'Grant Ave', 'Hawthorne Ave', 'Irving Ave', 'Juniper Ave', 'Kingston Ave', 'Lakeshore Dr', 'Riverside Dr'];
-export const EW_STREETS = ['Northgate Pkwy', 'Ridge Rd', '2nd St', '3rd St', '4th St', '5th St', '6th St', 'Washington St',
-  '8th St', '9th St', '10th St', '11th St', '12th St', 'Harbor St', 'Port Rd'];
-
-export const RIVER = { name: 'Halston River', x0: 12.22 * B, x1: 12.78 * B };
-export const BRIDGE_ROWS = [2, 7, 11];
-export const BAY = { name: 'Ridgeview Bay', y0: 14.35 * B };
-export const HIGHWAYS = {
-  i47: { name: 'I-47', x: 3.5 * B, rampRows: [1, 4, 7, 10, 13], y0: -0.6 * B, y1: 14.3 * B },
-  rt9: { name: 'Route 9 Expressway', y: 10.5 * B, rampCols: [1, 4, 7, 10, 14], x0: -0.6 * B, x1: 14.6 * B },
-};
-export const MAP_BOUNDS = { x0: -1.2 * B, y0: -1.2 * B, x1: 15.2 * B, y1: 15.6 * B };
-
-// ---------- Zones & districts ----------
-function zoneFor(bx, by) {
-  if (bx === 12) return 'water';
-  if ((bx <= 1 && by === 0)) return 'airport';
-  if (bx >= 5 && bx <= 6 && by >= 2 && by <= 3) return 'park';
-  if (bx === 9 && by === 12) return 'park';
-  if ((bx <= 1 && by >= 11) || (bx === 2 && by === 13)) return 'forest';
-  if (bx >= 9 && bx <= 11 && by <= 4) return 'industrial';
-  if (by === 13 && bx >= 7 && bx <= 11) return 'industrial';
-  if (bx >= 1 && bx <= 2 && by === 5) return 'institutional';
-  if (bx >= 5 && bx <= 8 && by >= 5 && by <= 8) return 'downtown';
-  if (bx === 6 || bx === 7 || by === 6 || by === 7) return 'commercial';
-  if (bx === 13 && (by === 2 || by === 7 || by === 11)) return 'commercial';
-  return 'residential';
-}
-function districtFor(bx, by) {
-  if (bx === 12) return 'Halston River';
-  if (bx === 13) return 'Riverside';
-  if (bx >= 9 && bx <= 11 && by <= 5) return 'Ironworks';
-  if (bx <= 1 && by <= 5) return 'Maple Heights';
-  if (by <= 3) return 'Northgate';
-  if (bx >= 5 && bx <= 8 && by >= 4 && by <= 9) return 'Downtown';
-  if (bx <= 4 && by >= 4 && by <= 9) return 'Cedar Hill';
-  if (bx <= 4 && by >= 10) return 'Westbrook';
-  if (bx >= 9 && bx <= 11 && by >= 6 && by <= 10) return 'Oak Grove';
-  if (by >= 10) return 'Southport';
-  return 'Downtown';
-}
-export const DISTRICTS = ['Downtown', 'Northgate', 'Maple Heights', 'Cedar Hill', 'Westbrook', 'Southport', 'Oak Grove', 'Ironworks', 'Riverside'];
-
-// ---------- Facilities ----------
-// kind is matched by unit types' `station` lists.
-const FACILITY_DEFS = [
-  ['police_hq', 'Ridgeview Police Headquarters', 7.5, 6.18, 'PD HQ'],
-  ['precinct', '1st Precinct (Northgate)', 6.5, 1.2, '1st Pct'],
-  ['precinct', '2nd Precinct (Cedar Hill)', 1.2, 7.5, '2nd Pct'],
-  ['precinct', '3rd Precinct (Southport)', 8.5, 11.8, '3rd Pct'],
-  ['precinct', '4th Precinct (Riverside)', 13.8, 5.5, '4th Pct'],
-  ['sheriff', "Halston County Sheriff's Office", 2.5, 3.2, 'Sheriff'],
-  ['federal', 'Federal Building (FBI / DEA)', 8.2, 5.2, 'Federal'],
-  ['eoc', 'Emergency Operations Center & 911 Center', 4.8, 4.5, 'EOC / 911'],
-  ['fire', 'Fire Station 1 (Headquarters)', 6.2, 8.5, 'Sta 1'],
-  ['fire', 'Fire Station 2', 3.2, 1.5, 'Sta 2'],
-  ['fire', 'Fire Station 3', 0.8, 9.2, 'Sta 3'],
-  ['fire', 'Fire Station 4', 10.5, 2.8, 'Sta 4'],
-  ['fire', 'Fire Station 5', 10.2, 8.2, 'Sta 5'],
-  ['fire', 'Fire Station 6', 5.5, 12.2, 'Sta 6'],
-  ['fire', 'Fire Station 7', 13.5, 9.5, 'Sta 7'],
-  ['fire', 'Fire Station 8', 2.8, 11.5, 'Sta 8'],
-  ['fire', 'Fire Station 9', 13.4, 1.4, 'Sta 9'],
-  ['fire', 'Fire Station 10', 8.8, 3.6, 'Sta 10'],
-  ['ems', 'EMS Station 1', 5.2, 6.8, 'EMS 1'],
-  ['ems', 'EMS Station 2', 2.2, 10.2, 'EMS 2'],
-  ['ems', 'EMS Station 3', 11.2, 11.5, 'EMS 3'],
-  ['ems', 'EMS Station 4', 9.6, 1.6, 'EMS 4'],
-  ['hospital', 'Ridgeview General Hospital', 4.5, 6.5, 'Ridgeview General', { trauma: 1 }],
-  ['hospital', 'St. Catherine Medical Center', 10.5, 9.5, 'St. Catherine', { trauma: 2 }],
-  ['hospital', 'Northside Regional Hospital', 7.5, 2.5, 'Northside Regional', { trauma: 3 }],
-  ['hospital_helipad', 'Ridgeview General Helipad', 4.3, 6.2, 'Helipad'],
-  ['airport', 'Ridgeview Municipal Airport (Air Ops)', 0.9, 0.5, 'Airport'],
-  ['marina', 'Harbor Point Marina (Marine Patrol)', 10.5, 14.15, 'Marina'],
-  ['coastguard', 'Coast Guard Station Ridgeview', 13.6, 14.15, 'USCG'],
-  ['sar', 'Westbrook Search & Rescue Base', 1.8, 11.3, 'SAR Base'],
-  ['public_works', 'Public Works Yard', 11.5, 3.5, 'PW Yard'],
-  ['animal_control', 'Animal Control Center', 3.5, 12.5, 'Animal Ctrl'],
-  ['dot', 'DOT Maintenance Garage', 2.4, 8.6, 'DOT'],
-  ['utility', 'Halston Power & Light Ops', 11.4, 0.6, 'Utility'],
-];
-FACILITY_DEFS.push(['fire_hq', 'Fire Administration', 6.4, 8.8, 'Fire Admin']);
-
-// ---------- Points of interest (used by callers & map) ----------
-const POI_DEFS = [
-  ['Ridgeview Mall', 9.5, 7.5, 'commercial', 'mall'], ['Ridgeview Arena', 10.5, 6.5, 'commercial', 'arena'],
-  ['Lincoln High School', 3.5, 2.5, 'residential', 'school'], ['Maplewood Elementary', 0.5, 3.5, 'residential', 'school'],
-  ['Ridgeview State University', 1.8, 5.5, 'institutional', 'university'], ['City Hall', 7.3, 7.3, 'downtown', 'government'],
-  ['Central Station', 8.5, 8.6, 'downtown', 'transit'], ['Ridgeview Public Library', 5.6, 7.5, 'downtown', 'library'],
-  ['Grand Ridgeview Hotel', 6.6, 5.6, 'downtown', 'hotel'], ['Sunrise Senior Living', 3.4, 9.4, 'residential', 'nursing'],
-  ['Parkside Apartments', 4.5, 2.6, 'residential', 'apartments'], ['Riverbend Apartments', 13.5, 7.6, 'commercial', 'apartments'],
-  ['Halcyon Chemical Plant', 10.5, 1.5, 'industrial', 'chemical'], ['Ironworks Steel Mill', 9.5, 0.5, 'industrial', 'factory'],
-  ['Ridgeview Rail Yard', 11.5, 4.5, 'industrial', 'railyard'], ['Port of Ridgeview Terminal', 9.5, 13.6, 'industrial', 'port'],
-  ['FreshMart Grocery', 2.5, 6.6, 'commercial', 'grocery'], ['QuickStop Gas', 7.6, 10.4, 'commercial', 'gas'],
-  ['QuickStop Gas', 3.6, 7.6, 'commercial', 'gas'], ['Fuel Stop Truck Plaza', 4.4, 10.4, 'residential', 'gas'],
-  ["Murphy's Pub", 6.4, 9.4, 'commercial', 'bar'], ['The Blue Note Lounge', 7.6, 5.4, 'downtown', 'bar'],
-  ['Grace Community Church', 1.5, 8.5, 'residential', 'church'], ['Cedar Hill Park & Pool', 3.5, 5.5, 'residential', 'pool'],
-  ['Westbrook Forest Preserve', 0.8, 12.4, 'forest', 'forest'], ['Ridgeview Central Park', 6.0, 3.0, 'park', 'park'],
-  ['Lakeview Park', 9.5, 12.5, 'park', 'park'], ['Riverside Plaza', 13.5, 2.5, 'commercial', 'shopping'],
-  ['Oak Grove Shopping Center', 10.5, 7.6, 'commercial', 'shopping'], ['Halston Community College', 13.5, 11.5, 'commercial', 'college'],
-  ['Southport Marina Boardwalk', 11.5, 13.9, 'industrial', 'boardwalk'], ['Northgate Business Park', 4.5, 0.5, 'residential', 'office'],
-  ['Kingston Tower', 8.5, 6.5, 'downtown', 'office'], ['Ridgeview Medical Plaza', 5.5, 6.4, 'downtown', 'clinic'],
-  ['Ace Hardware & Lumber', 11.5, 10.5, 'residential', 'store'], ['Dragon Palace Restaurant', 7.4, 9.6, 'commercial', 'restaurant'],
-  ["Rosie's Diner", 13.4, 9.4, 'residential', 'restaurant'], ['SuperSaver Warehouse Club', 0.6, 6.6, 'commercial', 'store'],
+export const RIVERS = [
+  { name: 'Wabash River', width: 110, points: [[11320, -500], [11320, 0], [11500, 1600], [11350, 3200], [11550, 4800], [11400, 6400], [11650, 8000], [11500, 9400], [11300, 10500], [11200, 11000]] },
+  { name: 'Little Wabash River', width: 46, points: [[3600, -500], [3700, 0], [4300, 1800], [5200, 3600], [6300, 4900], [6580, 5600], [6620, 6300], [6750, 7000], [7400, 8200], [8600, 9400], [9800, 10300], [11300, 10500]] },
+  { name: 'Skillet Fork', width: 26, points: [[-500, 3550], [0, 3600], [1500, 3900], [3200, 4300], [4800, 4700], [6300, 4900]] },
 ];
 
-// ---------- Build ----------
+// ---------------- Towns ----------------
+export const TOWNS = [
+  { id: 'carmi', name: 'Carmi', x: 6000, y: 6200, block: 115, blockY: 110, mainNS: 5, mainEW: 4, weight: 0.58,
+    ns: ['Robinson St', 'Fair St', 'Oak St', 'Walnut St', 'Church St', 'Main Cross St', 'Jessup St', 'Slocumb St', 'Kerney St', 'Locust St'],
+    ew: ['College Blvd', 'Maple St', 'Sycamore St', 'Smith St', 'Main St', 'Stewart St', 'Rice St', 'Fourth St', 'Tenth St'] },
+  { id: 'norris', name: 'Norris City', x: 2600, y: 9300, block: 95, blockY: 95, mainNS: 2, mainEW: 2, weight: 0.08,
+    ns: ['Division St', 'Mill St', 'Main St', 'Elm St', 'East St'], ew: ['Cherry St', 'Locust St', 'Market St', 'Walnut St', 'South St'] },
+  { id: 'grayville', name: 'Grayville', x: 10800, y: 1200, block: 95, blockY: 95, mainNS: 2, mainEW: 2, weight: 0.08,
+    ns: ['West St', 'Oak St', 'Court St', 'Main St', 'Water St'], ew: ['North St', 'Mill St', 'Middle St', 'Commerce St', 'South St'] },
+  { id: 'crossville', name: 'Crossville', x: 9000, y: 4700, block: 95, blockY: 95, mainNS: 2, mainEW: 2, weight: 0.06,
+    ns: ['West St', 'Elm St', 'Cross St', 'Pine St', 'East St'], ew: ['North St', 'Third St', 'Main St', 'Second St', 'South St'] },
+  { id: 'enfield', name: 'Enfield', x: 2200, y: 5600, block: 95, blockY: 95, mainNS: 2, mainEW: 2, weight: 0.06,
+    ns: ['West St', 'Ash St', 'Main St', 'Oak St', 'East St'], ew: ['North St', 'Maple St', 'Market St', 'Church St', 'South St'] },
+  { id: 'millshoals', name: 'Mill Shoals', x: 1800, y: 1300, block: 95, blockY: 95, mainNS: 2, mainEW: 2, weight: 0.03,
+    ns: ['West St', 'Spring St', 'Main St', 'Elm St', 'East St'], ew: ['North St', 'Oak St', 'Center St', 'School St', 'South St'] },
+  { id: 'burntprairie', name: 'Burnt Prairie', x: 3900, y: 2050, block: 95, blockY: 95, mainNS: 2, mainEW: 2, weight: 0.03,
+    ns: ['West St', 'Pine St', 'Prairie St', 'Elm St', 'East St'], ew: ['North St', 'Walnut St', 'Main St', 'Church St', 'South St'] },
+  { id: 'springerton', name: 'Springerton', x: 2900, y: 3300, block: 90, blockY: 90, mainNS: 1, mainEW: 1, weight: 0.02, ns: ['West St', 'Main St', 'East St'], ew: ['North St', 'Center St', 'South St'] },
+  { id: 'phillipstown', name: 'Phillipstown', x: 10600, y: 3200, block: 90, blockY: 90, mainNS: 1, mainEW: 1, weight: 0.02, ns: ['West St', 'Main St', 'Bluff St'], ew: ['North St', 'Center St', 'South St'] },
+  { id: 'herald', name: 'Herald', x: 5600, y: 9500, block: 90, blockY: 90, mainNS: 1, mainEW: 1, weight: 0.015, ns: ['West St', 'Main St', 'East St'], ew: ['North St', 'Center St', 'South St'] },
+  { id: 'emma', name: 'Emma', x: 8800, y: 8700, block: 90, blockY: 90, mainNS: 1, mainEW: 1, weight: 0.02, ns: ['West St', 'Main St', 'East St'], ew: ['North St', 'Center St', 'South St'] },
+  { id: 'maunie', name: 'Maunie', x: 10900, y: 8500, block: 90, blockY: 90, mainNS: 1, mainEW: 1, weight: 0.02, ns: ['West St', 'Main St', 'River St'], ew: ['North St', 'Center St', 'South St'] },
+];
+export const TOWN_BY_ID = Object.fromEntries(TOWNS.map((t) => [t.id, t]));
+for (const t of TOWNS) {
+  t.xs = t.ns.map((_, i) => t.x + (i - t.mainNS) * t.block);
+  t.ys = t.ew.map((_, j) => t.y + (j - t.mainEW) * t.blockY);
+  t.x0 = t.xs[0]; t.x1 = t.xs[t.xs.length - 1]; t.y0 = t.ys[0]; t.y1 = t.ys[t.ys.length - 1];
+}
+export const RURAL = 'Rural White County';
+export const DISTRICTS = [...TOWNS.map((t) => t.name), RURAL];
+
+// Named non-grid roads. kind: interstate | us | state | county
+const ROAD_DEFS = [
+  { name: 'I-64', kind: 'interstate', pts: [[-400, 2380], [2000, 2370], [4500, 2350], [7600, 2150], [10500, 1750], [11500, 1620], [12400, 1550]] },
+  { name: 'US-45', kind: 'us', pts: [[1700, -400], [1800, 1110]] },
+  { name: 'US-45', kind: 'us', pts: [[1800, 1490], [1950, 3000], [2050, 4400], [2200, 5410]] },
+  { name: 'US-45', kind: 'us', pts: [[2200, 5790], [2200, 5900], [2400, 7500], [2600, 9110]] },
+  { name: 'US-45', kind: 'us', pts: [[2600, 9490], [2700, 10900]] },
+  { name: 'IL-14', kind: 'state', pts: [[-400, 5900], [1200, 5850], [2200, 5900], [3500, 6000], [4800, 6150], [5425, 6200]] },
+  { name: 'IL-14 / IL-1', kind: 'state', pts: [[6460, 6200], [6700, 6150], [7600, 5700], [8400, 5150], [8810, 4890]] },
+  { name: 'IL-14', kind: 'state', pts: [[9190, 4700], [10200, 4750], [11450, 4800]] },
+  { name: 'IL-1', kind: 'state', pts: [[9000, 4510], [9500, 3700], [9900, 2900], [10350, 2100], [10500, 1750], [10800, 1390]] },
+  { name: 'IL-1', kind: 'state', pts: [[10800, 1010], [10950, -400]] },
+  { name: 'IL-1', kind: 'state', pts: [[5655, 6640], [5500, 7200], [4500, 8000], [3400, 8800], [2790, 9110]] },
+  { name: 'IL-1', kind: 'state', pts: [[2410, 9490], [2200, 10000], [2000, 10900]] },
+  { name: 'IL-141', kind: 'state', pts: [[2790, 9490], [3300, 10100], [3700, 10900]] },
+  { name: 'County Road 20', kind: 'county', pts: [[1990, 1300], [2800, 1700], [3710, 2050]] },
+  { name: 'County Road 20', kind: 'county', pts: [[4090, 2050], [4500, 2350]] },
+  { name: 'Burnt Prairie Rd', kind: 'county', pts: [[6000, 5760], [5700, 4500], [4900, 3200], [3900, 2240]] },
+  { name: 'Springerton Rd', kind: 'county', pts: [[2390, 5410], [2600, 4300], [2900, 3390]] },
+  { name: 'Springerton Rd', kind: 'county', pts: [[2900, 3210], [3300, 2700], [3710, 2240]] },
+  { name: 'Seven Mile Rd', kind: 'county', pts: [[2990, 3300], [4000, 3250], [4900, 3200]] },
+  { name: 'Maunie Rd', kind: 'county', pts: [[6000, 6640], [6200, 7300], [7200, 8100], [8800, 8610]] },
+  { name: 'Maunie Rd', kind: 'county', pts: [[8890, 8700], [10000, 8600], [10810, 8500]] },
+  { name: 'Herald Rd', kind: 'county', pts: [[2790, 9300], [4000, 9450], [5510, 9500]] },
+  { name: 'Herald Rd', kind: 'county', pts: [[5690, 9500], [7200, 9200], [8710, 8700]] },
+  { name: 'Phillipstown Rd', kind: 'county', pts: [[9190, 4510], [9800, 3900], [10510, 3290]] },
+  { name: 'Sacramento Rd', kind: 'county', pts: [[6460, 5760], [7600, 4300], [8600, 3500], [10510, 3200]] },
+  { name: 'Calvin Rd', kind: 'county', pts: [[8600, 3500], [9900, 2900]] },
+  { name: 'County Road 1200 E', kind: 'county', pts: [[3500, 6000], [3700, 7800], [4000, 9450]] },
+  { name: 'Wabash River Rd', kind: 'county', pts: [[10900, 8410], [11100, 7000], [11000, 5600], [10200, 4750]] },
+  { name: 'Airport Rd', kind: 'county', pts: [[6200, 7300], [5900, 7350]] },
+];
+const SPEED = { interstate: 2.7, us: 2.25, state: 2.15, county: 1.7, street: 1.0 };
+export const ROAD_KINDS = SPEED;
+
+// ---------------- Build graph ----------------
+function townAt(x, y, pad = 0) { return TOWNS.find((t) => x >= t.x0 - pad && x <= t.x1 + pad && y >= t.y0 - pad && y <= t.y1 + pad) || null; }
+export { townAt };
+
 function buildCity() {
-  const r = new RNG(911_2026);
-  const blocks = [];
-  for (let by = 0; by < N - 1; by++) for (let bx = 0; bx < N - 1; bx++) {
-    const zone = zoneFor(bx, by);
-    const block = { bx, by, zone, district: districtFor(bx, by), buildings: [] };
-    // footprints for the map
-    const x0 = bx * B + 14, y0 = by * B + 14, size = B - 28;
-    if (zone === 'downtown') {
-      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) block.buildings.push([x0 + i * size / 2 + 6, y0 + j * size / 2 + 6, size / 2 - 12, size / 2 - 12, r.float(0.55, 0.85)]);
-    } else if (zone === 'commercial' || zone === 'industrial' || zone === 'institutional') {
-      const n = zone === 'industrial' ? 2 : 3;
-      for (let i = 0; i < n; i++) {
-        const w = r.float(40, size / n), h = r.float(50, size * 0.8);
-        block.buildings.push([x0 + i * (size / n) + 4, y0 + r.float(0, size - h), w - 8, h, r.float(0.4, 0.7)]);
-      }
-    } else if (zone === 'residential') {
-      const cols = 5;
-      for (let i = 0; i < cols; i++) for (const yy of [0, size - 34]) {
-        if (r.chance(0.12)) continue;
-        block.buildings.push([x0 + i * (size / cols) + 5, y0 + yy + r.float(0, 6), size / cols - 12, r.float(20, 28), r.float(0.3, 0.55)]);
-      }
-    }
-    blocks.push(block);
-  }
-  const blockAt = (bx, by) => (bx >= 0 && by >= 0 && bx < N - 1 && by < N - 1 ? blocks[by * (N - 1) + bx] : null);
-
-  // Road graph
-  const nodes = []; const adj = [];
-  const addNode = (x, y, meta = {}) => { nodes.push({ id: nodes.length, x, y, ...meta }); adj.push([]); return nodes.length - 1; };
-  const edges = [];
-  const addEdge = (a, b, speed, name, kind = 'street') => {
-    const len = dist(nodes[a].x, nodes[a].y, nodes[b].x, nodes[b].y);
-    const id = edges.length; edges.push({ id, a, b, len, speed, name, kind });
-    adj[a].push({ to: b, edge: id }); adj[b].push({ to: a, edge: id });
+  const r = new RNG(618_1814);
+  const nodes = []; const adj = []; const edges = []; const nodeMap = new Map();
+  const node = (x, y) => {
+    const k = `${Math.round(x)},${Math.round(y)}`;
+    if (nodeMap.has(k)) return nodeMap.get(k);
+    nodes.push({ id: nodes.length, x, y }); adj.push([]); nodeMap.set(k, nodes.length - 1); return nodes.length - 1;
   };
-  for (let rr = 0; rr < N; rr++) for (let c = 0; c < N; c++) addNode(c * B, rr * B, { c, r: rr });
-  const gid = (c, rr) => rr * N + c;
-  for (let rr = 0; rr < N; rr++) for (let c = 0; c < N - 1; c++) {
-    if (c === 12 && !BRIDGE_ROWS.includes(rr)) continue; // river
-    const isMain = rr === 7 || rr === 0 || rr === 14;
-    addEdge(gid(c, rr), gid(c + 1, rr), isMain ? 1.15 : 1.0, EW_STREETS[rr], c === 12 ? 'bridge' : 'street');
+  const addEdge = (a, b, meta) => {
+    if (a === b) return;
+    const A = nodes[a], Bn = nodes[b]; const len = dist(A.x, A.y, Bn.x, Bn.y);
+    const mx = (A.x + Bn.x) / 2, my = (A.y + Bn.y) / 2; const t = townAt(mx, my, 5);
+    const e = { id: edges.length, a, b, len, district: t ? t.name : RURAL, town: t?.id || null, ...meta };
+    edges.push(e); adj[a].push({ to: b, edge: e.id }); adj[b].push({ to: a, edge: e.id });
+  };
+  // town grids
+  for (const t of TOWNS) {
+    t.ns.forEach((name, i) => { for (let j = 0; j < t.ys.length - 1; j++) addEdge(node(t.xs[i], t.ys[j]), node(t.xs[i], t.ys[j + 1]), { name, kind: 'street', speed: i === t.mainNS ? 1.15 : 1.0, axis: 'ns', town: t.id, idx: i }); });
+    t.ew.forEach((name, j) => { for (let i = 0; i < t.xs.length - 1; i++) addEdge(node(t.xs[i], t.ys[j]), node(t.xs[i + 1], t.ys[j]), { name, kind: 'street', speed: j === t.mainEW ? 1.15 : 1.0, axis: 'ew', town: t.id, idx: j }); });
   }
-  for (let c = 0; c < N; c++) for (let rr = 0; rr < N - 1; rr++) {
-    const isMain = c === 7 || c === 0 || c === 13;
-    addEdge(gid(c, rr), gid(c, rr + 1), isMain ? 1.15 : 1.0, NS_STREETS[c]);
-  }
-  // I-47
-  const i47 = HIGHWAYS.i47; const i47Nodes = [];
-  for (const rr of i47.rampRows) {
-    const n = addNode(i47.x, rr * B, { hw: 'i47', label: `${EW_STREETS[rr]} exit` }); i47Nodes.push(n);
-    addEdge(n, gid(3, rr), 0.8, `${i47.name} ramp`, 'ramp'); addEdge(n, gid(4, rr), 0.8, `${i47.name} ramp`, 'ramp');
-  }
-  // Route 9
-  const rt9 = HIGHWAYS.rt9; const rt9Nodes = [];
-  for (const c of rt9.rampCols) {
-    const n = addNode(c * B, rt9.y, { hw: 'rt9', label: `${NS_STREETS[c]} exit` }); rt9Nodes.push(n);
-    addEdge(n, gid(c, 10), 0.8, `${rt9.name} ramp`, 'ramp'); addEdge(n, gid(c, 11), 0.8, `${rt9.name} ramp`, 'ramp');
-  }
-  const interchange = addNode(i47.x, rt9.y, { hw: 'both', label: 'I-47 / Route 9 interchange' });
-  const chain = (list, name) => { for (let i = 0; i < list.length - 1; i++) addEdge(list[i], list[i + 1], 1.8, name, 'highway'); };
-  // insert interchange into both chains in sorted order
-  const i47Chain = [...i47Nodes, interchange].sort((a, b) => nodes[a].y - nodes[b].y);
-  const rt9Chain = [...rt9Nodes, interchange].sort((a, b) => nodes[a].x - nodes[b].x);
-  chain(i47Chain, i47.name); chain(rt9Chain, rt9.name);
-
-  const facilities = FACILITY_DEFS.map(([kind, name, fx, fy, short, extra], i) => {
-    const x = fx * B, y = fy * B;
-    return { id: `fac_${i}`, kind, name, short, x, y, ...(extra || {}), address: null };
+  // named roads with cumulative distances (for rural addressing)
+  const roads = ROAD_DEFS.map((d, ri) => {
+    let acc = 0; const rd = { ...d, id: ri, cum: [0] };
+    for (let i = 1; i < d.pts.length; i++) { acc += dist(d.pts[i - 1][0], d.pts[i - 1][1], d.pts[i][0], d.pts[i][1]); rd.cum.push(acc); }
+    for (let i = 0; i < d.pts.length - 1; i++) addEdge(node(...d.pts[i]), node(...d.pts[i + 1]), { name: d.name, kind: d.kind, speed: SPEED[d.kind], road: ri, seg: i });
+    return rd;
   });
-  const pois = POI_DEFS.map(([name, px, py, zone, kind], i) => ({ id: `poi_${i}`, name, x: px * B, y: py * B, zone, kind }));
+  // Carmi's Main St carries IL-14/IL-1 and Oak St carries IL-1 (display aliases)
+  for (const e of edges) if (e.town === 'carmi' && e.kind === 'street') {
+    if (e.name === 'Main St') e.alias = 'IL-14 / IL-1';
+    if (e.name === 'Oak St' && nodes[e.a].y >= 6200) e.alias = 'IL-1';
+  }
 
-  return { blocks, blockAt, nodes, adj, edges, gid, facilities, pois };
+  // blocks (for map drawing and location generation)
+  const blocks = [];
+  for (const t of TOWNS) {
+    for (let i = 0; i < t.xs.length - 1; i++) for (let j = 0; j < t.ys.length - 1; j++) {
+      const cx = (t.xs[i] + t.xs[i + 1]) / 2, cy = (t.ys[j] + t.ys[j + 1]) / 2;
+      let zone = 'residential';
+      const di = i - (t.mainNS - 1), dj = j - (t.mainEW - 1);
+      if (t.id === 'carmi') {
+        if ((i === 4 || i === 5) && (j === 3 || j === 4)) zone = 'downtown';
+        else if (j === 3 || j === 4 || ((i === 2 || i === 1) && j >= 4)) zone = 'commercial';
+        else if (i === 8 && j <= 2) zone = 'industrial';
+        else if (i === 0 && j === 6) zone = 'park';
+        else if ((i === 1 || i === 2) && j === 0) zone = 'institutional';
+      } else if (t.xs.length >= 5) {
+        if ((di === 0 || di === 1) && (dj === 0 || dj === 1)) zone = 'commercial';
+        else if (i === 0 && j === t.ys.length - 2) zone = 'park';
+        else if (i === t.xs.length - 2 && j === 0) zone = 'industrial';
+      } else if (i === 0 && j === 0) zone = 'commercial';
+      const b = { town: t.id, district: t.name, i, j, x0: t.xs[i], y0: t.ys[j], x1: t.xs[i + 1], y1: t.ys[j + 1], cx, cy, zone, buildings: [] };
+      const w = b.x1 - b.x0, h = b.y1 - b.y0; const m = 9;
+      if (zone === 'downtown') { for (let k = 0; k < 5; k++) b.buildings.push([b.x0 + m + k * (w - 2 * m) / 5, b.y0 + m, (w - 2 * m) / 5 - 2, h * 0.38, r.float(0.5, 0.8)], [b.x0 + m + k * (w - 2 * m) / 5, b.y1 - m - h * 0.38, (w - 2 * m) / 5 - 2, h * 0.38, r.float(0.5, 0.8)]); }
+      else if (zone === 'commercial' || zone === 'industrial' || zone === 'institutional') { const n = zone === 'commercial' ? 2 : 1; for (let k = 0; k < n; k++) b.buildings.push([b.x0 + m + k * (w / n), b.y0 + m + r.float(0, 12), w / n - 2 * m, h * r.float(0.35, 0.6), r.float(0.4, 0.65)]); }
+      else if (zone === 'residential') { for (let k = 0; k < 4; k++) for (const yy of [b.y0 + m, b.y1 - m - 16]) { if (r.chance(0.18)) continue; b.buildings.push([b.x0 + m + k * (w - 2 * m) / 4 + 2, yy + r.float(0, 4), (w - 2 * m) / 4 - 8, 14, r.float(0.3, 0.55)]); } }
+      blocks.push(b);
+    }
+  }
+
+  // rural farmsteads & oil wells along county/state roads
+  const farms = []; const wells = [];
+  for (const rd of roads) {
+    if (rd.kind === 'interstate') continue;
+    const total = rd.cum[rd.cum.length - 1];
+    for (let d = r.float(150, 500); d < total - 100; d += r.float(380, 820)) {
+      const p = pointAlong(rd, d); const side = r.chance(0.5) ? 1 : -1;
+      const x = p.x + p.nx * side * 75, y = p.y + p.ny * side * 75;
+      if (townAt(x, y, 120) || nearRiver(x, y, 60)) continue;
+      farms.push({ x, y, road: rd.id, along: d, side, barn: r.chance(0.7) });
+      if (r.chance(0.28)) wells.push({ x: x + p.nx * side * 140 + r.float(-60, 60), y: y + p.ny * side * 140 + r.float(-60, 60), road: rd.id });
+    }
+  }
+  // woods along the rivers
+  const woods = [];
+  for (const rv of RIVERS) for (let i = 0; i < rv.points.length - 1; i++) {
+    const [ax, ay] = rv.points[i], [bx, by] = rv.points[i + 1]; const L = dist(ax, ay, bx, by);
+    for (let d = 0; d < L; d += 260) { const k = d / L; const s = r.chance(0.5) ? 1 : -1; const nx = -(by - ay) / L, ny = (bx - ax) / L;
+      const x = ax + (bx - ax) * k + nx * s * r.float(80, 260), y = ay + (by - ay) * k + ny * s * r.float(80, 260);
+      if (!townAt(x, y, 80)) woods.push([x, y, r.float(90, 190)]); }
+  }
+  return { nodes, adj, edges, roads, blocks, farms, wells, woods };
+}
+
+function pointAlong(rd, d) {
+  let i = 1; while (i < rd.cum.length - 1 && rd.cum[i] < d) i++;
+  const [ax, ay] = rd.pts[i - 1], [bx, by] = rd.pts[i]; const L = rd.cum[i] - rd.cum[i - 1] || 1; const k = clamp((d - rd.cum[i - 1]) / L, 0, 1);
+  return { x: ax + (bx - ax) * k, y: ay + (by - ay) * k, nx: -(by - ay) / L, ny: (bx - ax) / L };
+}
+
+function segDist(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay; const L2 = dx * dx + dy * dy || 1;
+  const t = clamp(((px - ax) * dx + (py - ay) * dy) / L2, 0, 1);
+  const qx = ax + dx * t, qy = ay + dy * t; return { d: dist(px, py, qx, qy), t, qx, qy };
+}
+export function nearRiver(x, y, pad = 0) {
+  for (const rv of RIVERS) for (let i = 0; i < rv.points.length - 1; i++) {
+    const s = segDist(x, y, ...rv.points[i], ...rv.points[i + 1]); if (s.d < rv.width / 2 + pad) return { river: rv, ...s };
+  }
+  return null;
 }
 
 export const city = buildCity();
-for (const f of city.facilities) f.address = addressFor(f.x, f.y).full;
+export const ROADS = city.roads;
 
-// ---------- Address system ----------
-export function blockOf(x, y) {
-  const bx = clamp(Math.floor(x / B), 0, N - 2), by = clamp(Math.floor(y / B), 0, N - 2);
-  return city.blockAt(bx, by);
+// ---------------- Spatial index over edges ----------------
+const CELL = 400; const grid = new Map();
+const ck = (cx, cy) => `${cx},${cy}`;
+for (const e of city.edges) {
+  const A = city.nodes[e.a], Bn = city.nodes[e.b];
+  for (let cx = Math.floor((Math.min(A.x, Bn.x) - 50) / CELL); cx <= Math.floor((Math.max(A.x, Bn.x) + 50) / CELL); cx++)
+    for (let cy = Math.floor((Math.min(A.y, Bn.y) - 50) / CELL); cy <= Math.floor((Math.max(A.y, Bn.y) + 50) / CELL); cy++) {
+      const k = ck(cx, cy); if (!grid.has(k)) grid.set(k, []); grid.get(k).push(e);
+    }
+}
+/** Nearest edge to a point (expanding search). Returns {edge, d, t, qx, qy} */
+export function nearestEdge(x, y, filter) {
+  const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
+  for (let rad = 1; rad <= 12; rad++) {
+    let best = null; const seen = new Set();
+    for (let i = cx - rad; i <= cx + rad; i++) for (let j = cy - rad; j <= cy + rad; j++) {
+      for (const e of grid.get(ck(i, j)) || []) {
+        if (seen.has(e.id) || (filter && !filter(e))) continue; seen.add(e.id);
+        const A = city.nodes[e.a], Bn = city.nodes[e.b]; const s = segDist(x, y, A.x, A.y, Bn.x, Bn.y);
+        if (!best || s.d < best.d) best = { edge: e, ...s };
+      }
+    }
+    if (best && best.d < rad * CELL) return best;
+  }
+  return null;
 }
 
-/** Returns the frontage street, house number, cross street and district for any point. */
+// ---------------- Facilities & points of interest ----------------
+const C = TOWN_BY_ID.carmi;
+const T = (id, i, j, dx = 0, dy = 0) => { const t = TOWN_BY_ID[id]; return [t.xs[i] + dx, t.ys[j] + dy]; };
+const FACILITY_DEFS = [
+  ['police_hq', 'Carmi Police Department', ...T('carmi', 5, 4, 40, 35), 'Carmi PD'],
+  ['precinct', 'Norris City Police Department', ...T('norris', 2, 2, 40, 30), 'Norris City PD'],
+  ['precinct', 'Grayville Police Department', ...T('grayville', 2, 2, 40, -30), 'Grayville PD'],
+  ['precinct', 'Crossville Police Department', ...T('crossville', 2, 2, -35, 30), 'Crossville PD'],
+  ['precinct', 'Enfield Police Department', ...T('enfield', 2, 2, 35, -30), 'Enfield PD'],
+  ['sheriff', "White County Sheriff's Office", ...T('carmi', 6, 4, 45, -35), 'Sheriff'],
+  ['federal', 'Federal Field Office (Evansville) – staging', 12320, 1480, 'Federal'],
+  ['eoc', 'White County 911 & EMA (your center)', ...T('carmi', 4, 3, 40, 40), '911 / EMA'],
+  ['fire', 'Carmi Fire Department – Station 1', ...T('carmi', 4, 4, -40, 35), 'Carmi FD 1'],
+  ['fire', 'Carmi Fire Department – Station 2', ...T('carmi', 8, 6, 40, 30), 'Carmi FD 2'],
+  ['fire', 'Norris City Fire Department', ...T('norris', 3, 2, 35, -30), 'Norris City FD'],
+  ['fire', 'Enfield Fire Department', ...T('enfield', 2, 3, -35, 30), 'Enfield FD'],
+  ['fire', 'Crossville Fire Department', ...T('crossville', 3, 2, 35, 30), 'Crossville FD'],
+  ['fire', 'Grayville Fire Department', ...T('grayville', 3, 2, 35, 30), 'Grayville FD'],
+  ['fire', 'Mill Shoals Fire Department', ...T('millshoals', 2, 2, 35, 30), 'Mill Shoals FD'],
+  ['fire', 'Burnt Prairie Fire Department', ...T('burntprairie', 2, 2, 35, 30), 'Burnt Prairie FD'],
+  ['fire', 'Southeastern White County Fire (Maunie)', ...T('maunie', 1, 1, 30, 30), 'SE White FD'],
+  ['fire', 'Springerton Fire Department', ...T('springerton', 1, 1, 30, 30), 'Springerton FD'],
+  ['fire_hq', 'Carmi Fire Administration', ...T('carmi', 4, 4, -60, 60), 'Fire Admin'],
+  ['ems', 'White County Ambulance Service (Carmi)', ...T('carmi', 3, 5, 40, 35), 'WCAS Carmi'],
+  ['ems', 'White County Ambulance – Norris City', ...T('norris', 1, 2, 35, 30), 'WCAS Norris'],
+  ['ems', 'White County Ambulance – Grayville', ...T('grayville', 1, 2, 35, 30), 'WCAS Grayville'],
+  ['ems', 'White County Ambulance – Crossville', ...T('crossville', 1, 2, 35, -30), 'WCAS Crossville'],
+  ['hospital', 'Carmi Township Hospital', ...T('carmi', 2, 6, 55, 40), 'Carmi Twp Hospital', { trauma: 3 }],
+  ['hospital', 'Deaconess Midtown (Evansville, IN)', 12380, 1640, 'Deaconess', { trauma: 1 }],
+  ['hospital', 'Ferrell Hospital (Eldorado)', 2050, 10860, 'Ferrell Hosp.', { trauma: 3 }],
+  ['hospital', 'Fairfield Memorial Hospital', 1650, -360, 'Fairfield Mem.', { trauma: 3 }],
+  ['hospital_helipad', 'Carmi Township Hospital Helipad', ...T('carmi', 2, 6, 25, 75), 'Helipad'],
+  ['airport', 'Carmi Municipal Airport', 5880, 7360, 'Carmi Airport'],
+  ['marina', 'Grayville Wabash River Boat Ramp', ...T('grayville', 4, 2, 60, 0), 'Boat Ramp'],
+  ['coastguard', 'Wabash River Station (IL-14 landing)', 11380, 4820, 'River Station'],
+  ['sar', 'White County Search & Rescue', ...T('carmi', 7, 6, 40, 30), 'SAR'],
+  ['public_works', 'Carmi Public Works / County Highway Dept', ...T('carmi', 8, 1, 40, 30), 'Public Works'],
+  ['animal_control', 'White County Animal Control', ...T('carmi', 6, 7, 40, 30), 'Animal Ctrl'],
+  ['dot', 'IDOT Maintenance Yard (Carmi)', 5180, 6230, 'IDOT'],
+  ['utility', 'Electric Co-op Operations Center', ...T('carmi', 7, 0, 40, 30), 'Electric Co-op'],
+];
+
+const POI_DEFS = [
+  ['White County Courthouse', ...T('carmi', 5, 4, -45, -40), 'downtown', 'government'],
+  ['Carmi City Hall', ...T('carmi', 5, 4, 45, -40), 'downtown', 'government'],
+  ['Carmi-White County High School', ...T('carmi', 2, 0, 55, 45), 'institutional', 'school'],
+  ['Carmi-White County Junior High', ...T('carmi', 1, 1, 55, 45), 'residential', 'school'],
+  ['Carmi Elementary School', ...T('carmi', 7, 2, 55, 45), 'residential', 'school'],
+  ['White County Fairgrounds', ...T('carmi', 9, 0, 120, -160), 'commercial', 'arena'],
+  ['The Ratcliff Inn', ...T('carmi', 4, 4, 55, -38), 'downtown', 'hotel'],
+  ['Carmi Supercenter', ...T('carmi', 2, 7, -45, 40), 'commercial', 'mall'],
+  ['County Market Grocery', ...T('carmi', 1, 5, 55, 35), 'commercial', 'grocery'],
+  ['QuickStop Gas – West Main', ...T('carmi', 1, 4, 55, 35), 'commercial', 'gas'],
+  ['QuickStop Gas – East Main', ...T('carmi', 8, 4, 55, -35), 'commercial', 'gas'],
+  ['Main Street Diner', ...T('carmi', 5, 4, 55, 38), 'downtown', 'restaurant'],
+  ['Little Egypt Tavern', ...T('carmi', 6, 4, 55, 38), 'downtown', 'bar'],
+  ['Carmi Public Library', ...T('carmi', 4, 3, -45, 40), 'downtown', 'library'],
+  ['Bicentennial Park', ...T('carmi', 0, 6, 57, 55), 'park', 'park'],
+  ['Carmi Community Pool', ...T('carmi', 0, 6, 57, 25), 'park', 'pool'],
+  ['White County Senior Living', ...T('carmi', 7, 5, 55, 40), 'residential', 'nursing'],
+  ['Oak Street Apartments', ...T('carmi', 2, 5, 40, 55), 'commercial', 'apartments'],
+  ['Carmi Medical Clinic', ...T('carmi', 3, 6, 55, 40), 'residential', 'clinic'],
+  ['First Baptist Church', ...T('carmi', 4, 2, 55, 40), 'residential', 'church'],
+  ['Carmi Grain Elevator', ...T('carmi', 8, 0, 55, 40), 'industrial', 'factory'],
+  ['Oil Field Supply & Service', ...T('carmi', 8, 2, 55, 40), 'industrial', 'chemical'],
+  ['Carmi Rail Spur', ...T('carmi', 8, 1, 60, 60), 'industrial', 'railyard'],
+  ['Little Wabash River Boat Access', 6520, 6240, 'commercial', 'boardwalk'],
+  ['Carmi Office Plaza', ...T('carmi', 6, 3, 55, 45), 'downtown', 'office'],
+  ['Norris City-Omaha-Enfield High School', ...T('norris', 0, 1, 50, 45), 'residential', 'school'],
+  ['Norris City Dollar Store', ...T('norris', 2, 2, -45, -40), 'commercial', 'store'],
+  ['Grayville Truck Stop (I-64 Exit 130)', 10560, 1700, 'commercial', 'gas'],
+  ['Grayville Riverfront Park', ...T('grayville', 4, 1, 60, 40), 'park', 'park'],
+  ['Grayville Grocery', ...T('grayville', 2, 2, -45, 40), 'commercial', 'grocery'],
+  ['Crossville Community Park', ...T('crossville', 0, 3, 45, 45), 'park', 'park'],
+  ['Crossville Market', ...T('crossville', 2, 2, 45, -40), 'commercial', 'shopping'],
+  ['Enfield Grocery', ...T('enfield', 2, 2, 45, 40), 'commercial', 'grocery'],
+  ['Enfield Grain Co-op', ...T('enfield', 3, 0, 45, 45), 'industrial', 'factory'],
+  ['Mill Shoals Grain Elevator', ...T('millshoals', 3, 0, 45, 45), 'industrial', 'factory'],
+  ['Burnt Prairie Church', ...T('burntprairie', 1, 1, 45, 45), 'residential', 'church'],
+  ['Maunie Boat Ramp', 11300, 8480, 'park', 'boardwalk'],
+  ['Emma General Store', ...T('emma', 0, 0, 45, 45), 'commercial', 'store'],
+  ['Little Wabash River Bottoms', 7050, 7600, 'forest', 'forest'],
+  ['Skillet Fork Bottoms', 3300, 4500, 'forest', 'forest'],
+  ['Wabash River Bottoms (Phillipstown)', 11050, 3600, 'forest', 'forest'],
+  ['Calvin', 9900, 2930, 'residential', 'village'],
+];
+
+export const FACILITIES = FACILITY_DEFS.map(([kind, name, x, y, short, extra], i) => ({ id: `fac_${i}`, kind, name, short, x, y, ...(extra || {}), address: null }));
+city.facilities = FACILITIES;
+city.pois = POI_DEFS.map(([name, x, y, zone, kind], i) => ({ id: `poi_${i}`, name, x, y, zone, kind }));
+for (const [i, w] of city.wells.entries()) w.name = `Oil well tank battery #${i + 1}`;
+
+// ---------------- Addresses ----------------
+export function nearestTown(x, y) {
+  let best = null, bd = Infinity;
+  for (const t of TOWNS) { const d = dist(x, y, t.x, t.y); if (d < bd) { bd = d; best = t; } }
+  return { town: best, d: bd };
+}
+function compass(dx, dy) { const a = Math.atan2(dx, -dy) * 180 / Math.PI; return ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'][Math.round(((a + 360) % 360) / 45) % 8]; }
+export function miles(gameMeters) { return (gameMeters * SCALE) / 1609; }
+function milesText(m) { return m < 0.35 ? 'just outside' : `${m.toFixed(1)} miles`; }
+function relTown(x, y) { const { town, d } = nearestTown(x, y); const m = miles(d); return m < 0.35 ? `near ${town.name}` : `${milesText(m)} ${compass(x - town.x, y - town.y)} of ${town.name}`; }
+
+/** Address for any point. kind: street | road | highway | water */
 export function addressFor(x, y) {
-  // Highways
-  if (Math.abs(x - HIGHWAYS.i47.x) < 18 && y > -B && y < 14.4 * B) {
-    const rr = clamp(Math.round(y / B), 0, 14);
-    return { kind: 'highway', street: 'I-47', number: null, cross: EW_STREETS[rr], district: districtFor(3, clamp(Math.floor(y / B), 0, 13)),
-      full: `I-47 near the ${EW_STREETS[rr]} exit`, short: `I-47 @ ${EW_STREETS[rr]}` };
+  const near = nearestEdge(x, y);
+  const river = nearRiver(x, y, 5);
+  if (river && (!near || near.d > 45)) {
+    return { kind: 'water', street: river.river.name, number: null, cross: relTown(x, y), district: townAt(x, y, 150)?.name || RURAL, full: `${river.river.name}, ${relTown(x, y)}`, short: river.river.name };
   }
-  if (Math.abs(y - HIGHWAYS.rt9.y) < 18) {
-    const c = clamp(Math.round(x / B), 0, 14);
-    return { kind: 'highway', street: 'Route 9', number: null, cross: NS_STREETS[c], district: districtFor(clamp(Math.floor(x / B), 0, 13), 10),
-      full: `Route 9 Expressway near ${NS_STREETS[c]}`, short: `Rt 9 @ ${NS_STREETS[c]}` };
+  if (!near) return { kind: 'road', street: 'Unknown road', number: null, cross: '', district: RURAL, full: relTown(x, y), short: relTown(x, y) };
+  const e = near.edge;
+  if (e.kind === 'street') {
+    const t = TOWN_BY_ID[e.town];
+    let number, prefix, cross;
+    if (e.axis === 'ns') {
+      const d = near.qy - t.y; prefix = Math.abs(d) < 8 ? '' : d < 0 ? 'N ' : 'S ';
+      number = Math.max(1, Math.floor((Math.abs(d) / t.blockY) * 100));
+      if ((x > t.xs[e.idx]) !== (number % 2 === 0)) number += 1;
+      cross = t.ew[clamp(Math.round((near.qy - t.y0) / t.blockY), 0, t.ew.length - 1)];
+    } else {
+      const d = near.qx - t.x; prefix = Math.abs(d) < 8 ? '' : d < 0 ? 'W ' : 'E ';
+      number = Math.max(1, Math.floor((Math.abs(d) / t.block) * 100));
+      if ((y > t.ys[e.idx]) !== (number % 2 === 0)) number += 1;
+      cross = t.ns[clamp(Math.round((near.qx - t.x0) / t.block), 0, t.ns.length - 1)];
+    }
+    const street = `${prefix}${e.name}`;
+    return { kind: 'street', street: e.name, prefix: prefix.trim(), number, cross, district: t.name, town: t.id, full: `${number} ${street}${t.id === 'carmi' ? '' : `, ${t.name}`}`, short: `${number} ${street}`, alias: e.alias || null };
   }
-  if (y > BAY.y0) return { kind: 'water', street: BAY.name, cross: 'Port Rd', district: 'Southport', full: `${BAY.name} off Port Rd`, short: BAY.name, number: null };
-  if (x > RIVER.x0 && x < RIVER.x1) {
-    const rr = clamp(Math.round(y / B), 0, 14);
-    return { kind: 'water', street: RIVER.name, cross: EW_STREETS[rr], district: 'Halston River', full: `${RIVER.name} near ${EW_STREETS[rr]}`, short: `${RIVER.name}`, number: null };
+  // rural roads and highways
+  const rd = city.roads[e.road];
+  const along = rd.cum[e.seg] + near.t * e.len;
+  const side = (near.qx - x) * (city.nodes[e.b].y - city.nodes[e.a].y) - (near.qy - y) * (city.nodes[e.b].x - city.nodes[e.a].x) > 0;
+  let number = Math.round((miles(along) * 1000) / 5) * 5 + 1000; if (side !== (number % 2 === 0)) number += 1;
+  const rel = relTown(x, y);
+  const district = townAt(x, y, 100)?.name || RURAL;
+  if (e.kind === 'interstate') {
+    const mm = Math.round(117 + ((near.qx - 4500) / 6000) * 13);
+    return { kind: 'highway', street: 'I-64', number: null, cross: `mile marker ${mm}`, district, full: `I-64 near mile marker ${mm} (${rel})`, short: `I-64 MM ${mm}`, rel, mm };
   }
-  const bx = clamp(Math.floor(x / B), 0, N - 2), by = clamp(Math.floor(y / B), 0, N - 2);
-  const lx = x - bx * B, ly = y - by * B;
-  const d = [lx, B - lx, ly, B - ly];
-  const side = d.indexOf(Math.min(...d));
-  let street, number, cross;
-  if (side <= 1) { // N-S street
-    const c = side === 0 ? bx : bx + 1;
-    street = NS_STREETS[clamp(c, 0, 14)];
-    number = by * 100 + 100 + Math.max(1, Math.floor((ly / B) * 96));
-    if ((x > c * B) !== (number % 2 === 0)) number += 1;
-    cross = EW_STREETS[clamp(Math.round(y / B), 0, 14)];
-  } else {
-    const rr = side === 2 ? by : by + 1;
-    street = EW_STREETS[clamp(rr, 0, 14)];
-    number = bx * 100 + 100 + Math.max(1, Math.floor((lx / B) * 96));
-    if ((y > rr * B) !== (number % 2 === 0)) number += 1;
-    cross = NS_STREETS[clamp(Math.round(x / B), 0, 14)];
-  }
-  const district = districtFor(bx, by);
-  return { kind: 'street', street, number, cross, district, full: `${number} ${street}`, short: `${number} ${street}` };
+  const label = e.kind === 'county' ? rd.name : rd.name.replace('IL-', 'IL Route ').replace('US-', 'US Hwy ');
+  return { kind: 'road', street: rd.name, number, cross: rel, district, full: `${number} ${label}`, short: `${number} ${label}`, rel, highway: e.kind !== 'county' };
 }
 
 export function nearestFacility(x, y, kinds) {
   let best = null, bd = Infinity;
-  for (const f of city.facilities) {
-    if (kinds && !kinds.includes(f.kind)) continue;
-    const d = dist(x, y, f.x, f.y);
-    if (d < bd) { bd = d; best = f; }
-  }
+  for (const f of city.facilities) { if (kinds && !kinds.includes(f.kind)) continue; const d = dist(x, y, f.x, f.y); if (d < bd) { bd = d; best = f; } }
   return best;
 }
-
-export function nearbyPOI(x, y, maxDist = 260) {
+export function nearbyPOI(x, y, maxDist = 90) {
   let best = null, bd = maxDist;
   for (const p of city.pois) { const d = dist(x, y, p.x, p.y); if (d < bd) { bd = d; best = p; } }
   return best;
 }
+export function blockOf(x, y) { return city.blocks.find((b) => x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1) || null; }
 
-// ---------- Location generation for scenarios ----------
+for (const f of city.facilities) f.address = addressFor(f.x, f.y).full;
+
+// ---------------- Location generation ----------------
 const ZONE_ALIASES = { street: ['residential', 'commercial', 'downtown'], any: ['residential', 'commercial', 'downtown', 'industrial', 'institutional'] };
+
+function pickTown(r, zones) {
+  const towns = TOWNS.filter((t) => city.blocks.some((b) => b.town === t.id && zones.includes(b.zone)));
+  return r.weighted(towns.length ? towns : TOWNS, (t) => t.weight);
+}
 
 export function randomLocation(r, zones = ['residential'], opts = {}) {
   zones = zones.flatMap((z) => ZONE_ALIASES[z] || [z]);
+  if (opts.poiKinds) {
+    const choices = [...city.pois, ...city.wells.map((w) => ({ ...w, kind: 'oilwell' }))].filter((p) => opts.poiKinds.includes(p.kind));
+    if (choices.length) { const p = r.pick(choices); return finalizeLocation(p.x + r.float(-15, 15), p.y + r.float(-15, 15), r, { poi: p }); }
+  }
   if (zones.includes('highway')) {
-    if (r.chance(0.6)) {
-      const y = r.float(0.3, 13.7) * B; const x = HIGHWAYS.i47.x + r.float(-6, 6);
-      return finalizeLocation(x, y, r, { dir: r.pick(['northbound', 'southbound']) });
-    }
-    const x = r.float(0.3, 13.7) * B; const y = HIGHWAYS.rt9.y + r.float(-6, 6);
-    return finalizeLocation(x, y, r, { dir: r.pick(['eastbound', 'westbound']) });
+    const hw = city.edges.filter((e) => ['interstate', 'us', 'state'].includes(e.kind) && !e.town && e.len > 150);
+    const e = r.weighted(hw, (x) => x.len * (x.kind === 'interstate' ? 1.4 : 1)); const A = city.nodes[e.a], Bn = city.nodes[e.b]; const k = r.float(0.1, 0.9);
+    const dir = e.kind === 'interstate' ? r.pick(['eastbound', 'westbound']) : Math.abs(Bn.x - A.x) > Math.abs(Bn.y - A.y) ? r.pick(['eastbound', 'westbound']) : r.pick(['northbound', 'southbound']);
+    return finalizeLocation(A.x + (Bn.x - A.x) * k, A.y + (Bn.y - A.y) * k, r, { dir, highway: true });
   }
   if (zones.includes('water')) {
-    if (r.chance(0.5)) return finalizeLocation(r.float(RIVER.x0 + 20, RIVER.x1 - 20), r.float(0.5, 13.5) * B, r);
-    return finalizeLocation(r.float(6, 14) * B, BAY.y0 + r.float(30, 140), r);
+    const rv = r.weighted(RIVERS, (x) => (x.name === 'Wabash River' ? 1.2 : x.name === 'Little Wabash River' ? 1.5 : 0.6));
+    const i = r.int(1, rv.points.length - 3); const [ax, ay] = rv.points[i], [bx, by] = rv.points[i + 1]; const k = r.float(0.1, 0.9);
+    return finalizeLocation(ax + (bx - ax) * k, ay + (by - ay) * k, r, { water: true });
   }
-  if (opts.poiKinds) {
-    const choices = city.pois.filter((p) => opts.poiKinds.includes(p.kind));
-    if (choices.length) {
-      const p = r.pick(choices);
-      return finalizeLocation(p.x + r.float(-20, 20), p.y + r.float(-20, 20), r, { poi: p });
-    }
+  if (zones.includes('forest')) {
+    const w = r.pick(city.woods); return finalizeLocation(w[0], w[1], r, { zone: 'forest' });
   }
-  const candidates = city.blocks.filter((b) => zones.includes(b.zone));
-  const block = r.pick(candidates.length ? candidates : city.blocks.filter((b) => b.zone === 'residential'));
-  // place near a frontage
-  const side = r.int(0, 3); const t = r.float(0.12, 0.88); const inset = r.float(22, 42);
-  let x = block.bx * B, y = block.by * B;
-  if (side === 0) { x += inset; y += t * B; } else if (side === 1) { x += B - inset; y += t * B; } else if (side === 2) { x += t * B; y += inset; } else { x += t * B; y += B - inset; }
+  if (zones.includes('rural') || (opts.ruralChance && r.chance(opts.ruralChance))) {
+    const f = r.pick(city.farms); return finalizeLocation(f.x, f.y, r, { zone: 'rural', farm: f });
+  }
+  const town = pickTown(r, zones);
+  const cands = city.blocks.filter((b) => b.town === town.id && zones.includes(b.zone));
+  const block = r.pick(cands.length ? cands : city.blocks.filter((b) => b.town === town.id));
+  const side = r.int(0, 3); const t = r.float(0.15, 0.85); const w = block.x1 - block.x0, h = block.y1 - block.y0; const inset = r.float(16, 26);
+  let x = block.x0, y = block.y0;
+  if (side === 0) { x += inset; y += t * h; } else if (side === 1) { x += w - inset; y += t * h; } else if (side === 2) { x += t * w; y += inset; } else { x += t * w; y += h - inset; }
   return finalizeLocation(x, y, r, { zone: block.zone });
 }
 
 function finalizeLocation(x, y, r, extra = {}) {
   const a = addressFor(x, y);
-  const poi = extra.poi || nearbyPOI(x, y, 120);
-  const loc = { x, y, ...a, poi: poi ? poi.name : null, poiKind: poi ? poi.kind : null, zone: extra.zone || blockOf(x, y)?.zone, dir: extra.dir || null };
-  if (a.kind === 'street' && (loc.zone === 'downtown' || (loc.zone === 'residential' && r.chance(0.25)))) {
-    if (r.chance(0.45)) loc.apt = `${r.pick(['Apt', 'Unit', 'Suite'])} ${r.int(1, 9)}${r.pick(['A', 'B', 'C', '0', '2', '4'])}`;
+  const poi = extra.poi || nearbyPOI(x, y, 60);
+  const loc = { x, y, ...a, poi: poi ? poi.name : null, poiKind: poi ? poi.kind : null, zone: extra.zone || blockOf(x, y)?.zone || 'rural', dir: extra.dir || null };
+  if (extra.highway && a.kind !== 'highway') {
+    loc.kind = 'highway'; loc.full = `${a.street}${extra.dir ? ` ${extra.dir}` : ''}, ${a.rel}`; loc.short = `${a.street} ${extra.dir ? extra.dir.slice(0, 2).toUpperCase() : ''}`.trim();
   }
-  loc.full = a.full + (loc.apt ? `, ${loc.apt}` : '');
+  if (a.kind === 'highway' && extra.dir) loc.full = `I-64 ${extra.dir} near mile marker ${a.mm}`;
+  if (a.kind === 'street' && (loc.zone === 'downtown' || (loc.zone === 'commercial' && r.chance(0.3)) || (loc.poiKind === 'apartments'))) {
+    if (r.chance(0.45) || loc.poiKind === 'apartments') loc.apt = `${r.pick(['Apt', 'Unit'])} ${r.int(1, 4)}${r.pick(['A', 'B', 'C', '0', '2'])}`;
+  }
+  loc.full = loc.full + (loc.apt ? `, ${loc.apt}` : '');
+  if (!loc.short) loc.short = loc.full;
   return loc;
 }
 
-// ---------- Routing ----------
+// ---------------- Geocoding (typed address → point) ----------------
+export const ALL_STREETS = [...new Set([...TOWNS.flatMap((t) => [...t.ns, ...t.ew]), ...ROAD_DEFS.map((d) => d.name)])];
+export const STREET_WORDS = [...new Set(ALL_STREETS.flatMap((s) => s.toLowerCase().split(/[\s/-]+/)))];
+// legacy exports used by the NLU
+export const NS_STREETS = C.ns; export const EW_STREETS = C.ew;
+
+export function geocodeAddress(number, street, text = '') {
+  if (!street) return null;
+  const low = ` ${String(text).toLowerCase()} `;
+  const townHint = TOWNS.find((t) => low.includes(` ${t.name.toLowerCase()} `));
+  const prefix = (low.match(/\b(\d+)\s+(n|s|e|w|north|south|east|west)\b/) || [])[2];
+  // town street
+  const towns = TOWNS.filter((t) => t.ns.includes(street) || t.ew.includes(street));
+  if (towns.length) {
+    const t = (townHint && towns.includes(townHint)) ? townHint : towns.find((x) => x.id === 'carmi') || towns[0];
+    const n = number || 0; const along = (n / 100);
+    if (t.ns.includes(street)) {
+      const i = t.ns.indexOf(street); const sign = prefix && /^(n|north)/.test(prefix) ? -1 : 1;
+      const y = clamp(t.y + sign * along * t.blockY, t.y0, t.y1); const x = t.xs[i] + (n % 2 === 0 ? 8 : -8);
+      return { x, y, ...addressFor(x, y), street, town: t.id, district: t.name };
+    }
+    const j = t.ew.indexOf(street); const sign = prefix && /^(w|west)/.test(prefix) ? -1 : 1;
+    const x = clamp(t.x + sign * along * t.block, t.x0, t.x1); const y = t.ys[j] + (n % 2 === 0 ? 8 : -8);
+    return { x, y, ...addressFor(x, y), street, town: t.id, district: t.name };
+  }
+  // county road / highway: number is ~1000 per mile from the road's start
+  const rds = city.roads.filter((r) => r.name === street);
+  if (!rds.length) return null;
+  const targetMi = number ? Math.max(0, (number - 1000) / 1000) : null;
+  let best = null;
+  for (const rd of rds) {
+    const total = rd.cum[rd.cum.length - 1];
+    const d = targetMi == null ? total / 2 : (targetMi * 1609) / SCALE;
+    if (!best || (d <= total && (!best.fits))) best = { rd, d: Math.min(d, total), fits: d <= total };
+  }
+  const p = pointAlong(best.rd, best.d);
+  const x = p.x + p.nx * 40, y = p.y + p.ny * 40;
+  return { x, y, ...addressFor(x, y) };
+}
+
+// ---------------- Routing ----------------
+class Heap {
+  constructor() { this.a = []; }
+  push(id, k) { const a = this.a; a.push([k, id]); let i = a.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (a[p][0] <= a[i][0]) break; [a[p], a[i]] = [a[i], a[p]]; i = p; } }
+  pop() { const a = this.a; const top = a[0]; const last = a.pop(); if (a.length) { a[0] = last; let i = 0; for (;;) { const l = i * 2 + 1, r = l + 1; let m = i; if (l < a.length && a[l][0] < a[m][0]) m = l; if (r < a.length && a[r][0] < a[m][0]) m = r; if (m === i) break; [a[m], a[i]] = [a[i], a[m]]; i = m; } } return top; }
+  get size() { return this.a.length; }
+}
+
 export class Router {
-  constructor() { this.closed = new Set(); this.slow = new Map(); /* district -> multiplier */ this.weatherFactor = 1; }
+  constructor() { this.closed = new Set(); this.slow = new Map(); this.weatherFactor = 1; }
 
   edgeCost(e) {
     if (this.closed.has(e.id)) return Infinity;
     let speed = e.speed;
-    const mid = city.nodes[e.a];
-    const blk = blockOf(mid.x + 1, mid.y + 1);
-    const slow = blk && this.slow.get(blk.district);
-    if (slow && e.kind !== 'highway') speed *= slow;
+    const slow = this.slow.get(e.district);
+    if (slow && e.kind !== 'interstate') speed *= slow;
     return e.len / (speed * this.weatherFactor);
   }
 
-  /** Projection of a point onto its frontage street: returns {px,py,a,b} with endpoint node ids. */
   entry(x, y) {
-    const c = clamp(Math.round(x / B), 0, N - 1), rr = clamp(Math.round(y / B), 0, N - 1);
-    let best = null;
-    const consider = (a, b) => {
-      if (a == null || b == null) return;
-      const A = city.nodes[a], Bn = city.nodes[b];
-      const dx = Bn.x - A.x, dy = Bn.y - A.y; const L2 = dx * dx + dy * dy || 1;
-      const t = clamp(((x - A.x) * dx + (y - A.y) * dy) / L2, 0, 1);
-      const px = A.x + dx * t, py = A.y + dy * t;
-      const d = dist(x, y, px, py);
-      // don't let a point snap across the river
-      if ((x < RIVER.x0) !== (px < RIVER.x0 + 1) && Math.abs(x - px) > 10) return;
-      if (!best || d < best.d) best = { d, px, py, a, b };
-    };
-    for (const e of [...city.adj[city.gid(c, rr)].map((n) => city.edges[n.edge])]) consider(e.a, e.b);
-    for (const [dc, dr] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-      const cc = c + dc, r2 = rr + dr; if (cc < 0 || r2 < 0 || cc >= N || r2 >= N) continue;
-      for (const n of city.adj[city.gid(cc, r2)]) { const e = city.edges[n.edge]; if (e.kind === 'street' || e.kind === 'bridge') consider(e.a, e.b); }
-    }
-    // highway points snap to highway chain
-    for (const e of city.edges) if (e.kind === 'highway') {
-      const A = city.nodes[e.a], Bn = city.nodes[e.b];
-      const dx = Bn.x - A.x, dy = Bn.y - A.y; const L2 = dx * dx + dy * dy || 1;
-      const t = clamp(((x - A.x) * dx + (y - A.y) * dy) / L2, 0, 1);
-      const px = A.x + dx * t, py = A.y + dy * t; const d = dist(x, y, px, py);
-      if (d < 25 && (!best || d < best.d)) best = { d, px, py, a: e.a, b: e.b };
-    }
-    return best;
+    const n = nearestEdge(x, y); if (!n) return null;
+    return { d: n.d, px: n.qx, py: n.qy, a: n.edge.a, b: n.edge.b, edge: n.edge };
   }
 
-  /** Path from point to point following roads. Returns { points:[[x,y],...], length, time } */
   route(x0, y0, x1, y1, { air = false, water = false } = {}) {
-    if (air || water) {
-      const L = dist(x0, y0, x1, y1);
-      return { points: [[x0, y0], [x1, y1]], speeds: [1], length: L, cost: L };
-    }
+    if (air || water) { const L = dist(x0, y0, x1, y1); return { points: [[x0, y0], [x1, y1]], speeds: [water ? 1.4 : 1], length: L, cost: L }; }
     const s = this.entry(x0, y0), t = this.entry(x1, y1);
     if (!s || !t) { const L = dist(x0, y0, x1, y1); return { points: [[x0, y0], [x1, y1]], speeds: [1], length: L, cost: L }; }
-    const n = city.nodes.length; const D = new Float64Array(n).fill(Infinity); const prev = new Int32Array(n).fill(-1);
-    const done = new Uint8Array(n);
-    const sd = (id) => dist(s.px, s.py, city.nodes[id].x, city.nodes[id].y);
-    D[s.a] = sd(s.a); D[s.b] = Math.min(D[s.b], sd(s.b));
-    // simple O(n^2) Dijkstra is fine for ~240 nodes
-    for (;;) {
-      let u = -1, bd = Infinity;
-      for (let i = 0; i < n; i++) if (!done[i] && D[i] < bd) { bd = D[i]; u = i; }
-      if (u < 0) break; done[u] = 1;
+    const sameSeg = s.edge.id === t.edge.id;
+    if (sameSeg) { const pts = [[x0, y0], [s.px, s.py], [t.px, t.py], [x1, y1]]; return this.finish(pts, [0.6, s.edge.speed, 0.6]); }
+    const n = city.nodes.length; const D = new Float64Array(n).fill(Infinity); const prev = new Int32Array(n).fill(-1); const done = new Uint8Array(n);
+    const h = new Heap(); const sp = s.edge.speed * this.weatherFactor;
+    const startCost = (id) => dist(s.px, s.py, city.nodes[id].x, city.nodes[id].y) / sp;
+    for (const id of [s.a, s.b]) { const c = startCost(id); if (c < D[id]) { D[id] = c; h.push(id, c); } }
+    const targets = new Set([t.a, t.b]); let found = 0;
+    while (h.size) {
+      const [d, u] = h.pop(); if (done[u]) continue; done[u] = 1;
+      if (targets.has(u) && ++found === 2) break;
       for (const { to, edge } of city.adj[u]) {
-        const c = this.edgeCost(city.edges[edge]); if (!isFinite(c)) continue;
-        if (D[u] + c < D[to]) { D[to] = D[u] + c; prev[to] = u; }
+        if (done[to]) continue; const c = this.edgeCost(city.edges[edge]); if (!isFinite(c)) continue;
+        if (d + c < D[to]) { D[to] = d + c; prev[to] = u; h.push(to, d + c); }
       }
     }
-    const td = (id) => dist(t.px, t.py, city.nodes[id].x, city.nodes[id].y);
-    const endA = D[t.a] + td(t.a), endB = D[t.b] + td(t.b);
-    const sameSeg = (s.a === t.a && s.b === t.b) || (s.a === t.b && s.b === t.a);
-    let points; let speeds;
-    if (sameSeg) { points = [[x0, y0], [s.px, s.py], [t.px, t.py], [x1, y1]]; speeds = [0.5, 1, 0.5]; }
-    else {
-      let end = endA <= endB ? t.a : t.b;
-      if (!isFinite(D[end])) { const L = dist(x0, y0, x1, y1); return { points: [[x0, y0], [x1, y1]], speeds: [1], length: L, cost: L * 1.5 }; }
-      const chainIds = []; for (let v = end; v !== -1; v = prev[v]) chainIds.push(v);
-      chainIds.reverse();
-      points = [[x0, y0], [s.px, s.py], ...chainIds.map((id) => [city.nodes[id].x, city.nodes[id].y]), [t.px, t.py], [x1, y1]];
-      speeds = [0.5, 1];
-      for (let i = 1; i < chainIds.length; i++) {
-        const a = chainIds[i - 1], b = chainIds[i];
-        const link = city.adj[a].find((n) => n.to === b);
-        speeds.push(link ? city.edges[link.edge].speed : 1);
-      }
-      speeds.push(1, 0.5);
-    }
-    let length = 0; for (let i = 1; i < points.length; i++) length += dist(points[i - 1][0], points[i - 1][1], points[i][0], points[i][1]);
-    const cost = sameSeg ? length : Math.min(endA, endB) + s.d + t.d;
+    const tp = t.edge.speed * this.weatherFactor;
+    const endCost = (id) => D[id] + dist(t.px, t.py, city.nodes[id].x, city.nodes[id].y) / tp;
+    const end = endCost(t.a) <= endCost(t.b) ? t.a : t.b;
+    if (!isFinite(D[end])) { const L = dist(x0, y0, x1, y1); return { points: [[x0, y0], [x1, y1]], speeds: [1], length: L, cost: L * 2 }; }
+    const chain = []; for (let v = end; v !== -1; v = prev[v]) chain.push(v); chain.reverse();
+    const pts = [[x0, y0], [s.px, s.py], ...chain.map((id) => [city.nodes[id].x, city.nodes[id].y]), [t.px, t.py], [x1, y1]];
+    const speeds = [0.6, s.edge.speed];
+    for (let i = 1; i < chain.length; i++) { const link = city.adj[chain[i - 1]].find((l) => l.to === chain[i]); speeds.push(link ? city.edges[link.edge].speed : 1); }
+    speeds.push(t.edge.speed, 0.6);
+    return this.finish(pts, speeds);
+  }
+
+  finish(points, speeds) {
+    let length = 0, cost = 0;
+    for (let i = 1; i < points.length; i++) { const L = dist(points[i - 1][0], points[i - 1][1], points[i][0], points[i][1]); length += L; cost += L / (speeds[i - 1] || 1); }
     return { points, speeds, length, cost };
   }
 
-  /** Edges near a point, used by road-closure events. */
-  edgesNear(x, y, radius = B * 0.6) {
+  /** Non-interstate edges near a point (road-closure events). */
+  edgesNear(x, y, radius = 150) {
     return city.edges.filter((e) => {
-      const A = city.nodes[e.a], Bn = city.nodes[e.b];
-      return dist(x, y, (A.x + Bn.x) / 2, (A.y + Bn.y) / 2) < radius && e.kind !== 'highway';
+      if (e.kind === 'interstate') return false;
+      const A = city.nodes[e.a], Bn = city.nodes[e.b]; return segDist(x, y, A.x, A.y, Bn.x, Bn.y).d < radius;
     });
   }
 }
 
-export const STREET_WORDS = [...new Set([...NS_STREETS, ...EW_STREETS].flatMap((s) => s.toLowerCase().split(' ')))];
+/** Radio-style location ("400 block of W Main St", "IL-14, 2.1 miles east of Enfield"). */
+export function blockText(a) {
+  if (a.kind === 'street') return `${Math.floor(a.number / 100) * 100 || 'unit'} block of ${a.prefix ? `${a.prefix} ` : ''}${a.street}${a.district && a.district !== 'Carmi' ? `, ${a.district}` : ''}`;
+  if (a.kind === 'road') return `${a.street}, ${a.rel}`;
+  return a.full;
+}

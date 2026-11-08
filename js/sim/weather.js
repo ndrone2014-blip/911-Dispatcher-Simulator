@@ -20,9 +20,9 @@ const TRANSITIONS = {
 };
 
 const ALERTS = {
-  thunderstorm: 'The National Weather Service has issued a Severe Thunderstorm Warning for Halston County.',
-  severe: 'The National Weather Service has issued a Tornado Warning for Halston County. Take shelter now.',
-  snow: 'A Winter Weather Advisory is in effect for Halston County. Expect slick roads.',
+  thunderstorm: 'The National Weather Service has issued a Severe Thunderstorm Warning for White County.',
+  severe: 'The National Weather Service has issued a Tornado Warning for White County. Take shelter now.',
+  snow: 'A Winter Weather Advisory is in effect for White County. Expect slick roads.',
   fog: 'A Dense Fog Advisory is in effect. Visibility under a quarter mile.',
 };
 

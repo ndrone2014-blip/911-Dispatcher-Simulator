@@ -51,7 +51,8 @@ export function openSettings(game) {
         + row('…for radio requests', '', tog('ui.toastRadio'))
         + row('…for incidents', '', tog('ui.toastIncidents'))
         + row('24-hour clock', '', tog('ui.clock24'))
-        + row('Show control hints', '', tog('ui.showHints'));
+        + row('Show control hints', '', tog('ui.showHints'))
+        + row('Holiday decorations', 'Thanksgiving decorations in the dispatch center (automatic = all of November).', sel('ui.seasonal', { auto: 'Automatic', on: 'Always on', off: 'Off' }));
     }
     body.innerHTML = `${html}</div>`;
   }

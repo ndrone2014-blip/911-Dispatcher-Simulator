@@ -85,7 +85,7 @@ function answerSlot(call, slot, r) {
         c.revealed.location_partial = true;
         return { text: line('location_partial', ctx, r), note: `${loc.street} (number unknown)`, partial: true };
       }
-      if (loc.kind === 'highway') return { text: line('location_highway', { ...ctx, dir: loc.dir || 'northbound' }, r), note: `${loc.full}${loc.dir ? ` (${loc.dir})` : ''}` };
+      if (loc.kind === 'highway') return { text: line('location_highway', { ...ctx, dir: loc.dir || 'northbound' }, r), note: `${loc.full}${loc.dir && !loc.full.includes(loc.dir) ? ` (${loc.dir})` : ''}` };
       if (loc.kind === 'water') return { text: line('location_water', ctx, r), note: loc.full };
       if (sc.locVague) return { text: line('location_vague', ctx, r), note: `${loc.street} near ${loc.cross} (number unknown)` };
       if (loc.poi && r.chance(0.5)) return { text: line('location_poi', ctx, r), note: `${loc.full} (${loc.poi})` };

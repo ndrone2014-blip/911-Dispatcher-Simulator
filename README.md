@@ -1,6 +1,6 @@
 # 911 Dispatch Simulator
 
-A first-person 3D emergency communications center simulator that runs entirely in your web browser — on PC, Mac, iPhone, Android and tablets. Sit at your console in the Ridgeview 911 center, answer calls, talk to callers (with your microphone or keyboard), create incidents, and send **any unit you want to any incident**.
+A first-person 3D emergency communications center simulator that runs entirely in your web browser — on PC, Mac, iPhone, Android and tablets. Sit at your console in the **White County Emergency Communications center in Carmi, Illinois**, answer calls from Carmi and every town and back road of White County, talk to callers (with your microphone or keyboard), create incidents, and send **any unit you want to any incident**.
 
 **No API keys. No accounts. No servers. No paid services.** It's a static website.
 
@@ -18,16 +18,34 @@ python3 -m http.server 8080
 # then open http://localhost:8080
 ```
 
-**GitHub Pages:** Settings → Pages → Deploy from branch → `main` / root. Your game will be live at `https://<user>.github.io/911-Dispatcher-Simulator/`.
+**Netlify (recommended):** Add new site → Import from Git → pick this repository. There is no build command; `netlify.toml` already sets the publish directory to the repo root and the right headers. Every push to `main` redeploys automatically. (Or drag the folder onto app.netlify.com/drop.)
 
-> Opening `index.html` directly from disk (`file://`) won't work because browsers block ES modules there — use a local server or GitHub Pages.
+**Add to Home Screen:** the site is an installable web app. On iPhone/iPad open it in Safari → Share → *Add to Home Screen*; on Android open it in Chrome → ⋮ → *Add to Home screen / Install app*. It gets the game's logo as its icon (`icons/`), opens full screen, and keeps working offline after the first visit (`sw.js`). The logo source is `icons/logo.svg`; regenerate the PNG sizes with `node tools/make-icons.mjs` (needs the `sharp` package).
+
+**GitHub Pages** also works: Settings → Pages → Deploy from branch → `main` / root.
+
+> Opening `index.html` directly from disk (`file://`) won't work because browsers block ES modules there — use a local server or Netlify.
+
+## The setting: Carmi & White County, Illinois
+
+You're stationed at the 911 center in **Carmi**, the county seat, but you dispatch for **all of White County**: Carmi, Norris City, Grayville, Crossville, Enfield, Mill Shoals, Burnt Prairie, plus the villages of Springerton, Phillipstown, Herald, Emma and Maunie and every rural road in between.
+
+- **Real highway layout:** I-64 (mile markers 117–130), US-45, IL-1, IL-14 (and the IL-14 / IL-1 run between Carmi and Crossville), IL-141, plus county roads like Burnt Prairie Rd, Springerton Rd, Maunie Rd, Herald Rd and Wabash River Rd.
+- **Rivers:** the Little Wabash through Carmi, the Skillet Fork, and the Wabash River along the Indiana line.
+- **Carmi streets** (Main St, Main Cross St, Robinson, Fair, Oak, Walnut, Church, Jessup, Slocumb, Kerney, Locust, College Blvd, Stewart, Rice and more). Town street grids and exact positions are a simplified, game-friendly approximation — not a survey-accurate map. Distances are compressed about 3× so drives take minutes instead of half an hour, while staying in proportion (Carmi → Grayville is still the long run).
+- **Rural addresses** ("2145 Burnt Prairie Rd"), interstate mile markers, and town addresses ("412 W Main St, Carmi") all work in the CAD and when callers give them.
+- **Rural White County calls:** grain bin entrapments, tractor rollovers, combine/field fires, oil-field tank battery fires and H2S releases, barn fires, livestock on the road, deer strikes, hunters hurt in the river bottoms, boats on the Wabash.
+- Hospitals: Carmi Township Hospital locally, with transfers to Evansville, Eldorado and Fairfield. Mutual aid from Hamilton, Wayne, Gallatin and Edwards counties.
+
+### Thanksgiving
+Every November the center is decorated: harvest banners, leaf garlands around the video wall, hay bales and pumpkins, a pumpkin on every console, and a potluck table in the break room with a turkey and pies. Holiday calls (turkey fryer fires, family disputes, holiday travel crashes) show up more often. Settings → Interface → *Holiday decorations* lets you force it on or off.
 
 ## Features
 
 ### The dispatch center (3D, first person)
 - Main floor with 8 three-monitor dispatch consoles, privacy partitions, radio consoles, phones and chairs
 - Live **video wall** (operations stats, city map, active incidents), **news TVs** whose ticker reports your actual incidents, **department status boards**, working wall clock
-- Windows with a city skyline that follows the **time of day** and **weather** (rain, snow, fog, thunderstorms with lightning and thunder)
+- Windows looking out on Carmi — water tower, church steeple, grain elevators, autumn trees — that follows the **time of day** and **weather** (rain, snow, fog, thunderstorms with lightning and thunder)
 - Corridor, **break room** (coffee, fridge, vending machine, TV, couch), **supervisor office**, **radio equipment room**, **director's office**
 - Coworkers who work their consoles, take coffee breaks and walk the floor; visiting police, fire and EMS personnel drop by the break room
 - Your three desk monitors show your real CAD, map and radio log
@@ -47,7 +65,7 @@ Police (Patrol, Traffic, Supervisors, Detectives, CID, K-9, SWAT, Gang, Cybercri
 Units have statuses (Available, Assigned, Responding, On Scene, Transporting, Busy, Out of Service, Returning to Station, Clearing), drive along the road network from their home stations, transport patients to hospitals, self-initiate traffic stops, and have their own radio personalities.
 
 ### Calls & scenarios
-- **108 scenario templates** with procedural variation (locations, callers, personalities, details, vehicles, suspects, developments) — thousands of distinct calls
+- **120 scenario templates** with procedural variation (locations, callers, personalities, details, vehicles, suspects, developments) — thousands of distinct calls
 - Mostly everyday calls (noise, parking, alarms, fender benders, welfare checks…), regular medium incidents, and occasional major ones (structure fires, pileups, shootings, hazmat, severe weather…)
 - Misdials, pocket-dials, prank calls and non-emergency questions
 - Incidents evolve: fires spread, suspects flee, patients deteriorate — and units radio for what they need
@@ -95,9 +113,11 @@ Automatic and manual saves in browser storage, resume an in-progress shift, and 
 
 ```
 index.html            entry page
+manifest.webmanifest  home-screen app manifest · sw.js offline cache · netlify.toml hosting config
+icons/                game logo (logo.svg) and home-screen icons · tools/make-icons.mjs regenerates them
 css/                  global + CAD styles
 js/core/              event bus, utilities, settings, save system
-js/data/              departments & units, incident types, city, scenario library
+js/data/              departments & units, incident types, White County map (city.js), scenario library
 js/sim/               headless simulation: units, incidents, calls, radio, weather, events, career
 js/ai/                NLU, caller conversation engine, dialogue, staff dialogue, speech, optional LLM
 js/engine/            WebGL renderer, geometry, procedural textures
@@ -115,7 +135,7 @@ tests/                logic tests (Node) and browser tests (Playwright)
 ## Tests
 
 ```bash
-npm test                         # 2,700+ headless logic checks (Node 18+)
+npm test                         # 3,000+ headless logic checks (Node 18+)
 python3 tests/browser_test.py    # desktop/mobile/tablet playthrough in headless Chrome (needs Playwright)
 python3 tests/training_test.py   # plays the full tutorial
 ```

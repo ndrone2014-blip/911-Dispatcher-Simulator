@@ -1,4 +1,4 @@
-// Builds the Ridgeview Emergency Communications Center: geometry batches,
+// Builds the White County Emergency Communications Center (Carmi, IL): geometry batches,
 // colliders, interactables, light positions, screens and the NPC path graph.
 import { MeshBuilder } from '../engine/geometry.js';
 
@@ -126,7 +126,7 @@ export function buildCenter(opts = {}) {
     mb('blackgloss').box(sx * 7.4, 2.45, -7.87, 2.0, 1.18, 0.08, { uv: 0 });
     screen(`tv${sx > 0 ? 'R' : 'L'}`, 'tv', sx * 7.4, 2.45, -7.82, 1.86, 1.05, 'z', 1, 0, { shared: 'scr_tv' });
   }
-  screen('logo', 'sign', 0, 3.38, -7.9, 6.2, 0.36, 'z', 1, 0, { text: 'RIDGEVIEW EMERGENCY COMMUNICATIONS CENTER' });
+  screen('logo', 'sign', 0, 3.38, -7.9, 6.2, 0.36, 'z', 1, 0, { text: 'WHITE COUNTY EMERGENCY COMMUNICATIONS · CARMI, ILLINOIS' });
   // department boards on the west wall
   for (const [i, z] of [[0, -4.2], [1, 0.4], [2, 4.6]]) {
     mb('blackgloss').box(-11.9, 1.95, z, 0.08, 1.62, 2.72, { uv: 0 });
@@ -246,7 +246,68 @@ export function buildCenter(opts = {}) {
   interactables.push({ id: 'water', kind: 'water', label: 'Get a cup of water', min: [10.6, 0, 9.9], max: [11.2, 1.6, 10.5], pri: 0 });
   for (const [x, t] of [[-11.95, 'RESTROOMS →']]) screen('restsign', 'sign', x + 0.05, 2.3, 9.3, 1.4, 0.24, 'x', 1, 0, { text: t });
 
+  if (opts.thanksgiving) buildThanksgiving({ mb, col, screen, consoles });
+
   return { batches: B, colliders, interactables, screens, lights, consoles };
+}
+
+// ---------------- Thanksgiving decorations ----------------
+function buildThanksgiving({ mb, col, screen, consoles }) {
+  const pumpkin = (x, y, z, r = 0.16, mat = 'pumpkin') => {
+    mb(mat).sphere(x, y + r * 0.78, z, r, 12, 8, { sy: 0.78 });
+    if (r > 0.1) for (const a of [0, 1.05, 2.1]) mb(mat).sphere(x + Math.cos(a) * r * 0.42, y + r * 0.76, z + Math.sin(a) * r * 0.42, r * 0.72, 10, 7, { sy: 0.95 });
+    mb('stem').cylinder(x, y + r * 1.62, z, r * 0.1, r * 0.4, 6, { r2: r * 0.07 });
+  };
+  const bale = (x, z, w = 1.0, d = 0.5, h = 0.42, rot = 0) => {
+    mb('hay').box(x, h / 2, z, w, h, d, { rotY: rot, uv: 0.4, ao: 0.25 });
+    const c = Math.abs(Math.cos(rot)), sn = Math.abs(Math.sin(rot)); const hx = (w * c + d * sn) / 2 + 0.05, hz = (w * sn + d * c) / 2 + 0.05;
+    col(x - hx, z - hz, x + hx, z + hz);
+    return h;
+  };
+  const LEAVES = ['leafRed', 'leafOrange', 'leafGold'];
+  // falling-leaf garland: a sagging string of leaves between two points on a wall
+  const garland = (x0, x1, y, z, sag = 0.18, axis = 'z') => {
+    const n = Math.max(6, Math.round(Math.abs(x1 - x0) / 0.16));
+    for (let i = 0; i <= n; i++) {
+      const k = i / n; const x = x0 + (x1 - x0) * k; const yy = y - Math.sin(k * Math.PI) * sag;
+      const mat = LEAVES[i % 3]; const rot = (i % 5) * 0.6;
+      if (axis === 'z') mb(mat).box(x, yy, z, 0.13, 0.1, 0.012, { rotY: rot * 0.25, uv: 0 });
+      else mb(mat).box(z, yy, x, 0.012, 0.1, 0.13, { rotY: rot * 0.25, uv: 0 });
+      if (i % 4 === 2) { if (axis === 'z') mb('stem').sphere(x, yy - 0.06, z, 0.025, 6, 4); else mb('stem').sphere(z, yy - 0.06, x, 0.025, 6, 4); }
+    }
+  };
+
+  // Banners on the front wall above the side TVs
+  screen('tg_banner_l', 'banner', -7.4, 3.31, -7.9, 2.7, 0.48, 'z', 1, 0, { text: 'HAPPY THANKSGIVING', unlit: true });
+  screen('tg_banner_r', 'banner', 7.4, 3.31, -7.9, 2.7, 0.48, 'z', 1, 0, { text: 'THANK YOU, FIRST RESPONDERS', unlit: true });
+  // leaf garland along the bottom of the video wall and over both side TVs
+  garland(-4.4, 4.4, 0.76, -7.78, 0.08);
+  garland(-8.4, -6.4, 3.02, -7.8, 0.12); garland(6.4, 8.4, 3.02, -7.8, 0.12);
+  // hay bale displays in the front corners of the floor
+  let h = bale(-9.9, -7.35, 1.1, 0.5); pumpkin(-10.15, h, -7.35, 0.17); pumpkin(-9.65, h, -7.3, 0.11, 'gourd'); pumpkin(-9.4, 0, -6.85, 0.2);
+  h = bale(9.4, -7.4, 1.0, 0.5); pumpkin(9.2, h, -7.4, 0.15); pumpkin(9.65, h, -7.35, 0.1, 'gourd'); pumpkin(8.7, 0, -7.0, 0.18); col(8.45, -7.25, 8.95, -6.75);
+  col(-9.65, -7.1, -9.15, -6.6);
+  // a little pumpkin on every console desk wing
+  for (const c of consoles) pumpkin(c.x - 1.45, 0.765, c.z + 0.25, 0.07);
+  // corridor: pumpkins beside the shift board and at the door frames
+  pumpkin(-3.15, 0, 8.32, 0.16); pumpkin(-3.55, 0, 8.3, 0.1, 'gourd'); col(-3.75, 8.1, -2.9, 8.55);
+  pumpkin(3.85, 0, 8.32, 0.15); col(3.65, 8.1, 4.05, 8.55);
+  garland(-2.7, -0.3, 2.42, 8.03, 0.1);
+  // break room potluck: tablecloth, turkey, pies and gourds on the table
+  const tx = -7.5, tz = 13.8, ty = 0.767;
+  mb('tablecloth').box(tx, ty + 0.004, tz, 1.78, 0.008, 1.08, { uv: 0.6 });
+  mb('tablecloth').box(tx, ty - 0.12, tz - 0.545, 1.78, 0.24, 0.006, { uv: 0.6 }); mb('tablecloth').box(tx, ty - 0.12, tz + 0.545, 1.78, 0.24, 0.006, { uv: 0.6 });
+  mb('plate').cylinder(tx, ty + 0.015, tz, 0.26, 0.02, 18, { r2: 0.22 });
+  mb('turkey').sphere(tx, ty + 0.1, tz, 0.17, 14, 10, { sy: 0.62 });
+  for (const s of [-1, 1]) { mb('turkey').sphere(tx + 0.13, ty + 0.08, tz + s * 0.11, 0.06, 8, 6, { sy: 0.8 }); mb('plate').sphere(tx + 0.19, ty + 0.09, tz + s * 0.13, 0.022, 6, 4); }
+  for (const [dx, dz] of [[-0.6, -0.25], [0.6, 0.28]]) { mb('pie').cylinder(tx + dx, ty + 0.025, tz + dz, 0.15, 0.045, 16, { r2: 0.13 }); mb('pieFill').cylinder(tx + dx, ty + 0.05, tz + dz, 0.12, 0.012, 16); }
+  mb('stem').cylinder(tx - 0.55, ty + 0.05, tz + 0.3, 0.13, 0.1, 12, { r2: 0.16 }); // basket
+  pumpkin(tx - 0.58, ty + 0.08, tz + 0.27, 0.06); pumpkin(tx - 0.5, ty + 0.08, tz + 0.34, 0.05, 'gourd'); pumpkin(tx - 0.49, ty + 0.08, tz + 0.24, 0.045, 'pie');
+  mb('plate').cylinder(tx + 0.5, ty + 0.01, tz - 0.3, 0.1, 0.012, 12); mb('plate').cylinder(tx - 0.2, ty + 0.01, tz + 0.36, 0.1, 0.012, 12);
+  screen('tg_potluck', 'banner', -9.0, 2.45, 10.72, 2.6, 0.46, 'z', 1, 0, { text: 'THANKSGIVING POTLUCK · THURSDAY', unlit: true });
+  garland(-11.6, -6.4, 2.86, 10.73, 0.16);
+  // hay bale + pumpkins in the break room corner by the window
+  h = bale(-5.8, 17.55, 0.9, 0.45, 0.4); pumpkin(-6.0, h, 17.55, 0.14); pumpkin(-5.6, h, 17.5, 0.09, 'gourd');
 }
 
 // ---------------- NPC navigation graph ----------------

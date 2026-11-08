@@ -2,7 +2,7 @@
 // resource requests and (non-binding) unit recommendations.
 import { TYPE, INCIDENT_STATUS_LABELS } from '../data/incidentTypes.js';
 import { TYPE_BY_ID, CAPABILITY_PROVIDER } from '../data/departments.js';
-import { city, addressFor, nearestFacility } from '../data/city.js';
+import { city, addressFor, nearestFacility, blockText } from '../data/city.js';
 import { bus } from '../core/events.js';
 import { dist, clamp, deepClone, fill } from '../core/util.js';
 
@@ -450,7 +450,7 @@ export class IncidentManager {
     const a = addressFor(u.x, u.y);
     const veh = `${r.pick(['red', 'black', 'silver', 'white', 'blue', 'gray', 'green'])} ${r.pick(['Honda Civic', 'Ford F-150', 'Toyota Camry', 'Chevy Malibu', 'Nissan Altima', 'Jeep Cherokee', 'Dodge Charger', 'Hyundai Elantra'])}`;
     const plate = `${r.pick(['K', 'R', 'D', 'H', 'L', 'B'])}${r.pick(['A', 'X', 'T', 'M', 'Z'])}${r.pick(['C', 'J', 'P', 'W'])}-${r.int(1000, 9999)}`;
-    const location = { x: u.x, y: u.y, ...a, full: a.kind === 'street' ? `${Math.floor(a.number / 100) * 100} block of ${a.street}` : a.full };
+    const location = { x: u.x, y: u.y, ...a, full: blockText(a) };
     location.short = location.full;
     const inc = this.create({ typeId: k.typeId, priority: 4, location, source: 'self', locationVerified: true,
       description: `${u.callsign} self-initiated: ${k.what}${k.typeId === 'TRAFFIC_STOP' ? ` – ${veh}, plate ${plate}` : ''}`,

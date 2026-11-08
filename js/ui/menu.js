@@ -7,6 +7,7 @@ import { WEATHER_TYPES } from '../sim/weather.js';
 import { FREQUENCY_LABELS } from '../sim/calls.js';
 import { RANKS, UPGRADES } from '../sim/career.js';
 import { DEFAULT_CONFIG } from '../sim/sim.js';
+import { thanksgivingOn } from '../core/season.js';
 
 const CREDIT = 'Developed by Drone Hive Studios | Developer @ndrone40';
 
@@ -40,8 +41,10 @@ export class Menu {
   main() {
     const g = this.game; const shift = g.save.loadShift();
     const rank = g.career.rank();
-    return `<div class="title-block"><div class="eyebrow">Ridgeview Emergency Communications</div><h1>911 Dispatch<br><span>Simulator</span></h1>
-      <p>Sit at your console, answer calls, talk to callers, and run the whole emergency response for the City of Ridgeview – at your own pace.</p></div>
+    const tg = thanksgivingOn(g.settings);
+    return `<div class="title-block"><img class="menu-logo" src="icon.svg" alt="911 Dispatch Simulator logo" width="96" height="96"><div class="eyebrow">White County Emergency Communications · Carmi, Illinois</div><h1>911 Dispatch<br><span>Simulator</span></h1>
+      ${tg ? '<div class="holiday-note">🦃 Happy Thanksgiving from White County 911 — thanks for working the holiday shift! 🍂</div>' : ''}
+      <p>Sit at your console, answer calls, talk to callers, and run the whole emergency response for Carmi and all of White County, Illinois – at your own pace.</p></div>
       <div class="menu-list">
         ${shift ? `<button class="menu-btn" data-act="continue"><span class="ico">▶</span><span><b>Continue shift</b><small>${esc(shift.mode === 'career' ? 'Career' : shift.mode === 'custom' ? 'Custom shift' : 'Free play')} · saved ${esc(new Date(shift.savedAt).toLocaleString())}</small></span></button>` : ''}
         <button class="menu-btn" data-act="go" data-v="free"><span class="ico">🎧</span><span><b>Free Play</b><small>Start dispatching immediately. Configure everything.</small></span></button>

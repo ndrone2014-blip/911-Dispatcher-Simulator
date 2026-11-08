@@ -8,6 +8,7 @@ import { ScreenPainter } from './screens.js';
 import { NPCManager } from './npcs.js';
 import { Player } from './player.js';
 import { bus } from '../core/events.js';
+import { thanksgivingOn } from '../core/season.js';
 
 const PRESETS = {
   low: { ratio: 0.6, lights: 3, aa: false, screenRes: 256, npcs: 'low', tvHz: 1, extHz: 3 },
@@ -36,7 +37,7 @@ export class World {
     this.unit = { box: this.renderer.createMesh(new MeshBuilder().box(0, 0, 0, 1, 1, 1, { uv: 0 }).build()), sphere: this.renderer.createMesh(new MeshBuilder().sphere(0, 0, 0, 1, 12, 9).build()) };
     this.build();
     this.player.attach(this.canvas, this.game.settings);
-    bus.on('settings:changed', ({ path }) => { if (path === 'graphics.preset') this.setPreset(this.game.settings.graphicsPreset()); });
+    bus.on('settings:changed', ({ path }) => { if (path === 'graphics.preset') this.setPreset(this.game.settings.graphicsPreset()); else if (path === 'ui.seasonal') this.build(); });
     return true;
   }
 
@@ -65,6 +66,11 @@ export class World {
       keyboard: m({ map: t.keyboard, specular: 0.3 }), radiopanel: m({ map: t.radioPanel, emissiveMap: t.radioPanel, emissive: [0.35, 0.35, 0.35] }),
       vendfront: m({ color: [0.2, 0.2, 0.2], emissiveMap: this.renderer.createTexture(this.vendCanvas()), emissive: [0.9, 0.9, 0.9] }),
       rack: m({ color: [0.1, 0.1, 0.1], emissiveMap: this.renderer.createTexture(this.rackCanvas()), emissive: [1, 1, 1] }),
+      pumpkin: m({ color: [0.95, 0.42, 0.07], specular: 0.35, shininess: 30 }), stem: m({ color: [0.3, 0.26, 0.1], specular: 0.05 }),
+      hay: m({ color: [0.78, 0.6, 0.28], specular: 0.03 }), gourd: m({ color: [0.95, 0.8, 0.25], specular: 0.3 }),
+      leafRed: m({ color: [0.72, 0.12, 0.05], specular: 0.1, doubleSided: true }), leafOrange: m({ color: [0.92, 0.42, 0.06], specular: 0.1, doubleSided: true }), leafGold: m({ color: [0.88, 0.64, 0.1], specular: 0.1, doubleSided: true }),
+      turkey: m({ color: [0.62, 0.32, 0.11], specular: 0.6, shininess: 60 }), pie: m({ color: [0.86, 0.62, 0.32], specular: 0.15 }), pieFill: m({ color: [0.72, 0.33, 0.07], specular: 0.3 }),
+      tablecloth: m({ color: [0.5, 0.2, 0.07], specular: 0.05 }), plate: m({ color: [0.95, 0.94, 0.9], specular: 0.5, shininess: 60 }),
       books: m({ map: this.renderer.createTexture(this.booksCanvas()) }), waterjug: m({ color: [0.5, 0.75, 1], opacity: 0.5, transparent: true, specular: 0.9, shininess: 90 }),
     };
   }
@@ -77,7 +83,7 @@ export class World {
   build() {
     if (this.failed) return;
     const g = this.game; const mode = g.sim?.state.mode || 'free';
-    const opts = { thirdMonitor: g.career.has('third_monitor', mode), espresso: g.career.has('espresso', mode), ergoChair: g.career.has('ergo_chair', mode) };
+    const opts = { thirdMonitor: g.career.has('third_monitor', mode), espresso: g.career.has('espresso', mode), ergoChair: g.career.has('ergo_chair', mode), thanksgiving: thanksgivingOn(g.settings) };
     const center = buildCenter(opts);
     this.center = center; this.colliders = center.colliders; this.interactablesStatic = center.interactables; this.lightDefs = center.lights;
     this.painter = new ScreenPainter(this.preset.screenRes);

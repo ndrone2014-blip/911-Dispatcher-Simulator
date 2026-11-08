@@ -1,7 +1,7 @@
 // Turns scenario templates into concrete, fully-filled call scenarios.
 import { SCENARIOS, SCENARIO_BY_ID } from '../data/scenarios/index.js';
 import { TYPE } from '../data/incidentTypes.js';
-import { randomLocation, addressFor, B } from '../data/city.js';
+import { randomLocation, addressFor, MAP_BOUNDS } from '../data/city.js';
 import { FIRST_NAMES, LAST_NAMES, makePhone } from '../ai/dialogue.js';
 import { fill, clamp } from '../core/util.js';
 import { EVENT_SCENARIO_BOOST } from './cityEvents.js';
@@ -28,7 +28,8 @@ export function timeOfDay(minutes) {
 
 function categoryOf(t) { return TYPE[t.typeId]?.category || t.category || 'service'; }
 
-export function chooseTemplate(r, { config = {}, weather = 'clear', clock = 720, recent = [], events = [] } = {}) {
+export function chooseTemplate(r, { config = {}, weather = 'clear', clock = 720, recent = [], events = [], month } = {}) {
+  const mon = month ?? new Date().getMonth();
   const tod = timeOfDay(clock);
   const mix = SEVERITY_MIX[config.majorFrequency || 'occasional'];
   const cats = config.categories || {};
@@ -41,6 +42,7 @@ export function chooseTemplate(r, { config = {}, weather = 'clear', clock = 720,
     if (t.weather) w *= t.weather[weather] ?? (t.weatherOnly ? 0 : 1);
     if (t.event) w *= events.some((e) => e.kind === t.event) ? 6 : 0.05;
     else if (events.some((e) => EVENT_SCENARIO_BOOST[e.kind]?.includes(t.id))) w *= 3;
+    if (t.season === 'thanksgiving') w *= mon === 10 ? 4 : 0.3; // November holiday calls
     if (recent.includes(t.id)) w *= 0.15; // avoid repeats
     return w;
   });
@@ -63,7 +65,7 @@ function evalField(v, r, vars, loc, ctx) {
 /** Build a concrete scenario instance (plain JSON). */
 export function buildScenario(r, template, { forcedLoc } = {}) {
   const t = template;
-  const loc = forcedLoc || randomLocation(r, t.zones || ['residential'], { poiKinds: t.poiKinds });
+  const loc = forcedLoc || randomLocation(r, t.zones || ['residential'], { poiKinds: t.poiKinds, ruralChance: t.zones ? 0 : 0.18 });
   const sex = t.callerSex || r.pick(['m', 'f']);
   const first = r.pick(FIRST_NAMES[sex]); const last = r.pick(LAST_NAMES);
   const personaPool = t.personas ? t.personas.map((p) => [p, 1]) : PERSONA_BY_SEVERITY[t.severity] || PERSONA_BY_SEVERITY.small;
@@ -110,14 +112,14 @@ export function makeANI(r, sc) {
     const err = r.float(40, 260); const ang = r.float(0, Math.PI * 2);
     ani.x = sc.loc.x + Math.cos(ang) * err * 0.6; ani.y = sc.loc.y + Math.sin(ang) * err * 0.6; ani.radius = Math.round(err);
     const a = addressFor(ani.x, ani.y);
-    ani.address = `Phase II – near ${a.kind === 'street' ? `${Math.floor(a.number / 100) * 100} blk ${a.street}` : a.full}`;
-    ani.sector = `${a.district || 'Ridgeview'} sector ${r.int(1, 6)}`;
+    ani.address = `Phase II – near ${a.kind === 'street' ? `${Math.floor(a.number / 100) * 100} blk ${a.prefix ? `${a.prefix} ` : ''}${a.street}${a.district !== 'Carmi' ? `, ${a.district}` : ''}` : a.full}`;
+    ani.sector = `${a.district === 'Rural White County' ? 'White Co.' : a.district} tower sector ${r.int(1, 3)}`;
   } else {
     // landline/VoIP: registered address – matches the scene only if the caller is home
     const atHome = sc.callerAtScene && sc.loc.kind === 'street' && r.chance(0.85);
     if (atHome) { ani.x = sc.loc.x; ani.y = sc.loc.y; ani.address = sc.loc.full; }
     else {
-      const x = clamp(sc.loc.x + r.float(-4, 4) * B, 0.2 * B, 13.8 * B), y = clamp(sc.loc.y + r.float(-4, 4) * B, 0.2 * B, 13.8 * B);
+      const x = clamp(sc.loc.x + r.float(-500, 500), 100, 11200), y = clamp(sc.loc.y + r.float(-500, 500), 100, 10400);
       const a = addressFor(x, y); ani.x = x; ani.y = y; ani.address = a.full;
     }
     ani.radius = 0;
