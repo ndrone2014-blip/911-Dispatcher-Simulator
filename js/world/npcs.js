@@ -114,7 +114,7 @@ export class NPCManager {
     // decide next activity
     const roll = Math.random();
     if (npc.kind === 'dispatcher') {
-      if (npc.sitting) { npc.timer = 25 + Math.random() * 60; if (roll < 0.25) { this.goTo(npc, rng.pick(BREAK_SPOTS)); } }
+      if (npc.sitting) { npc.timer = 25 + Math.random() * 60; if (roll < 0.06) this.goTo(npc, npc.sex === 'f' ? 'rest_w' : 'rest_m'); else if (roll < 0.25) { this.goTo(npc, rng.pick(BREAK_SPOTS)); } }
       else { this.goTo(npc, npc.home); }
     } else if (npc.kind === 'supervisor') {
       if (npc.sitting) { npc.timer = 20 + Math.random() * 40; if (roll < 0.6) this.goTo(npc, rng.pick(['front_-5.6', 'mid_0', 'back_5.6', 'front_5.6', 'mid_-11', 'back_-5.6'])); }
@@ -128,7 +128,7 @@ export class NPCManager {
       this.goTo(npc, rng.pick(['front_-11', 'front_0', 'mid_5.6', 'back_-5.6', 'br_chat2', 'coffee', 'front_5.6', 'back_11']));
     } else if (npc.kind === 'visitor') {
       npc.timer = 10 + Math.random() * 20;
-      if (!npc.leaving) this.goTo(npc, rng.pick(['br_chat1', 'br_chat2', 'coffee', 'seatT1', 'br_table']));
+      if (!npc.leaving) this.goTo(npc, rng.pick(npc.dept === 'police' ? ['brief_room', 'armory_mid', 'garage', 'locker_rm', 'coffee', 'sheriff_in', 'br_chat1'] : ['br_chat1', 'br_chat2', 'coffee', 'seatT1', 'br_table']));
     }
   }
 
@@ -151,9 +151,9 @@ export class NPCManager {
   }
 
   drawNPC(n, items, meshes, makeMat) {
-    n.mats ||= { skin: makeMat(n.skin), hair: makeMat(n.hair, 0.05), shirt: makeMat(n.shirt), pants: makeMat(n.pants), shoe: makeMat([0.06, 0.06, 0.07], 0.3), dark: makeMat([0.05, 0.05, 0.06], 0.4), badge: makeMat([0.85, 0.7, 0.2], 0.6) };
+    n.mats ||= { skin: makeMat(n.skin), hair: makeMat(n.hair, 0.05), shirt: makeMat(n.shirt), pants: makeMat(n.pants), shoe: makeMat([0.06, 0.06, 0.07], 0.3), dark: makeMat([0.05, 0.05, 0.06], 0.4), badge: makeMat([0.85, 0.7, 0.2], 0.6), belt: makeMat([0.1, 0.07, 0.05], 0.35) };
     n.mats.face ||= { ...makeMat(n.skin, 0.1), map: this.world?.tex?.face };
-    n.parts ||= Array.from({ length: 18 }, () => ({ model: mat4(), mesh: null, mat: null }));
+    n.parts ||= Array.from({ length: 30 }, () => ({ model: mat4(), mesh: null, mat: null }));
     const M = n.mats; let pi = 0;
     const cy = Math.cos(n.yaw), sy = Math.sin(n.yaw);
     const W = (lx, ly, lz) => [n.x + lx * cy + lz * sy, ly, n.z - lx * sy + lz * cy];
@@ -171,7 +171,14 @@ export class NPCManager {
     const t = n.phase;
     const sw = walking ? Math.sin(t * n.speed * 5.2) * 0.55 : 0;
     const bob = walking ? Math.abs(Math.cos(t * n.speed * 5.2)) * 0.035 : Math.sin(t * 1.3) * 0.004;
-    const box = meshes.box, sph = meshes.sphere;
+    const box = meshes.box, sph = meshes.sphere, torso = meshes.torso || meshes.box;
+    const cop = n.kind === 'visitor' && n.dept === 'police';
+    // two-segment arm with elbow + hand
+    const arm = (s, sx, sy, sz, upper, fore) => { const el = limb(box, M.shirt, sx, sy, sz, upper, 0.31, 0.105, 0.115); const wr = limb(box, n.sleeves ? M.skin : M.shirt, el[0], el[1], el[2], fore, 0.28, 0.09, 0.1); put(sph, M.skin, wr[0], wr[1] - 0.04, wr[2], 0, 0.045, 0.06, 0.045); put(sph, M.shirt, sx * 0.96, sy - 0.03, sz, 0, 0.058, 0.055, 0.065); };
+    const gear = (hipY) => {
+      put(box, cop ? M.dark : M.belt, 0, hipY + 0.02, 0, 0, 0.44, 0.065, 0.26);
+      if (cop) { put(box, M.dark, 0.22, hipY - 0.03, 0.02, 0, 0.06, 0.16, 0.12); put(box, M.dark, -0.2, hipY + 0.01, -0.09, 0, 0.07, 0.07, 0.06); put(box, M.dark, 0.13, hipY + 0.5, -0.125, 0, 0.05, 0.09, 0.03); put(box, M.badge, -0.12, hipY + 0.45, -0.125, 0, 0.06, 0.07, 0.01); }
+    };
     if (n.sitting) {
       const hipY = 0.58, hipZ = 0.02;
       for (const s of [-1, 1]) {
@@ -180,8 +187,9 @@ export class NPCManager {
         put(box, M.shoe, foot[0], 0.05, foot[2] - 0.05, 0, 0.12, 0.08, 0.24);
       }
       const typing = n.typing * Math.sin(t * 13 + (n.id.length)) * 0.05;
-      put(box, M.shirt, 0, hipY + 0.32 + bob, 0.04, -0.08, 0.42, 0.6, 0.24);
-      for (const s of [-1, 1]) limb(box, M.shirt, s * 0.27, hipY + 0.58, 0.02, 0.85 + (s > 0 ? typing : -typing), 0.58, 0.11, 0.12);
+      put(torso, M.shirt, 0, hipY + 0.32 + bob, 0.04, -0.08, 0.42, 0.6, 0.24);
+      gear(hipY + bob);
+      for (const s of [-1, 1]) arm(s, s * 0.25, hipY + 0.56 + bob, 0.02, 0.35, 1.45 + (s > 0 ? typing : -typing));
       this.head(n, put, box, sph, M, 0, hipY + 0.79 + bob, -0.02);
     } else {
       const hipY = 0.92 + bob;
@@ -192,10 +200,10 @@ export class NPCManager {
         const foot = limb(box, M.pants, knee[0], knee[1], knee[2], a - bend, 0.45, 0.13, 0.14);
         put(box, M.shoe, foot[0], Math.max(0.04, foot[1]), foot[2] - 0.05, 0, 0.12, 0.08, 0.24);
       }
-      put(box, M.shirt, 0, hipY + 0.3, 0, 0, 0.42, 0.62, 0.24);
+      put(torso, M.shirt, 0, hipY + 0.3, 0, 0, 0.42, 0.62, 0.24);
+      gear(hipY);
       const talk = n.state === 'talk' ? Math.sin(t * 3) * 0.2 + 0.25 : 0;
-      for (const s of [-1, 1]) limb(box, M.shirt, s * 0.27, hipY + 0.57, 0, -s * sw * 0.8 + (s > 0 ? talk : 0) + 0.04, 0.6, 0.11, 0.12);
-      if (n.kind === 'visitor' && n.dept === 'police') put(box, M.badge, -0.12, hipY + 0.45, -0.125, 0, 0.06, 0.07, 0.01);
+      for (const s of [-1, 1]) { const up = -s * sw * 0.8 + (s > 0 ? talk : 0) + 0.04; arm(s, s * 0.25, hipY + 0.55, 0, up, up + 0.25 + (s > 0 ? talk * 2.2 : 0) + (walking ? 0.15 : 0.05)); }
       this.head(n, put, box, sph, M, 0, hipY + 0.74, 0);
     }
   }

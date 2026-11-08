@@ -1,4 +1,6 @@
 // Units roster + unit detail, and department management.
+const STATION_BY_ID = Object.fromEntries(city.facilities.map((f) => [f.id, f]));
+function inStatus(sim, u) { const m = Math.max(0, Math.round(((sim.t - (u.statusSince || 0)) * (sim.state.time.clockRate || 6)) / 60)); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`; }
 import { Screen } from './cad.js';
 import { bus } from '../../core/events.js';
 import { bindActions, modal, toast } from '../dom.js';
@@ -32,9 +34,10 @@ export class UnitsScreen extends Screen {
     if (this.status === 'assignable') list = list.filter((u) => sim.units.isAssignable(u)); else if (this.status !== 'all') list = list.filter((u) => u.status === this.status);
     if (this.search) list = list.filter((u) => `${u.callsign} ${TYPE_BY_ID[u.type].name}`.toLowerCase().includes(this.search));
     const box = this.root.querySelector('[data-r="table"]');
-    box.innerHTML = list.length ? `<table class="table"><thead><tr><th>Unit</th><th class="hide-narrow">Type</th><th>Status</th><th>Incident</th><th class="hide-narrow">Location</th></tr></thead><tbody>
-      ${list.map((u) => { const inc = u.incident ? sim.incidents.byId(u.incident) : null; return `<tr class="click" data-act="unit" data-u="${u.id}"><td>${callsign(u)}</td><td class="hide-narrow dim">${esc(TYPE_BY_ID[u.type].name)}</td><td>${unitStatus(u, sim)}</td>
-        <td class="mono">${inc ? `${pri(inc.priority)} ${esc(inc.number)}` : '<span class="dim">–</span>'}</td><td class="hide-narrow dim" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sim.units.locationText(u))}</td></tr>`; }).join('')}</tbody></table>` : '<div class="empty">No units match.</div>';
+    box.innerHTML = list.length ? `<table class="table"><thead><tr><th>Unit</th><th class="hide-narrow">Type</th><th>Status</th><th class="hide-narrow">Time</th><th>Incident</th><th class="hide-narrow">Location</th><th class="hide-narrow">Station</th></tr></thead><tbody>
+      ${list.map((u) => { const inc = u.incident ? sim.incidents.byId(u.incident) : null; return `<tr class="click" data-act="unit" data-u="${u.id}"><td>${callsign(u)}</td><td class="hide-narrow dim">${esc(TYPE_BY_ID[u.type].name)}</td><td>${unitStatus(u, sim)}</td><td class="hide-narrow mono dim">${inStatus(sim, u)}</td>
+        <td class="mono">${inc ? `${pri(inc.priority)} ${esc(inc.number)}` : '<span class="dim">–</span>'}</td><td class="hide-narrow dim" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sim.units.locationText(u))}</td>
+        <td class="hide-narrow dim" style="white-space:nowrap;font-size:.9em">${esc(STATION_BY_ID[u.station]?.short || '')}</td></tr>`; }).join('')}</tbody></table>` : '<div class="empty">No units match.</div>';
   }
 
   openUnit(id) {

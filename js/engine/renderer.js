@@ -180,9 +180,9 @@ void main() {
 
 export const QUALITY = {
   low: { shadows: 0, shadowTaps: 1, envmap: false, post: false, msaa: 0, fxaa: false, bloom: false, dynamicShadows: false, aniso: 2 },
-  medium: { shadows: 1024, shadowTaps: 1, envmap: true, post: true, msaa: 0, fxaa: true, bloom: false, dynamicShadows: false, aniso: 4 },
+  medium: { shadows: 2048, shadowTaps: 1, envmap: true, post: true, msaa: 0, fxaa: true, bloom: false, dynamicShadows: false, aniso: 4 },
   high: { shadows: 2048, shadowTaps: 5, envmap: true, post: true, msaa: 4, fxaa: false, bloom: true, dynamicShadows: false, aniso: 8 },
-  ultra: { shadows: 2048, shadowTaps: 9, envmap: true, post: true, msaa: 4, fxaa: false, bloom: true, dynamicShadows: true, aniso: 16 },
+  ultra: { shadows: 4096, shadowTaps: 9, envmap: true, post: true, msaa: 4, fxaa: false, bloom: true, dynamicShadows: true, aniso: 16 },
 };
 
 export class Renderer {
@@ -442,7 +442,7 @@ export class Renderer {
     this.resize();
     const W = this.canvas.width, H = this.canvas.height;
     // shadows: static scene is baked once; Ultra refreshes every 3rd frame to include people
-    if (q.shadows && (this.shadowDirty || (q.dynamicShadows && this.frame % 3 === 0))) this.renderShadow(scene.items);
+    if (q.shadows && (this.shadowDirty || (q.dynamicShadows && this.frame % 3 === 0))) this.renderShadow(scene.shadowItems || scene.items);
     const tg = q.post ? this.ensureTargets(W, H) : null;
     gl.bindFramebuffer(gl.FRAMEBUFFER, tg ? (tg.msFbo || tg.fbo) : null);
     gl.viewport(0, 0, W, H);

@@ -10,12 +10,13 @@
 // All geometry is merged into one batch per material, so extra detail costs vertices,
 // not draw calls. Colliders, interactables and screens are identical at every level.
 import { MeshBuilder } from '../engine/geometry.js';
+import { buildSheriffWing } from './sheriffWing.js';
 
 export const H = 3.6; // ceiling height
 export const CONSOLE_XS = [-8.4, -2.8, 2.8, 8.4];
 export const ROW_ZS = [-3.2, 1.8];
 export const PLAYER_CONSOLE = 1;
-export const BUILDING_BOUNDS = [-12.2, 0, -8.2, 12.2, H, 18.2];
+export const BUILDING_BOUNDS = [-42.2, 0, -8.2, 12.2, H, 18.2];
 
 // material key -> [shared batch, vertex colour]
 const SOLID = {
@@ -23,7 +24,7 @@ const SOLID = {
   frame: ['satin', [0.23, 0.25, 0.28]], white: ['satin', [0.86, 0.87, 0.87]], red: ['satin', [0.7, 0.07, 0.07]], blue: ['satin', [0.1, 0.3, 0.75]],
   aed: ['satin', [0.75, 0.82, 0.1]], flag: ['satin', [0.62, 0.1, 0.12]], chairShell: ['satin', [0.16, 0.2, 0.26]], pen: ['satin', [0.1, 0.2, 0.6]],
   recycle: ['satin', [0.1, 0.32, 0.62]], cableBlue: ['satin', [0.12, 0.35, 0.8]], cableYellow: ['satin', [0.85, 0.7, 0.1]], print1: ['satin', [0.22, 0.38, 0.42]],
-  print2: ['satin', [0.55, 0.36, 0.2]], doorWood: ['satin', [0.52, 0.36, 0.22]],
+  print2: ['satin', [0.55, 0.36, 0.2]], doorWood: ['satin', [0.52, 0.36, 0.22]], safety: ['satin', [0.9, 0.72, 0.08]], cone: ['satin', [0.95, 0.38, 0.06]],
   rubber: ['matte', [0.05, 0.05, 0.055]], soil: ['matte', [0.12, 0.08, 0.05]], coffee: ['matte', [0.12, 0.06, 0.03]], grille: ['matte', [0.03, 0.03, 0.035]],
   blackgloss: ['gloss', [0.02, 0.02, 0.025]], bezel: ['gloss', [0.015, 0.015, 0.018]], mug: ['gloss', [0.92, 0.92, 0.9]], fridge: ['gloss', [0.9, 0.9, 0.9]], pot: ['gloss', [0.85, 0.85, 0.82]],
   whiteCeil: ['ceilParts', [0.9, 0.9, 0.9]], ceilMetal: ['ceilParts', [0.7, 0.72, 0.75]],
@@ -41,11 +42,12 @@ export function buildCenter(opts = {}) {
   const B = {}; // material key -> MeshBuilder
   // Solid-colour parts share a handful of batches (colour lives in the vertices) so the
   // extra detail adds almost no draw calls.
-  const mb = (k) => {
-    const a = SOLID[k]; const key = a ? a[0] : k;
+  const mbZone = (zone) => (k) => {
+    const a = SOLID[k]; const key = (a ? a[0] : k) + (zone ? `@${zone}` : '');
     const m = (B[key] ||= new MeshBuilder()); m.tint = a ? a[1] : null; m.seg = opts.rseg || (D >= 2 ? 3 : 2);
     return m;
   };
+  let mb = mbZone(null);
   const colliders = []; const interactables = []; const screens = []; const lights = [];
   const col = (x0, z0, x1, z1) => colliders.push([Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1)]);
   const wallSeg = (x0, z0, x1, z1, mat = 'wall', y0 = 0, y1 = H, collide = true) => {
@@ -176,7 +178,9 @@ export function buildCenter(opts = {}) {
   if (D === 0) mb('dark').box(0, 0.05, -7.9, 24, 0.1, 0.03, { faces: 'Z' });
 
   // ---------------- Corridor & rooms ----------------
-  wallSeg(-12, 8, -12, 18); wallSeg(12, 8, 12, 10.6);
+  // west end of the corridor opens into the Sheriff's Office wing (z 8.3..10.3)
+  wallSeg(-12, 8, -12, 8.3); wallSeg(-12, 10.3, -12, 18); wallSeg(-12, 8.3, -12, 10.3, 'wall', 2.4, H, false); wallSeg(12, 8, 12, 10.6);
+  for (const zz of [8.3, 10.3]) mb('frame').box(-12, 1.2, zz, 0.22, 2.4, 0.08); mb('frame').box(-12, 2.42, 9.3, 0.22, 0.06, 2.08);
   wallSeg(-12, 10.6, -6, 10.6); wallSeg(-4.4, 10.6, -3, 10.6);
   wallSeg(-6, 10.6, -4.4, 10.6, 'wall', 2.3, H, false);
   // supervisor office glass front
@@ -486,12 +490,15 @@ export function buildCenter(opts = {}) {
   mb('fridge').box(10.9, 0.55, 10.2, 0.4, 1.1, 0.4); mb('waterjug').cylinder(10.9, 1.3, 10.2, 0.15, 0.4, 12, { color: [0.6, 0.8, 1] }); col(10.65, 9.95, 11.15, 10.45);
   if (D >= 1) { mb('blue').box(10.86, 0.85, 9.995, 0.04, 0.04, 0.02); mb('red').box(10.94, 0.85, 9.995, 0.04, 0.04, 0.02); mb('dark').box(10.9, 0.62, 10.0, 0.24, 0.02, 0.06); }
   interactables.push({ id: 'water', kind: 'water', label: 'Get a cup of water', min: [10.6, 0, 9.9], max: [11.2, 1.6, 10.5], pri: 0 });
-  for (const [x, t] of [[-11.95, 'RESTROOMS →']]) screen('restsign', 'sign', x + 0.05, 2.3, 9.3, 1.4, 0.24, 'x', 1, 0, { text: t });
+  screen('restsign', 'sign', -11.9, 2.85, 9.3, 2.0, 0.26, 'x', 1, 0, { text: "SHERIFF'S OFFICE · RESTROOMS" });
   if (D >= 1) { // framed prints in the corridor
     for (const x of [-9.5, 6.4, 10.3]) { mb('frame').box(x, 1.65, 10.49, 0.9, 0.65, 0.025); mb(x > 0 ? 'print2' : 'print1').box(x, 1.65, 10.475, 0.8, 0.55, 0.01, { uv: 0 }); }
   }
 
   if (D >= 1) buildLawEnforcement({ mb, col, D });
+  mb = mbZone('wing'); // wing geometry goes in its own batches so it can be culled
+  buildSheriffWing({ mb, col, wallSeg, floor, ceiling, light, door, screen, interactables, tableChair, chair, plant, D, H });
+  mb = mbZone(null);
 
   if (opts.thanksgiving) buildThanksgiving({ mb, col, screen, consoles });
 
@@ -647,6 +654,16 @@ export function buildNavGraph() {
   // director office
   add('dir_door', 7.7, 11.4); add('dir_desk', 9.3, 15.1); add('dir_mid', 8.0, 12.9);
   link('dir_door', 'c_7.7'); link('dir_door', 'dir_mid'); link('dir_mid', 'dir_desk');
+  // Sheriff's Office wing
+  const wx = [-14, -17.4, -20, -24, -26.8, -29];
+  for (const x of wx) add(`w_${x}`, x, 9.3);
+  link('c_-11', 'w_-14'); for (let i = 0; i < wx.length - 1; i++) link(`w_${wx[i]}`, `w_${wx[i + 1]}`);
+  add('rest_m', -13.9, 11.8); link('rest_m', 'w_-14'); add('rest_w', -17.4, 11.8); link('rest_w', 'w_-17.4');
+  add('locker_rm', -24, 12.6); link('locker_rm', 'w_-24');
+  add('brief_door', -14.75, 7.0); link('brief_door', 'w_-14'); add('brief_room', -20.4, 6.8); link('brief_room', 'brief_door');
+  add('brief_lane', -12.95, 4.0); link('brief_lane', 'brief_door'); add('armory_in', -13.9, -1.4); add('armory_mid', -16, -2.6); link('brief_lane', 'armory_in'); link('armory_in', 'armory_mid');
+  add('sheriff_in', -26.8, 6.6); link('sheriff_in', 'w_-26.8');
+  add('garage_in', -31, 9.3); link('garage_in', 'w_-29'); add('garage', -33, 6.0); link('garage', 'garage_in');
   return nodes;
 }
 

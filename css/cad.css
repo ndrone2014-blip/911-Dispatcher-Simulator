@@ -225,3 +225,18 @@
   .cad-bottom-tabs button.active { background: linear-gradient(180deg, #1a3a66, #15294a); box-shadow: inset 0 2px 0 var(--accent); }
 }
 @media (prefers-reduced-motion: reduce) { .line-card, .mon-tab { transition: none; } .line-card:hover { transform: none; } }
+
+/* --- extended CAD detail --- */
+.timers { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: .8em; color: var(--text2); }
+.timers b { font-family: var(--mono); color: var(--text); font-variant-numeric: tabular-nums; }
+.cad-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; padding: 0 10px 6px; font-size: .84em; }
+.cad-grid > div { display: flex; flex-direction: column; padding: 4px 7px; border-radius: 6px; background: #0e1726; border: 1px solid #18263b; min-width: 0; }
+.cad-grid > div.wide { grid-column: 1 / -1; }
+.cad-grid b { font-size: .72em; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; }
+.table.compact td, .table.compact th { padding: 4px 8px; font-size: .95em; }
+.table.compact { margin: 0 0 6px; }
+.hazards { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 10px 8px; }
+.haz { padding: 3px 8px; border-radius: 6px; font-size: .8em; background: #2b2410; border: 1px solid #8a6d1a; color: #f3dfa2; }
+.haz.bad { background: #2d1212; border-color: #a83232; color: #ffc9c4; }
+@container (max-width: 620px) { .cad-grid { grid-template-columns: 1fr; } }
+.table.compact td.mono, .table.compact th { white-space: nowrap; }

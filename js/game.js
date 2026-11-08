@@ -214,6 +214,13 @@ export class Game {
       case 'director_desk': toast(`Helen's desk: budget reports, a framed photo of the 2019 dispatch team, and your file – "${this.career.rank().name}".`, { level: 'info', duration: 6000 }); break;
       case 'shiftboard': toast('Shift board: verify addresses · Little Wabash crossings · Thanksgiving potluck Thursday.', { level: 'info', duration: 6000 }); break;
       case 'console': toast(t.label, { level: 'info' }); break;
+      case 'restroom': this.audio.door?.(); toast(rng.pick(['You wash up and splash some water on your face. Back to the console.', 'Quick restroom break. The hand dryer is louder than a siren.', 'You check yourself in the mirror – headset hair, as usual.']), { level: 'info' }); break;
+      case 'armory': toast(`Armory: ${14} patrol rifles, 8 shotguns, 24 duty pistols, less-lethal launchers, riot shields and helmets. Everything is signed out on the clipboard – Sgt. Hale has the keys.`, { level: 'info', duration: 7000 }); break;
+      case 'briefing': toast(`Roll call: ${sim ? `${sim.incidents.open().length} open incidents · weather ${sim.weather.current()} · ` : ''}watch for farm equipment on IL-14 and deer along the river bottoms. Be safe out there.`, { level: 'info', duration: 7000 }); break;
+      case 'sheriff_desk': toast("The Sheriff's desk: a county map with patrol districts, a stack of warrants to serve, and a coffee mug that says WORLD'S OKAYEST SHERIFF.", { level: 'info', duration: 7000 }); break;
+      case 'evidence': toast('Evidence room: every bag sealed, labeled and logged. Chain of custody is everything.', { level: 'info', duration: 6000 }); break;
+      case 'lockers': toast('Deputy lockers – names on every door, duty bags on the bench. Day shift is gearing up.', { level: 'info' }); break;
+      case 'squad': toast('White County Sheriff Tahoe – lights checked, radio checked, rifle locked in the rack. Ready for patrol.', { level: 'info', duration: 6000 }); break;
       default: break;
     }
   }

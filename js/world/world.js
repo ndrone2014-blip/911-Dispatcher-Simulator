@@ -55,6 +55,7 @@ export class World {
   /** Small per-device adjustments that keep a preset smooth on phones. */
   tunePreset(p) {
     const q = { ...p };
+    q.shadowCap = isTouchDevice() ? 1024 : 4096;
     if (isTouchDevice()) { q.texSize = Math.min(q.texSize, 256); q.dprCap = Math.min(q.dprCap, 1.5); q.screenRes = Math.min(q.screenRes, 512); }
     return q;
   }
@@ -62,18 +63,21 @@ export class World {
   /** Create everything that lives on the GPU. Called on start and after a context restore. */
   setupGPU() {
     this.renderer = new Renderer(this.canvas);
-    this.renderer.setQuality(this.preset.quality);
+    this.renderer.setQuality(this.preset.quality, this.qOverrides());
     this.applyPreset();
     this.makeTextureSet(this.preset.texSize);
     this.unit = {
       box: this.renderer.createMesh(new MeshBuilder().rbox(0, 0, 0, 1, 1, 1, { r: 0.22, seg: 2, uv: 0 }).build()),
       sphere: this.renderer.createMesh(new MeshBuilder().sphere(0, 0, 0, 1, 14, 10).build()),
       disc: this.renderer.createMesh(new MeshBuilder().disc(0, 0, 0, 1, 20).build()),
+      torso: this.renderer.createMesh(taperedTorso()),
     };
     this.renderer.setEnvironment(makeEnvironment(256), 1.0);
     this.renderer.configureShadow(BUILDING_BOUNDS, [0.06, -1, 0.04]);
     this.build();
   }
+
+  qOverrides() { const base = { low: 0, medium: 2048, high: 2048, ultra: 4096 }[this.preset.quality] ?? 0; return { shadows: Math.min(base, this.preset.shadowCap || 4096) }; }
 
   makeTextureSet(size) {
     for (const t of this.ownedTex) this.renderer.deleteTexture(t);
@@ -100,7 +104,7 @@ export class World {
     this.presetName = PRESETS[p] ? p : 'medium';
     this.preset = this.tunePreset(PRESETS[this.presetName]);
     if (!adaptive) { this.renderer.renderScale = 1; this.perf.warmup = 3; }
-    this.renderer.setQuality(this.preset.quality);
+    this.renderer.setQuality(this.preset.quality, this.qOverrides());
     this.applyPreset();
     if (this.texSize !== this.preset.texSize) this.makeTextureSet(this.preset.texSize);
     this.build();
@@ -142,6 +146,10 @@ export class World {
       flagUS: m({ map: t.flagUS, specular: 0.05, doubleSided: true }), flagIL: m({ map: t.flagIL, specular: 0.05, doubleSided: true }),
       seal: m({ map: t.seal, specular: 0.45, shininess: 50, reflect: 0.05 }), lockers: m({ map: t.lockers, specular: 0.45, shininess: 40, reflect: 0.08 }), cork: m({ map: t.cork, specular: 0.03 }),
       gold: m({ color: [0.85, 0.66, 0.22], specular: 0.9, shininess: 70, reflect: 0.3 }),
+      sheriffDoor: m({ map: t.sheriffDoor, specular: 0.6, shininess: 80, reflect: 0.12 }), rollup: m({ map: t.rollup, specular: 0.3, shininess: 30 }),
+      whiteboard: m({ map: t.whiteboard, specular: 0.6, shininess: 90, reflect: 0.1 }), briefing: m({ color: [0.02, 0.02, 0.02], emissiveMap: t.briefing, emissive: [1, 1, 1], reflect: 0.06, shininess: 90 }),
+      mirror: m({ color: [0.25, 0.27, 0.3], specular: 1.0, shininess: 140, reflect: 0.85 }), glassDark: m({ color: [0.04, 0.05, 0.06], specular: 1.0, shininess: 120, reflect: 0.35 }),
+      lightRed: glow([2.2, 0.15, 0.12]), lightBlue: glow([0.15, 0.4, 2.4]), headlight: glow([1.6, 1.6, 1.5]), taillight: glow([1.0, 0.05, 0.04]),
       pumpkin: m({ color: [0.95, 0.42, 0.07], specular: 0.35, shininess: 30 }), stem: m({ color: [0.3, 0.26, 0.1], specular: 0.05 }),
       hay: m({ color: [0.78, 0.6, 0.28], specular: 0.03 }), gourd: m({ color: [0.95, 0.8, 0.25], specular: 0.3 }),
       leafRed: m({ color: [0.72, 0.12, 0.05], specular: 0.1, doubleSided: true }), leafOrange: m({ color: [0.92, 0.42, 0.06], specular: 0.1, doubleSided: true }), leafGold: m({ color: [0.88, 0.64, 0.1], specular: 0.1, doubleSided: true }),
@@ -180,8 +188,9 @@ export class World {
     }
     for (const [key, b] of Object.entries(center.batches)) {
       const mesh = this.renderer.createMesh(b.build());
-      const mat = this.mats[key] || this.screens[key]?.mat || this.mats.satin;
-      this.static.push({ mesh, mat, key });
+      const [base, zone] = key.split('@');
+      const mat = this.mats[base] || this.screens[base]?.mat || this.mats.satin;
+      this.static.push({ mesh, mat, key, zone: zone || null });
     }
     // contact shadows under chairs on Low (Medium+ get real shadow maps)
     if (this.preset.quality === 'low') {
@@ -280,7 +289,7 @@ export class World {
   degrade() {
     const r = this.renderer;
     if (r.renderScale > 0.62) { r.renderScale = Math.max(0.55, Math.round((r.renderScale - 0.15) * 100) / 100); this.updateAdaptiveNote(); return; }
-    if (r.q.bloom || r.q.dynamicShadows || r.q.msaa) { r.setQuality(this.preset.quality, { bloom: false, dynamicShadows: false, msaa: 0, fxaa: true }); this.updateAdaptiveNote(); return; }
+    if (r.q.bloom || r.q.dynamicShadows || r.q.msaa) { r.setQuality(this.preset.quality, { ...this.qOverrides(), bloom: false, dynamicShadows: false, msaa: 0, fxaa: true }); this.updateAdaptiveNote(); return; }
     const i = ORDER.indexOf(this.presetName);
     if (i >= 0 && i < ORDER.length - 1) {
       const from = this.presetName; const to = ORDER[i + 1];
@@ -322,9 +331,13 @@ export class World {
     if (document.hidden) return;
     if (!this.game.cad?.open) this.adapt(dt);
     this.updateScreens(dt);
-    const items = [];
-    for (const s of this.static) items.push(s);
+    const items = []; const all = [];
+    // Zone culling: the Sheriff's wing is only visible from the corridor or from inside it
+    const p = this.player.pos; const wingVisible = p[2] > 7.3 || p[0] < -11.4;
+    for (const s of this.static) { all.push(s); if (s.zone !== 'wing' || wingVisible) items.push(s); }
+    const before = items.length;
     this.npcs.draw(items, this.unit, (color, spec = 0.12) => ({ color, specular: spec, shininess: 20 }));
+    for (let i = before; i < items.length; i++) all.push(items[i]);
     // soft contact shadow under every person
     this.npcs.npcs.forEach((n, i) => {
       const b = (this.blobs[i] ||= { model: mat4(), mesh: this.unit.disc, mat: this.mats.blob, order: -5 });
@@ -332,8 +345,15 @@ export class World {
       trs(b.model, n.x, 0.009, n.z, 0, 0, n.sitting ? 0.42 : 0.32, 1, n.sitting ? 0.42 : 0.32); items.push(b);
     });
     const cam = { pos: this.player.pos, yaw: this.player.yaw, pitch: this.player.pitch, fov: this.game.settings.data.graphics.fov || 72, near: 0.04, far: 150 };
-    this.renderer.render({ items, env: this.env(), points: this.points }, cam);
+    this.renderer.render({ items, shadowItems: all, env: this.env(), points: this.points }, cam);
   }
+}
+
+/** Unit torso: rounded box that widens toward the shoulders and slims at the waist. */
+function taperedTorso() {
+  const b = new MeshBuilder().rbox(0, 0, 0, 1, 1, 1, { r: 0.24, seg: 3, uv: 0 });
+  for (let i = 0; i < b.p.length; i += 3) { const y = b.p[i + 1] + 0.5; const sx = 0.8 + 0.22 * Math.min(1, y * 1.3), sz = 0.86 + 0.14 * y; b.p[i] *= sx; b.p[i + 2] *= sz; }
+  return b.build();
 }
 
 function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }

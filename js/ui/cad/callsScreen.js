@@ -1,4 +1,5 @@
 // Call-taking screen: lines, transcript, speech/text input, suggestions, info form.
+import { aniDetail, latLon } from './cadDetail.js';
 import { Screen } from './cad.js';
 import { bus } from '../../core/events.js';
 import { el, bindActions, toast } from '../dom.js';
@@ -123,7 +124,12 @@ export class CallsScreen extends Screen {
       ${c.status === 'active' ? '<button class="btn sm warn" data-act="hold">Hold</button>' : ''}${c.status === 'hold' ? '<button class="btn sm good" data-act="resume">Resume</button>' : ''}
       ${live ? '<button class="btn sm danger" data-act="end" title="End call (F4)">End call</button>' : ''}${c.status === 'abandoned' || c.status === 'ended' ? '<button class="btn sm" data-act="callback">↩ Call back</button>' : ''}`;
     const a = c.sc.ani;
-    this.r('ani').innerHTML = `<b>ANI</b><span>${esc(a.phone)} · ${esc(a.name)} · ${a.kind.toUpperCase()}</span><b>ALI</b><span>${esc(a.address)}${a.radius ? ` <span class="dim">(±${a.radius}m)</span>` : ''}</span>${persona ? `<b>VOICE</b><span class="dim">${c.sc.caller.sex === 'f' ? 'Female' : 'Male'} · sounds ${persona.toLowerCase()}</span>` : ''}`;
+    const ad = aniDetail(a);
+    this.r('ani').innerHTML = `<b>ANI</b><span>${esc(a.phone)} · ${esc(a.name)} · ${a.kind.toUpperCase()}</span><b>ALI</b><span>${esc(a.address)}${a.radius ? ` <span class="dim">(±${a.radius}m)</span>` : ''}</span>`
+      + `<b>COS</b><span>${ad.cos} · ${esc(ad.carrier)}${ad.tower ? ` · ${esc(ad.tower)}` : ''}</span>`
+      + (ad.j ? `<b>LOC</b><span>${latLon(ad.j)} <span class="dim">· ${esc(ad.confidence)}</span></span><b>ESN</b><span>${ad.j.esn} · ${esc(ad.j.law)} · ${esc(ad.j.fireShort)} · ${esc(ad.j.emsShort)} · grid ${esc(ad.j.grid)}</span>` : '')
+      + `<b>PSAP</b><span class="dim">${esc(ad.psap)} · callback ${esc(ad.callback)}</span>`
+      + (persona ? `<b>VOICE</b><span class="dim">${c.sc.caller.sex === 'f' ? 'Female' : 'Male'} · sounds ${persona.toLowerCase()}</span>` : '');
     // transcript – append incrementally
     const tbox = this.r('transcript'); const scroll = this.r('tscroll');
     const atBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 60;

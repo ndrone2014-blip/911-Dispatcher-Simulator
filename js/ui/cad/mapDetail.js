@@ -27,7 +27,7 @@ function segInter(a, b, c, d) {
 }
 
 // Roughly where White County's townships sit (labels only).
-const TOWNSHIPS = [
+export const TOWNSHIPS = [
   ['MILL SHOALS TWP', 1900, 900], ['BURNT PRAIRIE TWP', 4300, 1500], ['GRAY TWP', 9900, 1000], ['INDIAN CREEK TWP', 1600, 3800],
   ['ENFIELD TWP', 2700, 5000], ['CARMI TWP', 6100, 4800], ['PHILLIPS TWP', 9600, 3500], ['HERALDS PRAIRIE TWP', 3700, 8300],
   ['HAWTHORNE TWP', 7600, 6700], ['EMMA TWP', 9300, 8000],
