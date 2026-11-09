@@ -5,7 +5,7 @@ import { MeshBuilder } from '../engine/geometry.js';
 import { makeTextures, makeCanvas, makeEnvironment, makeBlob, makeFace } from '../engine/textures.js';
 import { forwardOf, rayAABB, trs, mat4 } from '../engine/math.js';
 import { buildCenter, consoleList, PLAYER_CONSOLE, BUILDING_BOUNDS, OUTDOOR_BOUNDS } from './building.js';
-import { PD } from './policeDept.js';
+import { PD, inStairBox } from './policeDept.js';
 import { DynamicDoors } from './doors.js';
 import { Weather3D } from './weather3d.js';
 import { makeSignAtlas } from './exterior.js';
@@ -163,7 +163,7 @@ export class World {
       rack: m({ color: [0.1, 0.1, 0.1], emissiveMap: t.rack, emissive: [1, 1, 1] }),
       books: m({ map: t.books }),
       flagUS: m({ map: t.flagUS, specular: 0.05, doubleSided: true }), flagIL: m({ map: t.flagIL, specular: 0.05, doubleSided: true }),
-      seal: m({ map: t.seal, specular: 0.45, shininess: 50, reflect: 0.05 }), lockers: m({ map: t.lockers, specular: 0.45, shininess: 40, reflect: 0.08 }), cork: m({ map: t.cork, specular: 0.03 }),
+      seal: m({ map: t.seal, specular: 0.45, shininess: 50, reflect: 0.05 }), lockers: m({ map: t.lockers, specular: 0.45, shininess: 40, reflect: 0.08 }), cork: m({ map: t.cork, specular: 0.03 }), pdDecor: m({ map: t.pdDecor, specular: 0.3, shininess: 60, reflect: 0.04 }),
       gold: m({ color: [0.85, 0.66, 0.22], specular: 0.9, shininess: 70, reflect: 0.3 }), rangeTarget: m({ map: t.rangeTarget, specular: 0.02, doubleSided: true, noCast: true }),
       sheriffDoor: m({ map: t.sheriffDoor, specular: 0.6, shininess: 80, reflect: 0.12 }), rollup: m({ map: t.rollup, specular: 0.3, shininess: 30 }),
       whiteboard: m({ map: t.whiteboard, specular: 0.6, shininess: 90, reflect: 0.1 }), briefing: m({ color: [0.02, 0.02, 0.02], emissiveMap: t.briefing, emissive: [1, 1, 1], reflect: 0.06, shininess: 90 }),
@@ -226,7 +226,7 @@ export class World {
     for (const s of center.screens) {
       const canvas = this.painter.canvasFor(s);
       this.painter.paint(s, canvas, g);
-      const texture = this.renderer.createTexture(canvas, { repeat: false, mipmap: s.kind === 'sign' || s.kind === 'board' });
+      const texture = this.renderer.createTexture(canvas, { repeat: false, mipmap: s.kind === 'sign' || s.kind === 'board' || s.kind === 'signAtlas' });
       const mat = s.unlit ? { color: [1, 1, 1], map: texture, unlit: true, noCast: true, fogMode: s.sky ? 1 : 0, transparent: !!s.transparent, receive: false } : { color: [0.01, 0.01, 0.012], emissiveMap: texture, emissive: [1, 1, 1], specular: 0.12, shininess: 90, reflect: 0.06 };
       this.screens[s.key] = { def: s, canvas, texture, mat, last: -99 };
     }
@@ -262,9 +262,9 @@ export class World {
     const rects = [[PD.x0, PD.z0, PD.x1, PD.z1], [-12, -8, 12, 16], [-12, 16, -3, 18], [-42, -2, -12, 18], [-30, -8, -12, -2], [-22, -26, -12, -8]];
     return !rects.some(([x0, z0, x1, z1]) => x > x0 - 0.05 && x < x1 + 0.05 && z > z0 - 0.05 && z < z1 + 0.05);
   }
-  inStairwell(p = this.player.pos) { return (p[0] > 5 && p[0] < 8.6 && p[2] > -15 && p[2] < -8) || (p[0] > -12 && p[0] < -8.6 && p[2] > -25.6 && p[2] < -19.4); }
+  inStairwell(p = this.player.pos) { return inStairBox(p[0], p[2]); }
   /** In or just outside a stairwell door: the other floor is visible through the stair opening. */
-  nearStairwell(p = this.player.pos, m = 3.5) { return (p[0] > 5 - m && p[0] < 8.6 + m && p[2] > -15 - m && p[2] < -8 + m) || (p[0] > -12 - m && p[0] < -8.6 + m && p[2] > -25.6 - m && p[2] < -19.4 + m); }
+  nearStairwell(p = this.player.pos, m = 3.5) { return inStairBox(p[0], p[2], m); }
 
   seatPose() {
     const c = consoleList()[PLAYER_CONSOLE];
@@ -356,9 +356,13 @@ export class World {
     const o = this.player.pos, d = forwardOf(this.player.yaw, this.player.pitch);
     const lv = this.level(); const feet = this.player.feet;
     let best = null, bd = 2.6;
+    // walls and glass block interaction: nothing can be used through a wall (thin, tall static colliders)
+    if (this._occFor !== this.colliders) { this._occFor = this.colliders; this._occ = this.colliders.filter((c) => (c[2] - c[0] <= 0.35 || c[3] - c[1] <= 0.35) && (c[5] ?? 3.6) - (c[4] ?? 0) >= 1.4).map((c) => [[c[0], c[4] ?? 0, c[1]], [c[2], c[5] ?? 3.6, c[3]]]); }
+    let wallT = 2.8; for (const [mn, mx] of this._occ) { if (mx[0] < o[0] - 3 || mn[0] > o[0] + 3 || mx[2] < o[2] - 3 || mn[2] > o[2] + 3) continue; if (mn[0] < o[0] && mx[0] > o[0] && mn[1] < o[1] && mx[1] > o[1] && mn[2] < o[2] && mx[2] > o[2]) continue; const t = rayAABB(o, d, mn, mx); if (t >= 0 && t < wallT) wallT = t; }
     const consider = (it) => {
       if (it.max[1] < feet - 0.4 || it.min[1] > feet + 2.4) return; // other floor
       const t = rayAABB(o, d, it.min, it.max);
+      if (t > wallT + 0.04) return;
       if (t >= 0 && (t < bd - 0.15 || (best && Math.abs(t - bd) < 0.15 && (it.pri || 0) > (best.pri || 0)))) { bd = t; best = it; }
     };
     for (const it of this.interactablesStatic) { if (it.dynamic) continue; consider(it); }

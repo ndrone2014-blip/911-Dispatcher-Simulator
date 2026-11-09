@@ -4,21 +4,31 @@
 // canopy and the site around the front door. Unlit with lighting baked into the vertex
 // colours (like the rest of the outdoor scene) so it costs a few draw calls and no lights.
 import { MeshBuilder } from '../engine/geometry.js';
-import { PD, ENTRANCE } from './policeDept.js';
+import { PD, ENTRANCE, PD_FACADE } from './policeDept.js';
 
 const STONE = [0.78, 0.75, 0.68], FRAME = [0.16, 0.15, 0.14], COPING = [0.72, 0.7, 0.66], ROOFTRIM = [0.3, 0.31, 0.33];
+
+/** The PD's four facades from PD_FACADE (ground + 2nd floor openings), split where the range wing abuts the west wall. */
+function pdSegments() {
+  const P = PD; const F2 = P.F2;
+  const ops = (face, a0, a1) => PD_FACADE[face].map(([lv, [a, b, sill, head, kind]]) => [a, b, sill + (lv ? F2 : 0), head + (lv ? F2 : 0), kind === 'door' ? 'door' : 'win']).filter(([a, b]) => a >= a0 - 1e-6 && b <= a1 + 1e-6);
+  const RANGE_Z = -26; // the one-story range wing covers the PD's west wall south of here
+  return [
+    { ax: 'z', c: P.z0, a: P.x0, b: P.x1, out: -1, y0: 0, y1: P.ROOF, open: ops('N', P.x0, P.x1) },
+    { ax: 'x', c: P.x1, a: P.z0, b: P.z1, out: 1, y0: 0, y1: P.ROOF, open: ops('E', P.z0, P.z1) },
+    { ax: 'x', c: P.x0, a: P.z0, b: RANGE_Z, out: -1, y0: 0, y1: P.ROOF, open: ops('W', P.z0, RANGE_Z) },
+    { ax: 'x', c: P.x0, a: RANGE_Z, b: P.z1, out: -1, y0: 4.2, y1: P.ROOF, open: ops('W', RANGE_Z, P.z1) },
+    { ax: 'z', c: P.z1, a: P.x0, b: P.x1, out: 1, y0: 4.2, y1: P.ROOF, open: ops('S', P.x0, P.x1) },
+  ];
+}
 
 // Every exterior wall: line, outward normal, vertical range, openings [a0, a1, y0, y1, kind]
 function segments() {
   const P = PD; const F2 = P.F2; const W1 = (a, b, y0 = 0.85, y1 = 2.75) => [a, b, y0, y1, 'win'];
   const W2 = (a, b) => [a, b, F2 + 0.85, F2 + 2.75, 'win'];
   return [
-    // Police Department (two stories)
-    { ax: 'z', c: P.z0, a: P.x0, b: P.x1, out: -1, y0: 0, y1: P.ROOF, open: [W1(2, 3.4), W1(4.6, 6.6, 0.45, 3.0), W1(9.6, 11.4, 0.45, 3.0), W2(-11, -9), W2(-8, -6), W2(-4.2, -1.4), W2(0.6, 3.2), W2(5, 7.6), W2(8.4, 11)] },
-    { ax: 'x', c: P.x1, a: P.z0, b: P.z1, out: 1, y0: 0, y1: P.ROOF, open: [W1(-39.4, -36, 0.3, 3.1), [ENTRANCE[0], ENTRANCE[1], 0, 2.45, 'door'], W1(-32, -28.6, 0.3, 3.1), W1(-26.4, -23.2), W1(-20.4, -17.2), W1(-13.6, -10.6), W2(-38.6, -36), W2(-32.6, -29.4), W2(-26.4, -23.2), W2(-20.4, -17.2), W2(-13.6, -10.6)] },
-    { ax: 'x', c: P.x0, a: P.z0, b: -26, out: -1, y0: 0, y1: P.ROOF, open: [W2(-39, -36.6), W2(-31.6, -29.2)] },
-    { ax: 'x', c: P.x0, a: -26, b: P.z1, out: -1, y0: 4.2, y1: P.ROOF, open: [W2(-14.2, -11.8), W2(-10.6, -8.6)] },
-    { ax: 'z', c: P.z1, a: P.x0, b: P.x1, out: 1, y0: 4.2, y1: P.ROOF, open: [W2(-11.2, -9), W2(-5.8, -3.6), W2(0, 3.4), W2(9.4, 11.4)] },
+    // Police Department (two stories) – openings come from the same list the interior walls use
+    ...pdSegments(),
     // 911 center
     { ax: 'x', c: 12, a: -7.48, b: 16, out: 1, y0: 0, y1: 4.2, open: [W1(-6.6, -3.0, 0.9, 2.8), W1(-1.8, 1.8, 0.9, 2.8), W1(3.0, 6.6, 0.9, 2.8), W1(11.4, 15.2, 0.9, 2.8)] },
     { ax: 'z', c: 16, a: -3, b: 12, out: 1, y0: 0, y1: 4.2, open: [] },
@@ -101,8 +111,8 @@ export function buildShell({ D = 1 } = {}) {
   for (const s of segments()) parapet(s, s.y1);
   // rooftop: HVAC units, exhausts, radio mast with antennas, satellite dishes, roof hatches
   const hvac = (x, z, w = 2.4, d = 1.6, y = 4.2) => { ext.box(x, y + 0.6, z, w, 1.2, d, { color: [0.66, 0.67, 0.68], uv: 0 }); ext.box(x, y + 1.22, z, w + 0.04, 0.04, d + 0.04, { color: [0.55, 0.56, 0.57], uv: 0 }); if (D >= 1) for (let i = 0; i < 2; i++) ext.cylinder(x - w / 4 + i * w / 2, y + 1.27, z, 0.42, 0.06, 14, { color: [0.2, 0.21, 0.22] }); };
-  hvac(-5, -2); hvac(5, 4); hvac(-26, 6); hvac(-36, 10, 3.2, 2); hvac(-18, -18, 2.0, 1.4); hvac(-6, -28, 3.0, 2.0, PD.ROOF); hvac(4, -16, 3.0, 2.0, PD.ROOF); hvac(-4, -16, 2.0, 1.4, PD.ROOF);
-  for (const [x, z, y] of [[0, 8, 4.2], [-20, 14, 4.2], [8, -34, PD.ROOF], [-10, -12, PD.ROOF]]) { ext.cylinder(x, y + 0.5, z, 0.18, 1.0, 10, { color: [0.6, 0.6, 0.62] }); ext.cylinder(x, y + 1.05, z, 0.26, 0.1, 10, { color: [0.5, 0.5, 0.52], r2: 0.1 }); }
+  hvac(-5, -2); hvac(5, 4); hvac(-26, 6); hvac(-36, 10, 3.2, 2); hvac(-18, -18, 2.0, 1.4); hvac(-6, -28, 3.0, 2.0, PD.ROOF); hvac(4, -16, 3.0, 2.0, PD.ROOF); hvac(-4, -16, 2.0, 1.4, PD.ROOF); hvac(-6, -48, 3.0, 2.0, PD.ROOF); hvac(5, -52, 2.4, 1.6, PD.ROOF);
+  for (const [x, z, y] of [[0, 8, 4.2], [-20, 14, 4.2], [8, -34, PD.ROOF], [-10, -12, PD.ROOF], [-9, -56, PD.ROOF], [1, -42, PD.ROOF]]) { ext.cylinder(x, y + 0.5, z, 0.18, 1.0, 10, { color: [0.6, 0.6, 0.62] }); ext.cylinder(x, y + 1.05, z, 0.26, 0.1, 10, { color: [0.5, 0.5, 0.52], r2: 0.1 }); }
   { // lattice radio mast on the PD roof (dispatch antennas)
     const mx = 9, mz = -12, y0 = PD.ROOF, H = 14; const leg = [0.32, 0.33, 0.35];
     for (const [dx, dz] of [[-0.45, -0.3], [0.45, -0.3], [0, 0.45]]) ext.cylinder(mx + dx, y0 + H / 2, mz + dz, 0.04, H, 5, { color: leg, caps: false });
@@ -115,7 +125,7 @@ export function buildShell({ D = 1 } = {}) {
     glow.sphere(mx, y0 + H + 2.05, mz, 0.12, 6, 4, { color: [1.4, 0.06, 0.04] }); glow.sphere(mx, y0 + H * 0.55, mz + 0.45, 0.08, 6, 4, { color: [1.4, 0.06, 0.04] });
     for (const [x, z, a] of [[6, -36, 0.6], [-9, -36, 2.2]]) { ext.cylinder(x, PD.ROOF + 0.5, z, 0.06, 1.0, 6, { color: leg }); ext.sphere(x, PD.ROOF + 1.2, z, 0.55, 12, 6, { color: [0.86, 0.86, 0.85], sy: 0.35 }); void a; }
   }
-  for (const [x, z, y] of [[2, -24, PD.ROOF], [-30, 2, 4.2]]) ext.box(x, y + 0.25, z, 1.0, 0.5, 1.0, { color: ROOFTRIM, uv: 0 });
+  for (const [x, z, y] of [[2, -24, PD.ROOF], [-30, 2, 4.2], [-3, -44, PD.ROOF]]) ext.box(x, y + 0.25, z, 1.0, 0.5, 1.0, { color: ROOFTRIM, uv: 0 });
   // entrance canopy on two round columns, with downlights and the department sign above it
   { const z0 = ENTRANCE[0] - 1.4, z1 = ENTRANCE[1] + 1.4, x1 = 15.0;
     ext.box((12 + x1) / 2 + 0.13, 3.25, (z0 + z1) / 2, x1 - 12 + 0.26, 0.36, z1 - z0, { color: [0.82, 0.8, 0.76], uv: 0 });

@@ -28,8 +28,40 @@ export class ScreenPainter {
       case 'shiftboard': return makeCanvas(512, 256);
       case 'sign': return textTexture(s.text || '', { w: s.small ? 256 : 1024, h: s.small ? 64 : 64, bg: s.small ? '#10151d' : '#0b1626', fg: s.small ? '#64d2ff' : '#dfe8f5', font: s.small ? 'bold 26px system-ui' : 'bold 38px system-ui' });
       case 'banner': return this.bannerCanvas(s.text || '', s.w / s.h);
+      case 'signAtlas': return this.signAtlas(s);
       default: return makeCanvas(64, 64);
     }
+  }
+
+  /** Every Police Department sign in one texture: room plaques, directories, hanging and warning signs. */
+  signAtlas(s) {
+    const c = makeCanvas(s.atlasW, s.atlasH); const g = c.getContext('2d');
+    g.fillStyle = '#0b1626'; g.fillRect(0, 0, s.atlasW, s.atlasH);
+    const ST = {
+      room: { bg: '#102542', fg: '#f1f5fb', bar: '#c9a24a' }, dir: { bg: '#0f2340', fg: '#eef3fa', bar: '#c9a24a' }, hang: { bg: '#13294b', fg: '#ffffff', bar: '#3da5ff' },
+      warn: { bg: '#7d1515', fg: '#ffffff', bar: '#f2c230' }, brass: { bg: '#b8913e', fg: '#2a1c06', bar: '#7a5a1c' }, light: { bg: '#e9edf2', fg: '#14284a', bar: '#14284a' }, big: { bg: '#0b1a30', fg: '#e8eef8', bar: '#c9a24a' },
+    };
+    for (const it of s.items) {
+      const st = ST[it.style] || ST.room; const { x, y, w, h } = it; const pad = Math.max(3, Math.round(h * 0.07));
+      g.fillStyle = st.bg; g.fillRect(x, y, w, h);
+      g.fillStyle = st.bar; if (it.style === 'dir') g.fillRect(x, y, w, Math.round(h * 0.03) + 2); else g.fillRect(x, y + h - pad, w, pad);
+      g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = 2; g.strokeRect(x + 2, y + 2, w - 4, h - 4);
+      const rows = String(it.text).split('\n'); g.fillStyle = st.fg; g.textBaseline = 'middle';
+      if (rows.length === 1) {
+        let size = Math.round(h * 0.56); g.font = `800 ${size}px system-ui, sans-serif`;
+        while (g.measureText(rows[0]).width > w - pad * 4 && size > 8) { size -= 1; g.font = `800 ${size}px system-ui, sans-serif`; }
+        g.textAlign = 'center'; g.fillText(rows[0], x + w / 2, y + h / 2 - pad / 2 + 1);
+      } else {
+        const head = Math.round(h / (rows.length + 0.8)); const lh = (h - head - pad * 2) / (rows.length - 1);
+        let size = Math.round(head * 0.62); g.font = `900 ${size}px system-ui, sans-serif`; while (g.measureText(rows[0]).width > w - pad * 4 && size > 8) { size -= 1; g.font = `900 ${size}px system-ui, sans-serif`; }
+        g.textAlign = 'center'; g.fillText(rows[0], x + w / 2, y + pad + head / 2);
+        g.fillStyle = st.bar; g.fillRect(x + pad * 2, y + pad + head - 2, w - pad * 4, 2); g.fillStyle = st.fg;
+        let sz = Math.round(lh * 0.58); g.font = `700 ${sz}px system-ui, sans-serif`;
+        const widest = rows.slice(1).reduce((m, r) => Math.max(m, g.measureText(r).width), 0); if (widest > w - pad * 5) { sz = Math.max(7, Math.floor(sz * (w - pad * 5) / widest)); g.font = `700 ${sz}px system-ui, sans-serif`; }
+        g.textAlign = 'left'; rows.slice(1).forEach((r, i) => g.fillText(r, x + pad * 2.5, y + pad + head + lh * (i + 0.5)));
+      }
+    }
+    return c;
   }
 
   /** Festive autumn banner: bunting flags, leaves and cream lettering on a harvest gradient. */

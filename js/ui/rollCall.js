@@ -5,6 +5,7 @@ import { esc } from '../core/util.js';
 import { LEADERS } from '../sim/department.js';
 import { bus } from '../core/events.js';
 import { STAFF } from '../ai/staffDialogue.js';
+import { PD_ROOMS } from '../world/policeDept.js';
 
 const WHO = { captain: LEADERS.captain, watch: LEADERS.watch, chief: LEADERS.fireChief, karen: LEADERS.supervisor, hale: LEADERS.range };
 for (const s of STAFF) if (!WHO[s.id]) WHO[s.id] = { id: s.id, name: s.name, short: s.name.split(' ').slice(-1)[0], sex: s.sex, pitch: s.pitch, rate: s.rate };
@@ -64,7 +65,8 @@ export function openSchedule(game) {
 export class LiveBriefing {
   constructor(game, ev) {
     this.game = game; this.ev = ev; this.i = 0; this.wait = 0; this.done = false; this.started = false; this.t = 0;
-    this.room = { rollcall: [2, -21.5, 0, 9], briefing: [2, -21.5, 0, 9], training: [-17, -10, 0, 10], meeting: [8.2, -34.2, 4, 9] }[ev.kind] || [2, -21.5, 0, 9];
+    const rc = PD_ROOMS.rollcall, cf = PD_ROOMS.conference; const RC = [rc.c[0], rc.c[1], rc.y, rc.r];
+    this.room = { rollcall: RC, briefing: RC, training: [-17, -10, 0, 10], meeting: [cf.c[0], cf.c[1], cf.y, cf.r] }[ev.kind] || RC;
     this.people = game.world?.npcs?.gather?.(ev.kind) || [];
     this.log = [];
   }

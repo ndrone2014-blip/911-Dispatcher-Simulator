@@ -10,6 +10,7 @@ import { LocalLLM } from './ai/llm.js';
 import { StaffDialogue, STAFF } from './ai/staffDialogue.js';
 import { AudioSystem } from './audio/audio.js';
 import { World } from './world/world.js';
+import { PD_ROOMS } from './world/policeDept.js';
 import { CAD } from './ui/cad/cad.js';
 import { CallsScreen } from './ui/cad/callsScreen.js';
 import { IncidentsScreen } from './ui/cad/incidentsScreen.js';
@@ -237,6 +238,7 @@ export class Game {
       case 'briefing': this.releasePointer(); if (sim?.state.lastBriefing) openBriefing(this, sim.state.lastBriefing, { live: false }); else openSchedule(this); break;
       case 'sheriff_desk': toast("The Sheriff's desk: a county map with patrol districts, a stack of warrants to serve, and a coffee mug that says WORLD'S OKAYEST SHERIFF.", { level: 'info', duration: 7000 }); break;
       case 'evidence': toast('Evidence room: every bag sealed, labeled and logged. Chain of custody is everything.', { level: 'info', duration: 6000 }); break;
+      case 'directory': toast(t.floor ? 'Floor 2: the CAPTAIN, Assistant Chief and Chief are off the Command Hall (spine corridor, then right). Conference room and Administration are along corridor M2; Training, Major Case and Payroll are up the spine; the Detectives are across corridor M2.' : 'Floor 1: Lobby, Front Desk and Records are on the main corridor. Roll Call, Watch Command, the Sergeants, locker rooms, Report Writing and Evidence are up the spine corridor. Interview and Investigation rooms open off the main corridor; the Gun Room and Break Room are on corridor S. Command staff (Chief, Captain) are upstairs.', { level: 'info', title: '🧭 Building directory', duration: 9000 }); break;
       case 'lockers': toast('Deputy lockers – names on every door, duty bags on the bench. Day shift is gearing up.', { level: 'info' }); break;
       case 'squad': toast('County Sheriff patrol SUV – lights checked, radio checked, rifle locked in the rack. Ready for patrol.', { level: 'info', duration: 6000 }); break;
       default: break;
@@ -463,8 +465,8 @@ export class Game {
     const near = (x, z, y, r) => w.seats.map((s, i) => ({ s, i })).filter(({ s }) => Math.hypot(s.x - x, s.z - z) < r && Math.abs(s.y - y - 0.47) < 0.3 && !w.npcs.npcs.some((n) => n.sitting && Math.hypot(n.x - s.x, n.z - s.z) < 0.4) && !w.npcs.reserved.has(w.npcs.nearestNode(s.x, s.z, y).id));
     let pick = null;
     if (ev.kind === 'training') { p.pos = [-15.5, 1.65, -9.6]; p.feet = 0; p.yaw = 0; }
-    else if (ev.kind === 'meeting') { pick = near(8.2, -34.2, 4, 3.4).sort((a, b) => b.s.z - a.s.z)[0]; p.pos = [10.6, 5.65, -31]; p.feet = 4; }
-    else { pick = near(2, -20.4, 0, 3.6).sort((a, b) => b.s.z - a.s.z)[0]; p.pos = [3.8, 1.65, -18.4]; p.feet = 0; p.yaw = 0.2; }
+    else if (ev.kind === 'meeting') { const R = PD_ROOMS.conference; pick = near(R.c[0], R.c[1], R.y, 3.6).sort((a, b) => b.s.z - a.s.z)[0]; p.pos = [R.stand[0], R.y + 1.65, R.stand[1]]; p.feet = R.y; p.yaw = R.stand[2]; }
+    else { const R = PD_ROOMS.rollcall; pick = near(R.c[0], R.c[1], R.y, 5.2).sort((a, b) => a.s.x - b.s.x)[0]; p.pos = [R.stand[0], R.y + 1.65, R.stand[1]]; p.feet = R.y; p.yaw = R.stand[2]; }
     p.pitch = 0.02;
     if (pick) p.sitInSeat(pick.s, w.allColliders());
     this.lockPointer();

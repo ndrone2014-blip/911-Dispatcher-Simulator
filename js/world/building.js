@@ -20,9 +20,9 @@ export const H = 3.6; // ceiling height
 export const CONSOLE_XS = [-8.4, -2.8, 2.8, 8.4];
 export const ROW_ZS = [-3.2, 1.8];
 export const PLAYER_CONSOLE = 1;
-export const BUILDING_BOUNDS = [-42.2, 0, -40.2, 12.2, 8.0, 18.2];
+export const BUILDING_BOUNDS = [-42.2, 0, -60.2, 12.2, 8.0, 18.2];
 // Where you can walk outside: the patrol lot, Main Cross St sidewalk, the lawn and the side streets.
-export const OUTDOOR_BOUNDS = [-62, -62, 40.6, 44.5];
+export const OUTDOOR_BOUNDS = [-62, -82, 40.6, 44.5];
 
 // material key -> [shared batch, vertex colour]
 const SOLID = {
@@ -532,7 +532,7 @@ export function buildCenter(opts = {}) {
   mb = mbZone(null);
 
   // ---------------- Police Department (two stories, north of the floor) ----------------
-  buildPoliceDept({ mbZone, col, screen, interactables, lights, seats, doors, nav, D });
+  const pdLayout = buildPoliceDept({ mbZone, col, screen, screens, interactables, lights, seats, doors, nav, D });
   // the outside of the whole complex
   { const S = buildShell({ D: opts.extDetail ?? D }); B['extBrick@out'] = S.brick; B['extRoof@out'] = S.roof; B['ext2@out'] = S.ext; B['extGlow2@out'] = S.glow;
     for (const sg of S.signs) screen(sg.id, 'sign', sg.x, sg.y, sg.z, sg.w, sg.h, sg.axis, sg.sign, 0, { text: sg.text });
@@ -544,7 +544,7 @@ export function buildCenter(opts = {}) {
   seats.forEach((st, i) => { st.id = `seat_${i}`; interactables.push({ id: st.id, kind: 'seat', seat: i, label: st.label || 'Sit down', min: [st.x - 0.27, st.y - 0.15, st.z - 0.27], max: [st.x + 0.27, st.y + 0.42, st.z + 0.27], pri: 0, zone: st.zone }); });
   for (const d of doors) if (d.kind === 'stall') interactables.push({ id: d.id, kind: 'door', door: d.id, label: 'Open / close the stall door', min: [0, 0, 0], max: [0, 0, 0], pri: 2, dynamic: true });
 
-  return { batches: B, colliders, interactables, screens, lights, consoles, seats, doors, nav, walk: pdWalk() };
+  return { batches: B, colliders, interactables, screens, lights, consoles, seats, doors, nav, walk: pdWalk(), pdLayout };
 }
 
 

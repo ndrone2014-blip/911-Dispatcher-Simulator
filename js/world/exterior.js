@@ -306,12 +306,13 @@ export function buildExterior({ D = 1 } = {}) {
   flat(-260, -230, -90, 270, -0.14, C.grass);
   // Police Department frontage: entrance plaza, staff lot north of the PD with a drive to the street
   flat(12.1, -38.6, 15.3, -29.4, -0.115, C.concrete);
-  flat(-14, -60, 15.3, -44, -0.115, C.asphalt); box(0.6, -0.06, -44, 29.4, 0.14, 0.18, C.curb); box(0.6, -0.06, -60, 29.4, 0.14, 0.18, C.curb);
-  flat(15.3, -60, 31, -52, -0.114, C.asphalt2);                                       // drive out to Main Cross St
-  flat(-14, -44, 12.1, -40.3, -0.12, C.grass2); flat(-14, -40.3, 12.1, -40.1, -0.11, C.concrete);
-  for (let k = 0; k < 11; k++) { const x = -12 + k * 2.6; box(x, -0.1, -52, 0.1, 0.02, 15.6, C.white, { faces: 'Y' }); if (k < 10 && r() < 0.7) car(x + 1.3, k % 2 ? -47.6 : -56.4, k % 2 ? Math.PI / 2 : -Math.PI / 2, k < 4 ? [0.08, 0.1, 0.18] : pick(C.car), k < 3 ? 'patrol' : r() < 0.3 ? 'pickup' : 'sedan'); }
-  for (const z of [-46, -58]) streetLight(2, z, [1, 0], 8);
-  for (let x = -12; x < 12; x += 3.2) shrub(x + 1.2, -42.2, 0.8);
+  flat(-14, -80, 15.3, -64, -0.115, C.asphalt); box(0.6, -0.06, -64, 29.4, 0.14, 0.18, C.curb); box(0.6, -0.06, -80, 29.4, 0.14, 0.18, C.curb);
+  flat(15.3, -80, 31, -72, -0.114, C.asphalt2);                                       // drive out to Main Cross St
+  flat(-14, -64, 12.1, -60.3, -0.12, C.grass2); flat(-14, -60.3, 12.1, -60.1, -0.11, C.concrete); flat(12.1, -60.3, 14.2, -38.6, -0.12, C.concrete); flat(14.2, -60.3, 15.3, -38.6, -0.12, C.mulch);
+  for (let k = 0; k < 11; k++) { const x = -12 + k * 2.6; box(x, -0.1, -72, 0.1, 0.02, 15.6, C.white, { faces: 'Y' }); if (k < 10 && r() < 0.7) car(x + 1.3, k % 2 ? -67.6 : -76.4, k % 2 ? Math.PI / 2 : -Math.PI / 2, k < 4 ? [0.08, 0.1, 0.18] : pick(C.car), k < 3 ? 'patrol' : r() < 0.3 ? 'pickup' : 'sedan'); }
+  for (const z of [-66, -78]) streetLight(2, z, [1, 0], 8);
+  for (let x = -12; x < 12; x += 3.2) shrub(x + 1.2, -62.2, 0.8);
+  for (let z = -58; z < -40; z += 2.6) shrub(14.75, z + r() * 0.6, 0.8 + r() * 0.3);
   // bollards at the entrance plaza + a bike rack
   for (const z of [-38.2, -36.6, -31.4, -29.8]) { ext.cylinder(15.0, 0.45, z, 0.11, 0.9, 10, { color: [0.85, 0.83, 0.79] }); col(14.85, z - 0.15, 15.15, z + 0.15, 1); }
   for (let i = 0; i < 4; i++) ext.box(13.0, 0.45, -39.4 + i * 0.5, 0.04, 0.8, 0.5, { color: [0.3, 0.32, 0.35], uv: 0 }); col(12.8, -39.7, 13.2, -37.7, 1);
