@@ -105,6 +105,7 @@ export class LiveBriefing {
     if (near) {
       this.game.hud?.caption?.(w.name, line.text, Math.max(3, line.text.length * 0.06));
       this.game.speech.speak(line.text, { key: w.id || line.who, sex: w.sex, pitch: w.pitch, rate: w.rate, category: 'staff' });
+      this.game.world?.npcs?.say?.(w.id || line.who, line.text, w.rate || 1);
     }
     this.wait = Math.min(11, 1.2 + line.text.split(/\s+/).length * 0.36);
   }

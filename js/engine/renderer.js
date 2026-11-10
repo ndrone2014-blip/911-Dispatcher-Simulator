@@ -13,16 +13,36 @@ import { mat4, perspective, multiply, viewFromYawPitch, lookAt, ortho } from './
 
 export const MAX_LIGHTS = 12;
 
-const VS = `#version 300 es
+export const MAX_BONES = 28;
+// Vertex shader. With SKIN defined it is the character variant: each vertex follows up to two
+// bones (GPU skinning, one draw call per person) and carries its own surface response
+// (specular, shininess, reflectivity, skin light-wrap) so skin, cloth, leather and metal badges
+// can share a single draw.
+const vs = (defs = '') => `#version 300 es
 precision highp float;
+${defs}
 in vec3 aPos; in vec3 aNormal; in vec2 aUV; in vec3 aColor;
 uniform mat4 uModel; uniform mat4 uViewProj;
 out vec3 vWorld; out vec3 vNormal; out vec2 vUV; out vec3 vColor;
+#ifdef SKIN
+in vec4 aBones; in vec4 aSurf;
+uniform mat4 uBones[${MAX_BONES}];
+out vec4 vSurf;
+#endif
 void main() {
+#ifdef SKIN
+  float w0 = aBones.z / 255.0;
+  mat4 S = uBones[int(aBones.x)] * w0 + uBones[int(aBones.y)] * (1.0 - w0);
+  vec4 w = S * vec4(aPos, 1.0);
+  vNormal = mat3(S) * aNormal; vSurf = aSurf;
+#else
   vec4 w = uModel * vec4(aPos, 1.0);
-  vWorld = w.xyz; vNormal = mat3(uModel) * aNormal; vUV = aUV; vColor = aColor;
+  vNormal = mat3(uModel) * aNormal;
+#endif
+  vWorld = w.xyz; vUV = aUV; vColor = aColor;
   gl_Position = uViewProj * w;
 }`;
+const VS = vs();
 
 const fs = (defs) => `#version 300 es
 precision highp float;
@@ -30,6 +50,12 @@ precision highp sampler2DShadow;
 ${defs}
 #define MAXL ${MAX_LIGHTS}
 in vec3 vWorld; in vec3 vNormal; in vec2 vUV; in vec3 vColor;
+#ifdef SKIN
+in vec4 vSurf;
+#define WRAPD(x) max(((x) + wrapK) / (1.0 + wrapK), 0.0)
+#else
+#define WRAPD(x) max((x), 0.0)
+#endif
 uniform vec3 uColor; uniform sampler2D uMap; uniform int uHasMap;
 uniform vec3 uEmissive; uniform sampler2D uEmMap; uniform int uHasEm;
 uniform float uSpec; uniform float uShine; uniform float uOpacity; uniform int uUnlit; uniform float uRefl; uniform float uBump; uniform float uWet;
@@ -84,6 +110,10 @@ vec3 bumpNormal(vec3 N, float h) {
 #endif
 
 void main() {
+  float specK = uSpec, shineK = uShine, reflK = uRefl, wrapK = 0.0;
+#ifdef SKIN
+  specK = vSurf.x * 4.0; shineK = 2.0 + vSurf.y * 126.0; reflK = vSurf.z; wrapK = vSurf.w;
+#endif
   vec3 base = uColor * vColor;
   float alpha = uOpacity;
   float hgt = 0.5;
@@ -104,30 +134,30 @@ void main() {
     #endif
     float occl = mix(0.42, 1.0, sh);
     vec3 lit = mix(uGround, uSky, N.y * 0.5 + 0.5) * occl;
-    lit += uDirColor * max(dot(N, -uDirDir), 0.0);
+    lit += uDirColor * WRAPD(dot(N, -uDirDir));
     vec3 spec = vec3(0.0);
-    { vec3 Hs = normalize(-uDirDir + V); spec += uDirColor * pow(max(dot(N, Hs), 0.0), uShine) * uSpec * max(dot(N, -uDirDir), 0.0) * ((uShine + 8.0) / 40.0); }
+    { vec3 Hs = normalize(-uDirDir + V); spec += uDirColor * pow(max(dot(N, Hs), 0.0), shineK) * specK * max(dot(N, -uDirDir), 0.0) * ((shineK + 8.0) / 40.0); }
     float pointOcc = mix(0.3, 1.0, sh);
     for (int i = 0; i < MAXL; i++) {
       if (i >= uNumPoints) break;
       vec3 L = uPointPos[i] - vWorld; float d = length(L); L /= max(d, 0.0001);
       float att = clamp(1.0 - d / uPointRange[i], 0.0, 1.0); att *= att;
-      float nl = max(dot(N, L), 0.0);
+      float nl = WRAPD(dot(N, L));
       lit += uPointColor[i] * nl * att * pointOcc;
       vec3 H = normalize(L + V);
       float fres = 0.75 + 0.25 * pow(1.0 - max(dot(H, V), 0.0), 5.0);
-      spec += uPointColor[i] * pow(max(dot(N, H), 0.0), uShine) * att * uSpec * pointOcc * nl * ((uShine + 8.0) / 26.0) * fres;
+      spec += uPointColor[i] * pow(max(dot(N, H), 0.0), shineK) * att * specK * pointOcc * max(dot(N, L), 0.0) * ((shineK + 8.0) / 26.0) * fres;
     }
     lit += vec3(uFlash);
     col = base * lit + spec;
     #ifdef ENVMAP
-      if (uRefl > 0.0) {
+      if (reflK > 0.0) {
         vec3 R = reflect(-V, N);
         vec2 euv = vec2(atan(R.z, R.x) * 0.15915 + 0.5, acos(clamp(R.y, -1.0, 1.0)) * 0.31831);
-        float rough = clamp(1.0 - log2(max(uShine, 2.0)) / 7.0, 0.0, 1.0);
+        float rough = clamp(1.0 - log2(max(shineK, 2.0)) / 7.0, 0.0, 1.0);
         vec3 env = toLinear(textureLod(uEnv, euv, rough * 6.0).rgb);
-        float f = uRefl + (1.0 - uRefl) * pow(1.0 - max(dot(N, V), 0.0), 5.0) * (1.0 - rough * 0.85);
-        col = mix(col, env * uEnvStrength * occl, clamp(f * uRefl * 2.0, 0.0, 0.9));
+        float f = reflK + (1.0 - reflK) * pow(1.0 - max(dot(N, V), 0.0), 5.0) * (1.0 - rough * 0.85);
+        col = mix(col, env * uEnvStrength * occl, clamp(f * reflK * 2.0, 0.0, 0.9));
         alpha = max(alpha, f * 0.6);
       }
     #endif
@@ -145,6 +175,9 @@ void main() {
 const DEPTH_VS = `#version 300 es
 in vec3 aPos; uniform mat4 uModel; uniform mat4 uViewProj;
 void main() { gl_Position = uViewProj * uModel * vec4(aPos, 1.0); }`;
+const DEPTH_SKIN_VS = `#version 300 es
+in vec3 aPos; in vec4 aBones; uniform mat4 uBones[${MAX_BONES}]; uniform mat4 uViewProj;
+void main() { float w0 = aBones.z / 255.0; mat4 S = uBones[int(aBones.x)] * w0 + uBones[int(aBones.y)] * (1.0 - w0); gl_Position = uViewProj * S * vec4(aPos, 1.0); }`;
 const DEPTH_FS = `#version 300 es
 precision mediump float; out vec4 o; void main() { o = vec4(1.0); }`;
 
@@ -246,19 +279,20 @@ export class Renderer {
     const a = this.compile(gl.VERTEX_SHADER, vs), b = this.compile(gl.FRAGMENT_SHADER, fsrc);
     gl.attachShader(p, a); gl.attachShader(p, b);
     gl.bindAttribLocation(p, 0, 'aPos'); gl.bindAttribLocation(p, 1, 'aNormal'); gl.bindAttribLocation(p, 2, 'aUV'); gl.bindAttribLocation(p, 3, 'aColor');
+    gl.bindAttribLocation(p, 4, 'aBones'); gl.bindAttribLocation(p, 5, 'aSurf');
     gl.linkProgram(p); gl.deleteShader(a); gl.deleteShader(b);
     if (!gl.getProgramParameter(p, gl.LINK_STATUS) && !gl.isContextLost()) throw new Error(gl.getProgramInfoLog(p));
     const loc = {}; for (const n of uniforms) loc[n] = gl.getUniformLocation(p, n);
     return { p, loc };
   }
 
-  sceneProgram(q) {
-    const key = `${q.shadows ? `s${q.shadowTaps}` : 'n'}${q.envmap ? 'e' : ''}${q.bump ? 'b' : ''}`;
+  sceneProgram(q, skin = false) {
+    const key = `${q.shadows ? `s${q.shadowTaps}` : 'n'}${q.envmap ? 'e' : ''}${q.bump ? 'b' : ''}${skin ? 'K' : ''}`;
     if (this.programs[key]) return this.programs[key];
-    const defs = [q.shadows ? `#define SHADOWS\n#define SHADOW_TAPS ${q.shadowTaps}` : '', q.envmap ? '#define ENVMAP' : '', q.bump ? '#define BUMP' : ''].join('\n');
+    const defs = [q.shadows ? `#define SHADOWS\n#define SHADOW_TAPS ${q.shadowTaps}` : '', q.envmap ? '#define ENVMAP' : '', q.bump ? '#define BUMP' : '', skin ? '#define SKIN' : ''].join('\n');
     const names = ['uModel', 'uViewProj', 'uColor', 'uMap', 'uHasMap', 'uEmissive', 'uEmMap', 'uHasEm', 'uSpec', 'uShine', 'uOpacity', 'uUnlit', 'uRefl', 'uBump', 'uWet', 'uSky', 'uGround', 'uDirDir', 'uDirColor',
-      'uNumPoints', 'uPointPos', 'uPointColor', 'uPointRange', 'uCamPos', 'uFogColor', 'uFog', 'uExposure', 'uFlash', 'uFogMode', 'uOutFogColor', 'uOutFog', 'uShadow', 'uLightVP', 'uShadowTexel', 'uRecv', 'uEnv', 'uEnvStrength'];
-    const prog = this.link(VS, fs(defs), names);
+      'uNumPoints', 'uPointPos', 'uPointColor', 'uPointRange', 'uCamPos', 'uFogColor', 'uFog', 'uExposure', 'uFlash', 'uFogMode', 'uOutFogColor', 'uOutFog', 'uShadow', 'uLightVP', 'uShadowTexel', 'uRecv', 'uEnv', 'uEnvStrength', 'uBones'];
+    const prog = this.link(skin ? vs('#define SKIN') : VS, fs(defs), names);
     const gl = this.gl; gl.useProgram(prog.p);
     gl.uniform1i(prog.loc.uMap, 0); gl.uniform1i(prog.loc.uEmMap, 1);
     if (prog.loc.uShadow) gl.uniform1i(prog.loc.uShadow, 2);
@@ -274,6 +308,9 @@ export class Renderer {
     q.msaa = Math.min(q.msaa, this.maxSamples);
     try { this.prog = this.sceneProgram(q); }
     catch (e) { console.warn('Shader tier failed, falling back:', e.message); Object.assign(q, { shadows: 0, envmap: false, bump: false }); this.prog = this.sceneProgram(q); }
+    // characters (GPU skinned). If this device can't compile it, people fall back to the simple rigid bodies.
+    try { this.skinProg = this.sceneProgram(q, true); if (!this.depthSkinProg) this.depthSkinProg = this.link(DEPTH_SKIN_VS, DEPTH_FS, ['uBones', 'uViewProj']); }
+    catch (e) { console.warn('Character shader unavailable:', e.message); this.skinProg = null; }
     this.q = q; this.qualityName = name;
     this.disposeTargets();
     if (this.shadow && this.shadow.size !== q.shadows) this.disposeShadow();
@@ -333,6 +370,27 @@ export class Renderer {
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
     gl.bindVertexArray(null);
     return { vao, bufs, count: idx.length, type: big ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT };
+  }
+
+  /**
+   * Interleaved, compact mesh for a skinned character (36 bytes per vertex):
+   * g.data = ArrayBuffer laid out as [pos f32x3 | normal i8x4 | uv u16x2 | color u16x4 | bones u8x4 | surf u8x4].
+   */
+  createSkinnedMesh(g) {
+    const gl = this.gl; const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+    const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, g.data, gl.STATIC_DRAW);
+    const S = 36;
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, S, 0);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.BYTE, true, S, 12);
+    gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 2, gl.UNSIGNED_SHORT, true, S, 16);
+    gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 3, gl.UNSIGNED_SHORT, true, S, 20);
+    gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 4, gl.UNSIGNED_BYTE, false, S, 28);
+    gl.enableVertexAttribArray(5); gl.vertexAttribPointer(5, 4, gl.UNSIGNED_BYTE, true, S, 32);
+    const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+    const big = g.vcount > 65535; const idx = g.indices.BYTES_PER_ELEMENT ? g.indices : big ? new Uint32Array(g.indices) : new Uint16Array(g.indices);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
+    gl.bindVertexArray(null);
+    return { vao, bufs: [vb, ib], count: idx.length, type: big ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, skinned: true, bytes: g.data.byteLength + idx.byteLength };
   }
 
   /** Replace the vertex colours of a mesh (same vertex count). */
@@ -451,10 +509,16 @@ export class Renderer {
     gl.clear(gl.DEPTH_BUFFER_BIT);
     const P = this.depthProg; gl.useProgram(P.p); gl.uniformMatrix4fv(P.loc.uViewProj, false, this.lightVP);
     gl.disable(gl.CULL_FACE); gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(2, 4);
+    const skinned = [];
     for (const it of items) {
       const m = it.mat; if (it.visible === false || m.noCast || m.unlit || m.opacity < 1 || m.transparent) continue;
+      if (it.skin) { skinned.push(it); continue; }
       gl.uniformMatrix4fv(P.loc.uModel, false, it.model || IDENTITY);
       gl.bindVertexArray(it.mesh.vao); gl.drawElements(gl.TRIANGLES, it.mesh.count, it.mesh.type, 0);
+    }
+    if (skinned.length && this.depthSkinProg) {
+      const D = this.depthSkinProg; gl.useProgram(D.p); gl.uniformMatrix4fv(D.loc.uViewProj, false, this.lightVP);
+      for (const it of skinned) { gl.uniformMatrix4fv(D.loc.uBones, false, it.skin); gl.bindVertexArray(it.mesh.vao); gl.drawElements(gl.TRIANGLES, it.mesh.count, it.mesh.type, 0); }
     }
     gl.disable(gl.POLYGON_OFFSET_FILL); gl.enable(gl.CULL_FACE);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -481,8 +545,35 @@ export class Renderer {
     gl.viewport(0, 0, W, H);
     gl.clearColor(env.fogColor[0] ** 0.5, env.fogColor[1] ** 0.5, env.fogColor[2] ** 0.5, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    const P = this.prog; const L = P.loc; gl.useProgram(P.p);
     this.setCamera(cam, W / H);
+    // nearest point lights to the camera
+    const pts = scene.points.map((p) => ({ p, d: (p.pos[0] - cam.pos[0]) ** 2 + (p.pos[1] - cam.pos[1]) ** 2 + (p.pos[2] - cam.pos[2]) ** 2 - p.range * p.range * 0.3 }))
+      .sort((a, b) => a.d - b.d).slice(0, Math.min(this.maxLights, MAX_LIGHTS)).map((x) => x.p);
+    const pp = new Float32Array(MAX_LIGHTS * 3), pc = new Float32Array(MAX_LIGHTS * 3), pr = new Float32Array(MAX_LIGHTS);
+    pts.forEach((p, i) => { pp.set(p.pos, i * 3); pc.set(p.color, i * 3); pr[i] = p.range; });
+    const frame = { env, cam, n: pts.length, pp, pc, pr };
+    const P = this.prog; gl.useProgram(P.p); this.frameUniforms(P, frame);
+    this.stats.draws = 0; this.stats.tris = 0;
+    const opaque = [], transparent = [], skinned = [];
+    for (const it of scene.items) { if (it.visible === false || !it.mesh?.count) continue; (it.skin ? skinned : it.mat.opacity < 1 || it.mat.transparent ? transparent : opaque).push(it); }
+    transparent.sort((a, b) => (a.order || 0) - (b.order || 0));
+    gl.disable(gl.BLEND); gl.depthMask(true);
+    for (const it of opaque) this.drawItem(it);
+    if (skinned.length && this.skinProg) {
+      const K = this.skinProg; gl.useProgram(K.p); this.frameUniforms(K, frame);
+      for (const it of skinned) { gl.uniformMatrix4fv(K.loc.uBones, false, it.skin); this.drawItem(it, K.loc); }
+      gl.useProgram(P.p);
+    }
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+    for (const it of transparent) this.drawItem(it);
+    gl.depthMask(true); gl.disable(gl.BLEND);
+    if (tg) this.postProcess(tg, W, H);
+    gl.bindVertexArray(null);
+  }
+
+  /** Per-frame uniforms shared by the scene and character programs. */
+  frameUniforms(P, f) {
+    const gl = this.gl; const L = P.loc; const { env, cam } = f;
     gl.uniformMatrix4fv(L.uViewProj, false, this.viewProj);
     gl.uniform3fv(L.uCamPos, cam.pos); gl.uniform3fv(L.uSky, env.sky); gl.uniform3fv(L.uGround, env.ground);
     gl.uniform3fv(L.uDirDir, env.dirDir); gl.uniform3fv(L.uDirColor, env.dirColor); gl.uniform3fv(L.uFogColor, env.fogColor);
@@ -494,23 +585,7 @@ export class Renderer {
     }
     if (L.uEnv) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, (this.envTex || this.white).tex); gl.uniform1f(L.uEnvStrength, this.envTex ? this.envStrength : 0); }
     this.hasShadow = !!(L.uShadow && this.shadow);
-    // nearest point lights to the camera
-    const pts = scene.points.map((p) => ({ p, d: (p.pos[0] - cam.pos[0]) ** 2 + (p.pos[1] - cam.pos[1]) ** 2 + (p.pos[2] - cam.pos[2]) ** 2 - p.range * p.range * 0.3 }))
-      .sort((a, b) => a.d - b.d).slice(0, Math.min(this.maxLights, MAX_LIGHTS)).map((x) => x.p);
-    const pp = new Float32Array(MAX_LIGHTS * 3), pc = new Float32Array(MAX_LIGHTS * 3), pr = new Float32Array(MAX_LIGHTS);
-    pts.forEach((p, i) => { pp.set(p.pos, i * 3); pc.set(p.color, i * 3); pr[i] = p.range; });
-    gl.uniform1i(L.uNumPoints, pts.length); gl.uniform3fv(L.uPointPos, pp); gl.uniform3fv(L.uPointColor, pc); gl.uniform1fv(L.uPointRange, pr);
-    this.stats.draws = 0; this.stats.tris = 0;
-    const opaque = [], transparent = [];
-    for (const it of scene.items) { if (it.visible === false || !it.mesh?.count) continue; (it.mat.opacity < 1 || it.mat.transparent ? transparent : opaque).push(it); }
-    transparent.sort((a, b) => (a.order || 0) - (b.order || 0));
-    gl.disable(gl.BLEND); gl.depthMask(true);
-    for (const it of opaque) this.drawItem(it);
-    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
-    for (const it of transparent) this.drawItem(it);
-    gl.depthMask(true); gl.disable(gl.BLEND);
-    if (tg) this.postProcess(tg, W, H);
-    gl.bindVertexArray(null);
+    gl.uniform1i(L.uNumPoints, f.n); gl.uniform3fv(L.uPointPos, f.pp); gl.uniform3fv(L.uPointColor, f.pc); gl.uniform1fv(L.uPointRange, f.pr);
   }
 
   postProcess(t, W, H) {
@@ -542,8 +617,8 @@ export class Renderer {
     gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE);
   }
 
-  drawItem(it) {
-    const gl = this.gl; const L = this.prog.loc; const m = it.mat;
+  drawItem(it, L = this.prog.loc) {
+    const gl = this.gl; const m = it.mat;
     gl.uniformMatrix4fv(L.uModel, false, it.model || IDENTITY);
     gl.uniform3fv(L.uColor, m.color || ONE);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, (m.map || this.white).tex); gl.uniform1i(L.uHasMap, m.map ? 1 : 0);

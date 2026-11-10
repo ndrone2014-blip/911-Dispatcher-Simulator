@@ -11,6 +11,7 @@ import { Weather3D } from './weather3d.js';
 import { makeSignAtlas } from './exterior.js';
 import { ScreenPainter } from './screens.js';
 import { NPCManager } from './npcs.js';
+import { CharacterSystem } from './people/people.js';
 import { Player } from './player.js';
 import { bus } from '../core/events.js';
 import { thanksgivingOn } from '../core/season.js';
@@ -247,6 +248,12 @@ export class World {
     const prevTalk = this.npcs?.talkingTo;
     this.walk = center.walk; this.seats = center.seats;
     this.doors = new DynamicDoors(this, center.doors, this.doors);
+    // realistic characters (GPU skinned); kept across rebuilds while the GL context lives
+    if (this.renderer.skinProg) {
+      if (!this.people || this.people.renderer !== this.renderer) { this.people?.dispose(); this.people = new CharacterSystem(this); }
+      else this.people.configure(this.presetName);
+    } else { this.people?.dispose(); this.people = null; }
+    this.npcs?.dispose?.();
     this.npcs = new NPCManager(this, { count: this.preset.npcs, extraStaff: extra, nav: center.nav });
     this.npcs.talkingTo = prevTalk;
     this.points = center.lights.map((l) => ({ pos: l.pos, color: [1, 1, 1], range: l.range || (l.room === 'floor' ? 7.5 : 6.5), room: l.room, dim: l.dim || 1 }));
@@ -469,7 +476,7 @@ export class World {
     // the sky dome follows the camera (it sits behind everything else outdoors)
     if (outVisible) { this._envNow = this.env(); this.updateSky(); if (this.sky.item) items.push(this.sky.item); }
     const before = items.length;
-    this.npcs.draw(items, this.unit, (color, spec = 0.12) => ({ color, specular: spec, shininess: 20 }), { level: lv, out, up, pos: p, yaw: this.player.yaw });
+    this.npcs.draw(items, this.unit, (color, spec = 0.12) => ({ color, specular: spec, shininess: 20 }), { level: lv, out, up, pos: p, yaw: this.player.yaw, fov: this.game.settings.data.graphics.fov || 72, aspect: this.canvas.clientWidth / Math.max(1, this.canvas.clientHeight) });
     this.doors.draw(items);
     for (let i = before; i < items.length; i++) if (items[i].castShadow !== false) all.push(items[i]);
     // soft contact shadow under every visible person

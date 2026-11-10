@@ -21,7 +21,7 @@ export function openStaffChat(game, npc) {
     log.insertAdjacentHTML('beforeend', `<div class="bubble ${who === 'me' ? 'me' : 'them'}">${who === 'me' ? '' : `<span class="who">${esc(npc.name)}</span>`}${esc(text)}</div>`);
     log.scrollTop = log.scrollHeight;
   }
-  function speak(text) { game.speech.speak(text, { key: npc.id, sex: npc.sex, pitch: npc.pitch, rate: npc.rate, category: 'staff' }); }
+  function speak(text) { game.world?.npcs?.say?.(npc.id, text, npc.rate || 1); game.speech.speak(text, { key: npc.id, sex: npc.sex, pitch: npc.pitch, rate: npc.rate, category: 'staff' }); }
 
   async function send(text) {
     text = String(text || '').trim(); if (!text) return;

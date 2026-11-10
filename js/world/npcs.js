@@ -6,12 +6,15 @@
 // going out on patrol and coming back. Plans are made of small steps (walk to a node, sit,
 // stand facing something, open a door, talk) so behaviour is varied but believable.
 //
-// Drawing: articulated bodies with three levels of detail and distance/floor culling, so a
-// full building of ~35 people costs about as much as the old dozen.
+// Drawing: realistic GPU-skinned characters (see people/): unique sculpted faces, real
+// uniforms and police equipment, natural animation, expressions and lip sync, with three
+// levels of detail, view/floor culling and a capped mesh cache. Devices that can't run the
+// character shader fall back to the simple articulated bodies (drawNPC).
 import { trs, mat4 } from '../engine/math.js';
 import { STAFF } from '../ai/staffDialogue.js';
 import { buildNavGraph, findPath, consoleList } from './building.js';
 import { rng } from '../core/util.js';
+import { bus } from '../core/events.js';
 
 const SKIN = [[0.94, 0.78, 0.66], [0.82, 0.62, 0.46], [0.6, 0.42, 0.3], [0.42, 0.28, 0.2], [0.88, 0.7, 0.55], [0.72, 0.52, 0.38]];
 const HAIR = [[0.08, 0.06, 0.05], [0.25, 0.16, 0.09], [0.55, 0.42, 0.25], [0.7, 0.7, 0.68], [0.15, 0.1, 0.08], [0.42, 0.24, 0.12]];
@@ -55,6 +58,19 @@ export class NPCManager {
     this.visitorPool = STAFF.filter((s) => s.kind === 'visitor');
     this.allowVisitors = count !== 'low';
     this.nextVisitor = 20 + Math.random() * 40; this.nextCivilian = 25 + Math.random() * 40;
+    this.people = world.people || null; this.pendingDt = 0;
+    // lip sync: whenever the game speaks a line for someone in the building, their mouth moves with it
+    this.offSpeech = bus.on('speech:start', (item) => { const key = item?.opts?.key; const n = key && this.npc(key); if (n) this.say(key, item.text, item.opts.rate || 1); });
+  }
+
+  /** Detach from the event bus and free per-person data (the manager is rebuilt on preset changes). */
+  dispose() { this.offSpeech?.(); if (this.people) for (const n of this.npcs) this.people.release(n); }
+
+  /** Make an NPC's mouth (and gestures) follow a spoken line. */
+  say(id, text, rate = 1) {
+    const n = this.npc(id); if (!n || !this.people) return;
+    const st = n.look?.st; if (st?.speech && st.speech.text === String(text)) return; // already saying it
+    this.people.say(n, text, rate);
   }
 
   npc(id) { return this.npcs.find((n) => n.id === id); }
@@ -234,7 +250,7 @@ export class NPCManager {
 
   // ---------------------------------------------------------------- update
   update(dt, player) {
-    this.time += dt;
+    this.time += dt; this.pendingDt += dt;
     if (this.allowVisitors) {
       this.nextVisitor -= dt;
       const present = this.npcs.filter((n) => n.kind === 'visitor');
@@ -249,7 +265,8 @@ export class NPCManager {
         this.nextCivilian = 70 + Math.random() * 110;
         if (this.npcs.filter((n) => n.kind === 'civilian').length < 2) {
           const c = rng.pick(CIVILIANS); const id = `civ_${Math.floor(this.time)}`; const shirt = [[0.5, 0.3, 0.25], [0.2, 0.35, 0.3], [0.6, 0.55, 0.4], [0.3, 0.3, 0.45]][Math.floor(Math.random() * 4)];
-          const v = this.spawn({ id, name: c.name, role: 'Member of the public', sex: c.sex, kind: 'civilian', pitch: 1, rate: 1 }, 'p_lot1'); v.shirt = shirt;
+          const mood = rng.pick(['worried', 'worried', 'upset', 'confused', 'calm', 'calm', 'sad', 'frightened', 'pain']);
+          const v = this.spawn({ id, name: c.name, role: 'Member of the public', sex: c.sex, kind: 'civilian', pitch: 1, rate: 1, mood }, 'p_lot1'); v.shirt = shirt;
           this.plan(v, [{ go: 'p_lob_in' }, { go: 'p_lob_desk' }, { wait: 18 + Math.random() * 14, anim: 'talk' }, ...(Math.random() < 0.6 ? this.sitSomewhere(['p_wait0', 'p_wait1', 'p_wait2', 'p_wait3'], 30 + Math.random() * 40, 'idle') : [{ go: 'p_lob_kiosk' }, { wait: 20, anim: 'type' }]), { go: 'p_lob_out' }, { go: 'p_lot1' }, { fn: () => this.remove(v) }]);
         }
       }
@@ -260,7 +277,7 @@ export class NPCManager {
     if (this.captionCd <= 0) { this.captionCd = 3.5; this.overhear(player); }
   }
 
-  remove(npc) { const i = this.npcs.indexOf(npc); if (i >= 0) this.npcs.splice(i, 1); this.reserve(null, npc); }
+  remove(npc) { const i = this.npcs.indexOf(npc); if (i >= 0) this.npcs.splice(i, 1); this.reserve(null, npc); this.people?.release(npc); }
 
   updateNPC(npc, dt, player) {
     npc.phase += dt;
@@ -335,7 +352,9 @@ export class NPCManager {
     const chatter = this.npcs.filter((n) => n.chatWith && !n.away && Math.abs((n.y || 0) - feet) < 1.6 && Math.hypot(n.x - p[0], n.z - p[2]) < 6.5);
     if (!chatter.length) return;
     const n = rng.pick(chatter); const pool = CHAT[n.kind === 'sergeant' ? 'officer' : n.kind === 'pdcommand' ? 'command' : n.kind] || CHAT._;
-    hud.caption(n.name, rng.pick(Math.random() < 0.3 ? CHAT._ : pool));
+    const line = rng.pick(Math.random() < 0.3 ? CHAT._ : pool);
+    hud.caption(n.name, line); this.say(n.id, line);
+    if (/^Ha|exactly/.test(line)) { const o = this.npc(n.chatWith); if (o) o.laugh = true; n.laugh = true; }
   }
 
   /** Department events pull people together. */
@@ -386,6 +405,10 @@ export class NPCManager {
   draw(items, meshes, makeMat, view = {}) {
     const p = view.pos || this.world.player.pos; const yaw = view.yaw ?? 0; const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
     const feet = this.world.player.feet; const out = view.out;
+    // horizontal view cone (people outside it are neither animated nor drawn)
+    const fov = ((view.fov || 72) * Math.PI) / 180; const halfH = Math.atan(Math.tan(fov / 2) * (view.aspect || 1.6)) + 0.12;
+    const P = this.people; const dt = Math.min(0.1, this.pendingDt); this.pendingDt = 0;
+    if (P) { P.beginFrame(); this._busy = !!this.world.game.sim?.calls?.active?.(); }
     for (const n of this.npcs) {
       n.drawn = false;
       if (n.away) continue;
@@ -396,10 +419,20 @@ export class NPCManager {
       if (out && !nOut && d > 16) continue;   // people inside are only glimpsed through nearby windows
       if (!out && nOut && d > 24) continue;
       if (d > (out ? 45 : 30)) continue;
-      if (d > 2 && (dx * fx + dz * fz) / d < -0.35) continue; // behind the camera
+      if (d > 1.2) { const c = (dx * fx + dz * fz) / d; const ang = Math.acos(Math.max(-1, Math.min(1, c))); if (ang > halfH + Math.atan(0.7 / d)) continue; }
       n.drawn = true;
-      this.drawNPC(n, items, meshes, makeMat, d < 6.5 ? 2 : d < 14 ? 1 : 0);
+      if (P) { if (!P.draw(n, items, d, dt, this.lookCtx(n, p, d))) this.drawNPC(n, items, meshes, makeMat, 0); }
+      else this.drawNPC(n, items, meshes, makeMat, d < 6.5 ? 2 : d < 14 ? 1 : 0);
     }
+  }
+
+  /** Where a character looks: you (when you talk to them, or now and then when you're close), their conversation partner, else around. */
+  lookCtx(n, p, d) {
+    const ctx = this._ctx || (this._ctx = { target: null, busy: false, talkingToPlayer: false, tp: [0, 0, 0] }); ctx.busy = this._busy; ctx.target = null;
+    ctx.talkingToPlayer = this.talkingTo === n.id;
+    if (ctx.talkingToPlayer || (d < 3.4 && Math.sin(this.time * 0.37 + n.id.length * 1.7) > -0.35)) { ctx.tp[0] = p[0]; ctx.tp[1] = p[1]; ctx.tp[2] = p[2]; ctx.target = ctx.tp; }
+    else if (n.chatWith) { const o = this.npc(n.chatWith); if (o) { ctx.tp[0] = o.x; ctx.tp[1] = (o.y || 0) + (o.sitting ? 1.2 : 1.62); ctx.tp[2] = o.z; ctx.target = ctx.tp; } }
+    return ctx;
   }
 
   drawNPC(n, items, meshes, makeMat, lod) {
